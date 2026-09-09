@@ -1,0 +1,3 @@
+# Brochure is a fixed template filled by slot forms
+
+Every Academy brochure uses the same public template: the Owner supplies content slots (name, tagline, location, phone, images, YouTube, Batch blurbs, Coach profiles), not layout, fonts, or a per-Academy theme. Custom domains and white-label waits with ADR 0010. The Owner edits those slots as a form in `/app/…` with a preview of the public page — not an in-place or block builder — so “this is our website” cannot become a site builder in the first slice. Conversion at `/a/{academy-slug}/join` uses that same template with the Registration form and UPI QR in place of the marketing body. Product UI copy is English; Owner-supplied slot text is stored and shown as typed.
