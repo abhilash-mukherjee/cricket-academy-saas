@@ -1,0 +1,3 @@
+# Neon Free until latency or compute exhaustion is real
+
+Stay on Neon’s Free plan. Do not move to Launch (or Scale) until cold-start latency after scale-to-zero, or a Free monthly cap (CU-hours, 0.5 GB storage, 5 GB egress), is a real production problem. Free always suspends compute after five minutes idle — that extra few hundred milliseconds on the first query is accepted; cron keep-alives stay banned (ADR 0016). Hitting a cap suspends compute until the next billing month, which is an upgrade trigger, not something to paper over. This supersedes the paid-Neon / always-on half of ADR 0016 and the “PITR from day one” claim in ADR 0013.
