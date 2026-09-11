@@ -1,11 +1,11 @@
 import { deploymentTarget } from "@/lib/deployment-environment";
-import { probeBootstrapMarker } from "@/db/bootstrap";
+import { probeDatabase } from "@/db/bootstrap";
 
 export const dynamic = "force-dynamic";
 
-async function markerStatus(): Promise<string> {
+async function databaseStatus(): Promise<string> {
   try {
-    await probeBootstrapMarker();
+    await probeDatabase();
     return "reachable";
   } catch {
     return "unavailable";
@@ -14,7 +14,7 @@ async function markerStatus(): Promise<string> {
 
 export default async function Home() {
   const target = deploymentTarget(process.env);
-  const marker = await markerStatus();
+  const database = await databaseStatus();
 
   return (
     <main className="flex min-h-full flex-col items-center justify-center p-6">
@@ -25,7 +25,7 @@ export default async function Home() {
             Deployment target: <span className="font-mono">{target}</span>
           </p>
           <p>
-            Bootstrap marker: <span className="font-mono">{marker}</span>
+            Database: <span className="font-mono">{database}</span>
           </p>
         </div>
       </section>
