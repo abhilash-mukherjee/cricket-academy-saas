@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cricket Academy SaaS
 
-## Getting Started
+Software for cricket academies. Almost all features run in the context of one Academy.
 
-First, run the development server:
+## Local development
+
+Copy `.env.example` to `.env` and fill the Neon `dev` URLs from the Neon dashboard (pooled `DATABASE_URL` for the app, unpooled `DATABASE_URL_UNPOOLED` for migrate). Local work uses Neon `dev`, not a local Postgres.
 
 ```bash
+npm install
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The bootstrap page shows the deployment target (`local` on a laptop) and whether the bootstrap marker table is reachable.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Migrate from a laptop
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Do not run migrations in GitHub Actions or during a Vercel build. After a PR merges to a long-lived branch, migrate that branch's Neon database from your machine with the matching **unpooled** URL.
 
-## Learn More
+Install dependencies once (`npm install`). drizzle-kit reads `DATABASE_URL_UNPOOLED` from `.env`.
 
-To learn more about Next.js, take a look at the following resources:
+### After merge to `dev` (Neon `dev`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`.env` already points `DATABASE_URL_UNPOOLED` at Neon `dev`:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run db:migrate
+```
 
-## Deploy on Vercel
+### After merge to `staging` (Neon `staging`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+DATABASE_URL_UNPOOLED="$STAGING_DATABASE_URL_UNPOOLED" npm run db:migrate
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### After merge to `main` (Neon `production`)
+
+```bash
+DATABASE_URL_UNPOOLED="$PRODUCTION_DATABASE_URL_UNPOOLED" npm run db:migrate
+```
+
+Confirm the `schema_bootstrap` table exists on that Neon branch before treating the environment as current.
+
+## CI
+
+GitHub Actions runs typecheck, lint, and unit tests on pull requests. It does not deploy and does not use Neon credentials.
