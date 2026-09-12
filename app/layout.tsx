@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { robotsNoindex } from "@/lib/deployment-environment";
 import "./globals.css";
+import { APP_NAME } from "@/lib/constants";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 export function generateMetadata(): Metadata {
   const robots = robotsNoindex(process.env);
   return {
-    title: "Cricket Academy",
+    title: APP_NAME,
     ...(robots ? { robots } : {}),
   };
 }
