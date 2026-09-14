@@ -17,6 +17,7 @@ import {
 import {
   academies,
   batches,
+  batchFeeOptions,
   brochureImages,
   coachProfiles,
   youtubeEmbeds,
@@ -117,6 +118,9 @@ async function deleteOwnerByEmail(email: string) {
       await db
         .delete(coachProfiles)
         .where(eq(coachProfiles.academyId, academy.id));
+      await db
+        .delete(batchFeeOptions)
+        .where(eq(batchFeeOptions.academyId, academy.id));
       await db.delete(batches).where(eq(batches.academyId, academy.id));
       await db.delete(academies).where(eq(academies.id, academy.id));
     }
@@ -177,6 +181,173 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("+919123456789");
       expect(html).not.toContain("Blitz Cricket Academy");
       expect(html).not.toContain("Koramangala");
+    });
+
+    it("shows a location URL as a link and a place name as text", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+      const mapsUrl = "https://maps.google.com/?q=Indiranagar";
+
+      const mapsSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            location: mapsUrl,
+          }),
+        }),
+      );
+      expect(mapsSave.status).toBe(200);
+
+      const mapsHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(mapsHtml).toContain(`href="${mapsUrl}"`);
+      expect(mapsHtml).not.toContain("<iframe");
+
+      const textSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            location: "Koramangala",
+          }),
+        }),
+      );
+      expect(textSave.status).toBe(200);
+
+      const textHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(textHtml).toContain("Koramangala");
+      expect(textHtml).not.toContain("<iframe");
+    });
+
+    it("uses a Contact CTA that names the stored phone when intake is unavailable", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("Contact +919876543210");
+      expect(html).toContain("+919876543210");
+      expect(html).not.toContain("Register");
+      expect(html).not.toContain(`/a/${slug}/join`);
+    });
+
+    it("links Register to the conversion page when intake is available", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const db = getDb();
+      const [academy] = await db
+        .select({ id: academies.id })
+        .from(academies)
+        .where(eq(academies.slug, slug))
+        .limit(1);
+      expect(academy).toBeTruthy();
+
+      const [batch] = await db
+        .select({ id: batches.id })
+        .from(batches)
+        .where(eq(batches.academyId, academy!.id))
+        .limit(1);
+      expect(batch).toBeTruthy();
+
+      await db
+        .update(batches)
+        .set({ isOpenForRegistration: true })
+        .where(eq(batches.id, batch!.id));
+      await db.insert(batchFeeOptions).values({
+        academyId: academy!.id,
+        batchId: batch!.id,
+        termMonths: 3,
+        feePaise: 1500000,
+        sortOrder: 0,
+      });
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("Register");
+      expect(html).toContain(`/a/${slug}/join`);
+      expect(html).toContain("+919876543210");
+      expect(html).not.toContain("Contact +919876543210");
+    });
+
+    it("omits the CTA when intake is unavailable and phone is missing", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            phone: "",
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).not.toContain("Contact");
+      expect(html).not.toContain("Register");
+      expect(html).not.toContain(`/a/${slug}/join`);
+    });
+
+    it("includes the brochure CTA in the Owner preview", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      sessionCookie.value = cookie;
+      const { default: BrochureEditorPage } = await import(
+        "@/app/app/brochure/page"
+      );
+      const html = renderToStaticMarkup(await BrochureEditorPage());
+
+      expect(html).toContain("Contact +919876543210");
+      expect(html).toContain(
+        "A place name or a map link.",
+      );
     });
 
     it("shows edited Batch blurbs, YouTube, and Coach profiles on GET /a/{slug}", async () => {

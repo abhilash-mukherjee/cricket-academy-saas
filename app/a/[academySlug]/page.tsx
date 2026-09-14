@@ -33,7 +33,13 @@ export default async function AcademyBrochurePage({
   }
 
   return (
-    <div className="bg-base-100 min-h-dvh">
+    <div
+      className={
+        brochure.isIntakeAvailable || brochure.phone
+          ? "bg-base-100 min-h-dvh pb-20"
+          : "bg-base-100 min-h-dvh"
+      }
+    >
       <BrochureView brochure={brochure} />
       <footer className="text-base-content/60 p-6 text-center text-sm">
         Built with {APP_NAME}
