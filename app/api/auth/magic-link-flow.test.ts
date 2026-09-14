@@ -1,6 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import { NextRequest } from "next/server";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { GET, POST } from "./[...all]/route";
+import { proxy } from "@/proxy";
 import {
   clearCapturedMail,
   enableMailCapture,
@@ -10,6 +14,26 @@ import {
 } from "@/lib/mailer";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+
+const sessionCookie = vi.hoisted(() => ({ value: "" }));
+
+vi.mock("next/headers", () => ({
+  headers: async () => {
+    const headers = new Headers();
+    if (sessionCookie.value) {
+      headers.set("cookie", sessionCookie.value);
+    }
+    return headers;
+  },
+}));
+
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    connection: async () => undefined,
+  };
+});
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const hasAuthSecret = Boolean(process.env.BETTER_AUTH_SECRET);
@@ -21,17 +45,19 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
     beforeEach(() => {
       enableMailCapture();
+      sessionCookie.value = "";
     });
 
     afterEach(async () => {
       disableMailCapture();
       clearCapturedMail();
+      sessionCookie.value = "";
 
       const db = getDb();
       await db.delete(user).where(eq(user.email, testEmail));
     });
 
-    it("requests a link, captures mail, follows it, and returns a session", async () => {
+    it("requests a link, captures mail, follows it, and authenticates /app", async () => {
       const origin = "http://localhost:3000";
 
       const signInResponse = await POST(
@@ -82,6 +108,29 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(sessionResponse.status).toBe(200);
       const sessionBody = await sessionResponse.json();
       expect(sessionBody.user.email).toBe(testEmail);
+
+      const unauthenticatedApp = proxy(new NextRequest(`${origin}/app`));
+      expect(unauthenticatedApp.status).toBeGreaterThanOrEqual(300);
+      expect(unauthenticatedApp.status).toBeLessThan(400);
+      expect(unauthenticatedApp.headers.get("location")).toContain("/login");
+
+      const authenticatedApp = proxy(
+        new NextRequest(`${origin}/app`, {
+          headers: { cookie: setCookie! },
+        }),
+      );
+      expect(authenticatedApp.headers.get("location")).toBeNull();
+
+      sessionCookie.value = setCookie!;
+      const { default: AppLayout } = await import("@/app/app/layout");
+      const html = renderToStaticMarkup(
+        await AppLayout({
+          children: createElement("p", null, "signed in"),
+          params: Promise.resolve({}),
+        }),
+      );
+      expect(html).toContain(testEmail);
+      expect(html).toContain("signed in");
     });
   },
 );

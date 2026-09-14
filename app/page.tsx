@@ -1,4 +1,4 @@
-import { APP_DESCRIPTION, LANDING_PAGE_COPY } from "@/lib/constants";
+import { APP_DESCRIPTION, PRODUCT_HOMEPAGE_COPY } from "@/lib/constants";
 import Link from "next/link";
 import { MarketingShell } from "./marketing-shell";
 
@@ -11,7 +11,7 @@ export default function Home() {
             {APP_DESCRIPTION}
           </h1>
           <p className="text-lg text-base-100/85">
-            {LANDING_PAGE_COPY}
+            {PRODUCT_HOMEPAGE_COPY}
           </p>
         </div>
         <Link href="/login" className="btn btn-lg">

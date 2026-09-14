@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { GET as verifyAuth, POST as authPost } from "../auth/[...all]/route";
 import { POST as completeOnboarding } from "../onboarding/route";
@@ -14,6 +14,18 @@ import {
 import { academies, batches } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+
+const sessionCookie = vi.hoisted(() => ({ value: "" }));
+
+vi.mock("next/headers", () => ({
+  headers: async () => {
+    const headers = new Headers();
+    if (sessionCookie.value) {
+      headers.set("cookie", sessionCookie.value);
+    }
+    return headers;
+  },
+}));
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const hasAuthSecret = Boolean(process.env.BETTER_AUTH_SECRET);
@@ -59,11 +71,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
     beforeEach(() => {
       enableMailCapture();
+      sessionCookie.value = "";
     });
 
     afterEach(async () => {
       disableMailCapture();
       clearCapturedMail();
+      sessionCookie.value = "";
 
       const db = getDb();
       const [owner] = await db
@@ -120,6 +134,34 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Nets that make match-day simple");
       expect(html).toContain("Koramangala");
       expect(html).toContain("+919876543210");
+    });
+
+    it("starts the first Batch closed for Registration", async () => {
+      const cookie = await signInOwner(testEmail);
+      const onboardingResponse = await completeOnboarding(
+        new Request(`${origin}/api/onboarding`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            displayName: "Asha Rao",
+            academyName: "Blitz Cricket Academy",
+            slug,
+            batchName: "U-14 evening",
+          }),
+        }),
+      );
+      expect(onboardingResponse.status).toBe(200);
+
+      sessionCookie.value = cookie;
+      const { default: DashboardPage } = await import(
+        "@/app/app/dashboard/page"
+      );
+      const html = renderToStaticMarkup(await DashboardPage());
+      expect(html).toContain("U-14 evening is closed for Registration.");
     });
 
     it("does not let an Owner create a second Academy", async () => {

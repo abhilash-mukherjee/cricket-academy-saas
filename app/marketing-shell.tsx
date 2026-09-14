@@ -10,7 +10,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
   return (
     <main className="relative flex min-h-dvh flex-1 flex-col">
       <Image
-        src="/landing-hero.jpg"
+        src="/product-homepage-hero.jpg"
         alt=""
         fill
         priority
