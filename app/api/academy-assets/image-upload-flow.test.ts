@@ -265,10 +265,55 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain(gallery.url);
-      expect(html).toContain(coachPhoto.url);
+      expect(html).toContain(gallery.storageKey);
+      expect(html).toContain(coachPhoto.storageKey);
       expect(html).toContain("Ravi Kumar");
       expect(html).toContain("Head Coach");
+      expect(html).toContain("aspect-[4/3]");
+      expect(html).not.toContain("carousel");
+      expect(html).not.toContain("Previous");
+    });
+
+    it("shows DaisyUI carousel chrome when the gallery has two photos", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const first = await uploadImage(cookie, "brochure-gallery", pngFile("one.png"), 0);
+      const second = await uploadImage(
+        cookie,
+        "brochure-gallery",
+        pngFile("two.png"),
+        1,
+      );
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            imageStorageKeys: [first.storageKey, second.storageKey],
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain(first.storageKey);
+      expect(html).toContain(second.storageKey);
+      expect(html).toContain("carousel");
+      expect(html).toContain("Previous");
+      expect(html).toContain("Next");
     });
 
     it("shows uploaded UPI QR on GET /a/{slug}/join when intake is available", async () => {
@@ -324,7 +369,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain(upiQr.url);
+      expect(html).toContain(upiQr.storageKey);
       expect(html).toContain("Pay with UPI");
     });
   },

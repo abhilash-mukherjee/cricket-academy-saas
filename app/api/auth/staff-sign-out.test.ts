@@ -88,6 +88,7 @@ describe("public chrome has no Sign out", () => {
           tagline: "Play",
           location: "Bengaluru",
           phone: "9999999999",
+          isIntakeAvailable: false,
           images: [],
           youtubeVideoIds: [],
           batches: [],

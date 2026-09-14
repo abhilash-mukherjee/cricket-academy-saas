@@ -182,9 +182,10 @@ export function OnboardingWizard() {
           </p>
           <label className="form-control w-full">
             <span className="label-text mb-1">Tagline</span>
-            <input
-              className="input input-bordered w-full"
+            <textarea
+              className="textarea textarea-bordered w-full"
               name="tagline"
+              rows={3}
               value={values.tagline}
               onChange={(event) => update("tagline", event.target.value)}
             />

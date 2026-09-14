@@ -9,8 +9,8 @@ export const ACADEMY_NOT_FOUND = "Academy not found";
 export const SLUG_HELP =
   "Lowercase letters, numbers, and hyphens. This becomes your public URL and cannot change later.";
 export const MAGIC_LINK_EXPIRATION_TIME = 60 * 15;
-export const MAGIC_LINK_EMAIL_SUBJECT = "Sign in to Academy Pro";
-export const MAGIC_LINK_EMAIL_HTML = (url: string) => `<p><a href="${url}">Sign in to Academy Pro</a></p>`;
+export const MAGIC_LINK_EMAIL_SUBJECT = "Sign in to RestartHQ";
+export const MAGIC_LINK_EMAIL_HTML = (url: string) => `<p>Hello! Welocme to RestartHQ! Click on the link to sign in to your account: <a href="${url}">Sign in to RestartHQ</a></p>`;
 
 export const MAX_ACADEMY_IMAGE_BYTES = 2 * 1024 * 1024;
 export const ALLOWED_IMAGE_MIME_TYPES = [

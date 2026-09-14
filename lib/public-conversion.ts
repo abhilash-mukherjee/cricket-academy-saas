@@ -1,11 +1,8 @@
-import { eq, asc, and } from "drizzle-orm";
-import {
-  academies,
-  batches,
-  batchFeeOptions,
-} from "@/db/domain-schema";
+import { eq } from "drizzle-orm";
+import { academies } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
+import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
 
 export type PublicConversion = {
   name: string;
@@ -35,33 +32,10 @@ export async function getPublicConversion(
     return null;
   }
 
-  const openBatches = await db
-    .select({ id: batches.id })
-    .from(batches)
-    .where(
-      and(
-        eq(batches.academyId, academy.id),
-        eq(batches.isOpenForRegistration, true),
-      ),
-    );
-
-  let hasRegistrableBatch = false;
-  for (const batch of openBatches) {
-    const [feeOption] = await db
-      .select({ id: batchFeeOptions.id })
-      .from(batchFeeOptions)
-      .where(eq(batchFeeOptions.batchId, batch.id))
-      .orderBy(asc(batchFeeOptions.sortOrder))
-      .limit(1);
-
-    if (feeOption) {
-      hasRegistrableBatch = true;
-      break;
-    }
-  }
-
-  const isIntakeAvailable =
-    academy.isOnlineRegistrationAllowed && hasRegistrableBatch;
+  const isIntakeAvailable = await isAcademyIntakeAvailable({
+    academyId: academy.id,
+    isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
+  });
 
   return {
     name: academy.name,
