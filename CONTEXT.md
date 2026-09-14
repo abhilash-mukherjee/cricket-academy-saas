@@ -9,7 +9,7 @@ A cricket coaching business that is a tenant of the product. Almost all features
 _Avoid_: Tenant (in user-facing language), organisation, club
 
 **Brochure**:
-An Academy's public marketing page at `/a/{academy-slug}` on a fixed template, indexed by search engines. The Owner edits Academy name, tagline, location, phone, Batch blurbs for all Batches (names and short copy only — not selectable, regardless of whether the Batch is open for Registration), images, embedded YouTube links, and Coach profiles (name and image). When online Registration is on, the CTA links to the conversion page. When online Registration is off, the CTA shows the Academy phone; tapping it copies the number. Visitors do not submit a Registration here.
+An Academy's public marketing page at `/a/{academy-slug}` on a fixed template, indexed by search engines. The Owner edits Academy name, tagline, location, phone, Batch blurbs for all Batches (names and short copy only — not selectable, regardless of whether the Batch is open for Registration), uploaded images, embedded YouTube links, and Coach profiles (name and optional uploaded photo). When online Registration is on, the CTA links to the conversion page. When online Registration is off, the CTA shows the Academy phone; tapping it copies the number. Visitors do not submit a Registration here.
 _Avoid_: Landing page, website, homepage
 
 **Conversion page**:

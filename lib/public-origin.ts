@@ -19,6 +19,8 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
-export function publicStorageUrl(storageKey: string): string {
-  return storageKey;
+import { resolvePublicAssetUrl } from "@/lib/academy-assets";
+
+export function publicStorageUrl(storageKey: string): string | null {
+  return resolvePublicAssetUrl(storageKey);
 }

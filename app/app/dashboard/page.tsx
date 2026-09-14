@@ -54,6 +54,12 @@ export default async function DashboardPage() {
                 photos, YouTube, Batch blurbs, and Coach profiles.
               </li>
               <li>
+                <Link className="link" href="/app/conversion">
+                  Upload your conversion page UPI QR
+                </Link>{" "}
+                for visitors when intake is open.
+              </li>
+              <li>
                 Share your public {APP_NAME} links so visitors can find you.
               </li>
             </ul>

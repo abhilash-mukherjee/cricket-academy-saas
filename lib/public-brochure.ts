@@ -7,7 +7,8 @@ import {
   youtubeEmbeds,
 } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
-import { brochureUrl, publicStorageUrl } from "@/lib/public-origin";
+import { resolvePublicAssetUrl } from "@/lib/academy-assets";
+import { brochureUrl } from "@/lib/public-origin";
 
 export type PublicBrochure = {
   name: string;
@@ -80,14 +81,15 @@ export async function getPublicBrochure(
     tagline: academy.tagline,
     location: academy.location,
     phone: academy.phone,
-    images: images.map((image) => ({
-      url: publicStorageUrl(image.storageKey),
-    })),
+    images: images
+      .map((image) => resolvePublicAssetUrl(image.storageKey))
+      .filter((url): url is string => Boolean(url))
+      .map((url) => ({ url })),
     youtubeVideoIds: embeds.map((embed) => embed.videoId),
     batches: academyBatches,
     coaches: coaches.map((coach) => ({
       fullName: coach.fullName,
-      imageUrl: coach.storageKey ? publicStorageUrl(coach.storageKey) : null,
+      imageUrl: resolvePublicAssetUrl(coach.storageKey),
       blurb: coach.blurb,
     })),
   };

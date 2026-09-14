@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GET as verifyAuth, POST as authPost } from "../auth/[...all]/route";
 import { POST as completeOnboarding } from "../onboarding/route";
-import { POST as saveBrochure } from "./route";
-import AcademyBrochurePage, {
-  generateMetadata as generateBrochureMetadata,
-} from "@/app/a/[academySlug]/page";
+import { POST as uploadAsset } from "./upload/route";
+import { POST as saveBrochure } from "../brochure/route";
+import { POST as saveConversion } from "../conversion/route";
+import AcademyBrochurePage from "@/app/a/[academySlug]/page";
+import ConversionPage from "@/app/a/[academySlug]/join/page";
 import {
   clearCapturedMail,
   disableMailCapture,
@@ -17,6 +18,7 @@ import {
 import {
   academies,
   batches,
+  batchFeeOptions,
   brochureImages,
   coachProfiles,
   youtubeEmbeds,
@@ -25,6 +27,7 @@ import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
 
 const sessionCookie = vi.hoisted(() => ({ value: "" }));
+const blobStore = vi.hoisted(() => new Map<string, Buffer>());
 
 vi.mock("next/headers", () => ({
   headers: async () => {
@@ -36,9 +39,48 @@ vi.mock("next/headers", () => ({
   },
 }));
 
+vi.mock("@vercel/blob", () => ({
+  put: async (
+    pathname: string,
+    body: ArrayBuffer | Buffer | Blob,
+    _options: Record<string, unknown>,
+  ) => {
+    const bytes = new Uint8Array(
+      body instanceof Blob
+        ? await body.arrayBuffer()
+        : body instanceof Buffer
+          ? body
+          : body,
+    );
+    const buffer = Buffer.from(bytes);
+    blobStore.set(pathname, buffer);
+    return {
+      pathname,
+      url: `https://blob.test/${pathname}`,
+    };
+  },
+  del: async (pathnameOrUrl: string | string[]) => {
+    const targets = Array.isArray(pathnameOrUrl)
+      ? pathnameOrUrl
+      : [pathnameOrUrl];
+    for (const target of targets) {
+      const pathname = target.replace(/^https:\/\/blob\.test\//, "");
+      blobStore.delete(pathname);
+    }
+  },
+}));
+
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const hasAuthSecret = Boolean(process.env.BETTER_AUTH_SECRET);
 const origin = "http://localhost:3000";
+
+function pngFile(name = "photo.png"): File {
+  const bytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  return new File([bytes], name, { type: "image/png" });
+}
 
 async function signInOwner(email: string): Promise<string> {
   const signInResponse = await authPost(
@@ -95,6 +137,30 @@ async function onboardOwner(cookie: string, slug: string) {
   expect(response.status).toBe(200);
 }
 
+async function uploadImage(
+  cookie: string,
+  purpose: "brochure-gallery" | "coach-photo" | "upi-qr",
+  file: File,
+  draftGalleryCount?: number,
+) {
+  const form = new FormData();
+  form.set("purpose", purpose);
+  form.set("file", file);
+  if (purpose === "brochure-gallery" && draftGalleryCount !== undefined) {
+    form.set("draftGalleryCount", String(draftGalleryCount));
+  }
+
+  const response = await uploadAsset(
+    new Request(`${origin}/api/academy-assets/upload`, {
+      method: "POST",
+      headers: { origin, cookie },
+      body: form,
+    }),
+  );
+  expect(response.status).toBe(200);
+  return (await response.json()) as { storageKey: string; url: string };
+}
+
 async function deleteOwnerByEmail(email: string) {
   const db = getDb();
   const [owner] = await db
@@ -117,6 +183,9 @@ async function deleteOwnerByEmail(email: string) {
       await db
         .delete(coachProfiles)
         .where(eq(coachProfiles.academyId, academy.id));
+      await db
+        .delete(batchFeeOptions)
+        .where(eq(batchFeeOptions.academyId, academy.id));
       await db.delete(batches).where(eq(batches.academyId, academy.id));
       await db.delete(academies).where(eq(academies.id, academy.id));
     }
@@ -125,61 +194,26 @@ async function deleteOwnerByEmail(email: string) {
 }
 
 describe.skipIf(!hasDatabase || !hasAuthSecret)(
-  "brochure editor at the App Router seam",
+  "Academy image upload at the App Router seam",
   () => {
-    const testEmail = `brochure-owner-${Date.now()}@example.com`;
-    const slug = `brochure-${Date.now()}`;
+    const testEmail = `image-owner-${Date.now()}@example.com`;
+    const slug = `image-upload-${Date.now()}`;
 
     beforeEach(() => {
       enableMailCapture();
       sessionCookie.value = "";
+      blobStore.clear();
     });
 
     afterEach(async () => {
       disableMailCapture();
       clearCapturedMail();
       sessionCookie.value = "";
+      blobStore.clear();
       await deleteOwnerByEmail(testEmail);
     });
 
-    it("shows edited Academy fields on GET /a/{slug}", async () => {
-      const cookie = await signInOwner(testEmail);
-      await onboardOwner(cookie, slug);
-
-      const saveResponse = await saveBrochure(
-        new Request(`${origin}/api/brochure`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            origin,
-            cookie,
-          },
-          body: JSON.stringify({
-            name: "Blitz Nets Academy",
-            tagline: "Evening nets in the city",
-            location: "Indiranagar",
-            phone: "+919123456789",
-          }),
-        }),
-      );
-      expect(saveResponse.status).toBe(200);
-
-      const html = renderToStaticMarkup(
-        await AcademyBrochurePage({
-          params: Promise.resolve({ academySlug: slug }),
-          searchParams: Promise.resolve({}),
-        }),
-      );
-
-      expect(html).toContain("Blitz Nets Academy");
-      expect(html).toContain("Evening nets in the city");
-      expect(html).toContain("Indiranagar");
-      expect(html).toContain("+919123456789");
-      expect(html).not.toContain("Blitz Cricket Academy");
-      expect(html).not.toContain("Koramangala");
-    });
-
-    it("shows edited Batch blurbs, YouTube, and Coach profiles on GET /a/{slug}", async () => {
+    it("shows uploaded brochure and Coach images on GET /a/{slug}", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);
 
@@ -190,6 +224,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const editorHtml = renderToStaticMarkup(await BrochureEditorPage());
       const batchId = editorHtml.match(/data-batch-id="([^"]+)"/)?.[1];
       expect(batchId).toBeTruthy();
+
+      const gallery = await uploadImage(cookie, "brochure-gallery", pngFile(), 0);
+      const coachPhoto = await uploadImage(cookie, "coach-photo", pngFile());
 
       const saveResponse = await saveBrochure(
         new Request(`${origin}/api/brochure`, {
@@ -204,6 +241,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
             tagline: "Nets that make match-day simple",
             location: "Koramangala",
             phone: "+919876543210",
+            imageStorageKeys: [gallery.storageKey],
             youtubeUrls: ["https://www.youtube.com/watch?v=jNQXAC9IVRw"],
             batchBlurbs: [
               { id: batchId, blurb: "U-14 evening batting and bowling" },
@@ -211,6 +249,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
             coaches: [
               {
                 fullName: "Ravi Kumar",
+                imageStorageKey: coachPhoto.storageKey,
                 blurb: "Head Coach",
               },
             ],
@@ -226,72 +265,67 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain("U-14 evening");
-      expect(html).toContain("U-14 evening batting and bowling");
-      expect(html).toContain("https://www.youtube.com/embed/jNQXAC9IVRw");
+      expect(html).toContain(gallery.url);
+      expect(html).toContain(coachPhoto.url);
       expect(html).toContain("Ravi Kumar");
       expect(html).toContain("Head Coach");
     });
 
-    it("uses Academy name, tagline, and brochure URL as indexable metadata", async () => {
+    it("shows uploaded UPI QR on GET /a/{slug}/join when intake is available", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);
 
-      const metadata = await generateBrochureMetadata({
-        params: Promise.resolve({ academySlug: slug }),
-        searchParams: Promise.resolve({}),
-      });
+      const upiQr = await uploadImage(cookie, "upi-qr", pngFile("upi.png"));
 
-      expect(metadata.title).toBe("Blitz Cricket Academy");
-      expect(metadata.description).toBe("Nets that make match-day simple");
-      expect(metadata.alternates?.canonical).toBe(`${origin}/a/${slug}`);
-    });
-
-    it("lists only active Academy brochure URLs in the sitemap", async () => {
-      const cookie = await signInOwner(testEmail);
-      await onboardOwner(cookie, slug);
-
-      const sitemap = (await import("@/app/sitemap")).default;
-      const entries = await sitemap();
-      const urls = entries.map((entry) => entry.url);
-
-      expect(urls).toContain(`${origin}/a/${slug}`);
+      const saveResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ upiQrStorageKey: upiQr.storageKey }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
 
       const db = getDb();
+      const [academy] = await db
+        .select({ id: academies.id })
+        .from(academies)
+        .where(eq(academies.slug, slug))
+        .limit(1);
+      expect(academy).toBeTruthy();
+
+      const [batch] = await db
+        .select({ id: batches.id })
+        .from(batches)
+        .where(eq(batches.academyId, academy!.id))
+        .limit(1);
+      expect(batch).toBeTruthy();
+
       await db
-        .update(academies)
-        .set({ isActive: false })
-        .where(eq(academies.slug, slug));
-
-      const afterDeactivate = await sitemap();
-      expect(afterDeactivate.map((entry) => entry.url)).not.toContain(
-        `${origin}/a/${slug}`,
-      );
-    });
-
-    it("allows /a/ and disallows /app/ so /app/dashboard is not indexed", async () => {
-      const robots = (await import("@/app/robots")).default;
-      const result = robots();
-      const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-      const star = rules.find((rule) => rule.userAgent === "*") ?? rules[0];
-
-      expect(star.allow).toEqual("/a/");
-      expect(star.disallow).toEqual("/app/");
-    });
-
-    it("marks the conversion page noindex", async () => {
-      const cookie = await signInOwner(testEmail);
-      await onboardOwner(cookie, slug);
-
-      const { generateMetadata: generateJoinMetadata } = await import(
-        "@/app/a/[academySlug]/join/page"
-      );
-      const metadata = await generateJoinMetadata({
-        params: Promise.resolve({ academySlug: slug }),
-        searchParams: Promise.resolve({}),
+        .update(batches)
+        .set({ isOpenForRegistration: true })
+        .where(eq(batches.id, batch!.id));
+      await db.insert(batchFeeOptions).values({
+        academyId: academy!.id,
+        batchId: batch!.id,
+        termMonths: 3,
+        feePaise: 1500000,
+        sortOrder: 0,
       });
 
-      expect(metadata.robots).toEqual({ index: false, follow: false });
+      const html = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain(upiQr.url);
+      expect(html).toContain("Pay with UPI");
     });
   },
 );

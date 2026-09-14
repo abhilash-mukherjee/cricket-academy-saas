@@ -11,3 +11,11 @@ export const SLUG_HELP =
 export const MAGIC_LINK_EXPIRATION_TIME = 60 * 15;
 export const MAGIC_LINK_EMAIL_SUBJECT = "Sign in to Academy Pro";
 export const MAGIC_LINK_EMAIL_HTML = (url: string) => `<p><a href="${url}">Sign in to Academy Pro</a></p>`;
+
+export const MAX_ACADEMY_IMAGE_BYTES = 2 * 1024 * 1024;
+export const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+export const MAX_BROCHURE_GALLERY_IMAGES = 6;
