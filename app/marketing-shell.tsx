@@ -21,8 +21,15 @@ export function MarketingShell({ children }: MarketingShellProps) {
 
       <div className="navbar relative z-10 bg-transparent px-4 text-base-100">
         <div className="flex-1">
-          <Link href="/" className="text-xl font-semibold">
-            {APP_NAME}
+          <Link href="/" className="inline-flex items-center">
+            <Image
+              src="/logo-white.svg"
+              alt={APP_NAME}
+              width={897}
+              height={145}
+              className="h-6 w-auto"
+              priority
+            />
           </Link>
         </div>
         <div className="flex-none">

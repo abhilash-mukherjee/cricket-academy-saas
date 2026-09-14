@@ -1,4 +1,4 @@
-export const APP_NAME = "Academy Pro";
+export const APP_NAME = "RestartHQ";
 export const APP_DESCRIPTION = "Run your cricket Academy from one place!";
 export const PRODUCT_HOMEPAGE_COPY = `Publish a brochure, collect Registrations, and manage your roster.
             Built for Academy Owners and Coaches — not for Players or Guardians

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireStaffSession } from "@/lib/staff-session";
@@ -15,8 +16,15 @@ export default async function AppLayout({
     <div className="bg-base-100 flex min-h-full flex-col">
       <header className="navbar border-base-300 border-b px-4">
         <div className="flex-1">
-          <Link href="/app" className="text-lg font-semibold">
-            {APP_NAME}
+          <Link href="/app" className="inline-flex items-center">
+            <Image
+              src="/logo-black.svg"
+              alt={APP_NAME}
+              width={897}
+              height={145}
+              className="h-6 w-auto"
+              priority
+            />
           </Link>
         </div>
         <p className="text-base-content/70 flex-none text-sm">
