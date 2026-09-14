@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 const SIGN_OUT_ERROR = "Could not sign out. Try again.";
 
 export function SignOutButton() {
-  const router = useRouter();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -23,7 +21,8 @@ export function SignOutButton() {
         return;
       }
 
-      router.replace("/login");
+      // Full navigation after client sign-out; avoids useRouter (breaks SSR tests).
+      window.location.assign("/login"); // eslint-disable-line @next/next/no-location-assign-relative-destination
     } catch {
       setErrorMessage(SIGN_OUT_ERROR);
       setPending(false);

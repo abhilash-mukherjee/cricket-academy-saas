@@ -4,14 +4,8 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
-
-function publicOrigin(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.BETTER_AUTH_URL ??
-    "http://localhost:3000"
-  ).replace(/\/$/, "");
-}
+import { publicOrigin } from "@/lib/public-origin";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const session = await requireStaffSession();
@@ -53,7 +47,12 @@ export default async function DashboardPage() {
                     : `${firstBatch.name} is closed for Registration. Open it when you are ready.`
                   : "Add a Batch when you are ready for intake."}
               </li>
-              <li>Add brochure photos and Batch blurbs when you have them.</li>
+              <li>
+                <Link className="link" href="/app/brochure">
+                  Edit your brochure
+                </Link>{" "}
+                photos, YouTube, Batch blurbs, and Coach profiles.
+              </li>
               <li>
                 Share your public {APP_NAME} links so visitors can find you.
               </li>
