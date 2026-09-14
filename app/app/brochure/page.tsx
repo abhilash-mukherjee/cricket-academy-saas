@@ -22,7 +22,7 @@ export default async function BrochureEditorPage() {
 
   return (
     <main className="flex min-h-full flex-col p-6">
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">Brochure</h1>

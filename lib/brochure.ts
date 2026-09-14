@@ -16,6 +16,7 @@ import {
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
 import { normalizeOptionalPhone } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
+import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
 
 export type BrochureCoachInput = {
   fullName: string;
@@ -70,6 +71,7 @@ export type BrochureEditorState = {
   tagline: string | null;
   location: string | null;
   phone: string | null;
+  isIntakeAvailable: boolean;
   images: BrochureEditorImage[];
   youtubeUrls: string[];
   batches: BrochureEditorBatch[];
@@ -126,6 +128,7 @@ export async function getBrochureEditor(
       tagline: academies.tagline,
       location: academies.location,
       phone: academies.phone,
+      isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
     })
     .from(academies)
     .where(eq(academies.id, academyId))
@@ -135,7 +138,8 @@ export async function getBrochureEditor(
     return null;
   }
 
-  const [academyBatches, images, embeds, coaches] = await Promise.all([
+  const [academyBatches, images, embeds, coaches, isIntakeAvailable] =
+    await Promise.all([
     db
       .select({
         id: batches.id,
@@ -164,6 +168,10 @@ export async function getBrochureEditor(
       .from(coachProfiles)
       .where(eq(coachProfiles.academyId, academyId))
       .orderBy(asc(coachProfiles.sortOrder)),
+    isAcademyIntakeAvailable({
+      academyId,
+      isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
+    }),
   ]);
 
   return {
@@ -172,6 +180,7 @@ export async function getBrochureEditor(
     tagline: academy.tagline,
     location: academy.location,
     phone: academy.phone,
+    isIntakeAvailable,
     images: images
       .map((image) => normalizeStoredKey(image.storageKey))
       .filter((storageKey): storageKey is string => Boolean(storageKey))

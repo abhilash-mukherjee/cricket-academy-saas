@@ -107,6 +107,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       tagline: tagline.trim() || null,
       location: location.trim() || null,
       phone: phone.trim() || null,
+      isIntakeAvailable: brochure.isIntakeAvailable,
       images: images
         .map((image) => image.url)
         .filter((url): url is string => Boolean(url))
@@ -138,6 +139,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       brochure.name,
       brochure.slug,
       brochure.batches,
+      brochure.isIntakeAvailable,
     ],
   );
 
@@ -225,6 +227,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex max-w-lg flex-col gap-6">
       <label className="form-control w-full">
         <span className="label-text mb-1">Academy name</span>
         <input
@@ -236,15 +239,19 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       </label>
       <label className="form-control w-full">
         <span className="label-text mb-1">Tagline</span>
-        <input
-          className="input input-bordered w-full"
+        <textarea
+          className="textarea textarea-bordered w-full"
           name="tagline"
+          rows={8}
           value={tagline}
           onChange={(event) => setTagline(event.target.value)}
         />
       </label>
       <label className="form-control w-full">
         <span className="label-text mb-1">Location</span>
+        <p className="text-base-content/70 mb-1 text-sm">
+          A place name or a map link.
+        </p>
         <input
           className="input input-bordered w-full"
           name="location"
@@ -458,10 +465,11 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       >
         {submitting ? "Saving…" : "Save brochure"}
       </button>
+      </div>
 
-      <section className="border-base-300 rounded-box border p-2">
+      <section className="border-base-300 relative overflow-hidden rounded-box border p-2">
         <h2 className="px-4 pt-4 text-lg font-semibold">Preview</h2>
-        <BrochureView brochure={preview} />
+        <BrochureView brochure={preview} ctaPlacement="frame" />
       </section>
     </div>
   );
