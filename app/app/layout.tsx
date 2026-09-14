@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { requireStaffSession } from "@/lib/staff-session";
 import { APP_NAME } from "@/lib/constants";
+import { SignOutButton } from "./sign-out-button";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,10 @@ export default async function AppLayout({
             />
           </Link>
         </div>
-        <p className="text-base-content/70 flex-none text-sm">
-          {session.user.email}
-        </p>
+        <div className="flex flex-none items-center gap-3">
+          <p className="text-base-content/70 text-sm">{session.user.email}</p>
+          <SignOutButton />
+        </div>
       </header>
       {children}
     </div>
