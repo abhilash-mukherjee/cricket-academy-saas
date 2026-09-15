@@ -1,4 +1,4 @@
-import { eq, and, inArray, asc } from "drizzle-orm";
+import { eq, and, inArray, asc, isNull } from "drizzle-orm";
 import {
   academies,
   batches,

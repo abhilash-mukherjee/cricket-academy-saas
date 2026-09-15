@@ -63,8 +63,10 @@ describe("academy asset upload validation", () => {
     expect(extensionForMimeType("image/webp")).toBe("webp");
   });
 
-  it("counts saved and draft gallery images toward the cap", () => {
-    expect(validateGalleryCount(2, 3)).toBe(true);
-    expect(validateGalleryCount(2, 4)).toBe(false);
+  it("does not double-count saved images that are still in the editor", () => {
+    expect(validateGalleryCount(3, 3)).toBe(true);
+    expect(validateGalleryCount(6, 6)).toBe(false);
+    expect(validateGalleryCount(6, 0)).toBe(false);
+    expect(validateGalleryCount(0, 6)).toBe(false);
   });
 });

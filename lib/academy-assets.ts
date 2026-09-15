@@ -81,13 +81,15 @@ function pathnameForPurpose(
   return `${academyAssetPrefix(academyId)}${folder}/${id}.${extension}`;
 }
 
+// draftCount is the editor's current gallery size, including images already saved.
 export function validateGalleryCount(
   existingCount: number,
   draftCount = 0,
   incomingCount = 1,
 ): boolean {
   return (
-    existingCount + draftCount + incomingCount <= MAX_BROCHURE_GALLERY_IMAGES
+    Math.max(existingCount, draftCount) + incomingCount <=
+    MAX_BROCHURE_GALLERY_IMAGES
   );
 }
 

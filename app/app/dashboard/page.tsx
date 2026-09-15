@@ -41,23 +41,10 @@ export default async function DashboardPage() {
             <h2 className="card-title text-lg">Setup next steps</h2>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                {firstBatch
-                  ? firstBatch.isOpenForRegistration
-                    ? `${firstBatch.name} is open for Registration.`
-                    : `${firstBatch.name} is closed for Registration. Open it when you are ready.`
-                  : "Add a Batch when you are ready for intake."}
-              </li>
-              <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure
                 </Link>{" "}
                 photos, YouTube, Batch blurbs, and Coach profiles.
-              </li>
-              <li>
-                <Link className="link" href="/app/conversion">
-                  Upload your conversion page UPI QR
-                </Link>{" "}
-                for visitors when intake is open.
               </li>
               <li>
                 Share your public {APP_NAME} links so visitors can find you.
@@ -70,7 +57,6 @@ export default async function DashboardPage() {
           <div className="card-body gap-4">
             <h2 className="card-title text-lg">Public links</h2>
             <CopyLink label="Brochure" href={brochureUrl} />
-            <CopyLink label="Conversion page" href={conversionUrl} />
           </div>
         </section>
       </div>

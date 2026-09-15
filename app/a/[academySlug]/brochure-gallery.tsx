@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 
 type BrochureCarouselProps = {
@@ -43,13 +44,18 @@ export function BrochureCarousel({ images }: BrochureCarouselProps) {
           className="carousel w-full rounded-box"
           onScroll={syncIndexFromScroll}
         >
-          {images.map((image) => (
+          {images.map((image, slideIndex) => (
             <div key={image.url} className="carousel-item w-full">
-              <img
-                src={image.url}
-                alt=""
-                className="aspect-[4/3] w-full object-cover"
-              />
+              <div className="relative aspect-[4/3] w-full overflow-hidden">
+                <Image
+                  src={image.url}
+                  alt=""
+                  fill
+                  sizes="(min-width: 1024px) 32rem, 100vw"
+                  priority={slideIndex === 0}
+                  className="object-cover"
+                />
+              </div>
             </div>
           ))}
         </div>

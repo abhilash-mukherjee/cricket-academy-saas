@@ -1,0 +1,5 @@
+# Public Academy pages use two performance profiles
+
+Brochure (`/a/{academy-slug}`) and Conversion page (`/a/{academy-slug}/join`) share a template (ADR 0020) but not the same speed-vs-freshness trade-off. The Brochure is indexable (ADR 0019), cold-traffic, and mobile-first (ADR 0023): HTML should be CDN-served without waiting on Neon on a cache hit, and marketing slots may stay cached until explicitly purged. The Conversion page is noindex and correctness-first: intake availability, UPI QR, and (later) the Registration form must not lie — purge on every mutation that changes what a visitor sees, plus a short time-based safety TTL between purges.
+
+Work ships in two passes. **#38** optimises the public pages that exist today (caching shell, images, YouTube, loader dedupe, purge on brochure/conversion save). **Later feature tickets** that add new staff mutations affecting `/a` must read `docs/public-academy-pages-performance.md` and wire the shared purge helper in the same PR — not a follow-up. Implementation details live in that doc.
