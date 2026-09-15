@@ -134,6 +134,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
     const superAdminEmail = `super-${suffix}@example.com`;
     const ownerEmail = `owner-${suffix}@example.com`;
     const slug = `admin-academy-${suffix}`;
+    const secondSlug = `admin-academy-b-${suffix}`;
     let academyId = "";
 
     beforeEach(() => {
@@ -151,17 +152,19 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       cookieJar.clear();
 
       const db = getDb();
-      const [row] = await db
-        .select({ id: academies.id })
-        .from(academies)
-        .where(eq(academies.slug, slug))
-        .limit(1);
-      if (row) {
-        await db
-          .delete(impersonationAuditEvents)
-          .where(eq(impersonationAuditEvents.academyId, row.id));
-        await db.delete(batches).where(eq(batches.academyId, row.id));
-        await db.delete(academies).where(eq(academies.id, row.id));
+      for (const academySlug of [slug, secondSlug]) {
+        const [row] = await db
+          .select({ id: academies.id })
+          .from(academies)
+          .where(eq(academies.slug, academySlug))
+          .limit(1);
+        if (row) {
+          await db
+            .delete(impersonationAuditEvents)
+            .where(eq(impersonationAuditEvents.academyId, row.id));
+          await db.delete(batches).where(eq(batches.academyId, row.id));
+          await db.delete(academies).where(eq(academies.id, row.id));
+        }
       }
       await db.delete(user).where(eq(user.email, superAdminEmail));
       await db.delete(user).where(eq(user.email, ownerEmail));
@@ -219,6 +222,86 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         pendingOwnerEmail: ownerEmail,
       });
       expect(row?.createdAt).toBeTruthy();
+    });
+
+    it("rejects Super-admin email and emails that already own an Academy", async () => {
+      const { POST: createAcademy } = await import("./route");
+      const { POST: deactivateAcademy } = await import(
+        "./[academyId]/deactivate/route"
+      );
+      const { claimPendingAcademy } = await import("@/lib/academy-claim");
+
+      const superCookie = await signIn(superAdminEmail, "Super Admin");
+      await promoteSuperAdmin(superAdminEmail);
+
+      const asSuperAdmin = await createAcademy(
+        new Request(`${origin}/api/admin/academies`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie: superCookie,
+          },
+          body: JSON.stringify({
+            name: "Should Fail",
+            slug: secondSlug,
+            pendingOwnerEmail: superAdminEmail,
+          }),
+        }),
+      );
+      expect(asSuperAdmin.status).toBe(409);
+      expect(await asSuperAdmin.json()).toEqual({ error: "super-admin-email" });
+
+      const createResponse = await createAcademy(
+        new Request(`${origin}/api/admin/academies`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie: superCookie,
+          },
+          body: JSON.stringify({
+            name: "Admin Blitz Academy",
+            slug,
+            pendingOwnerEmail: ownerEmail,
+          }),
+        }),
+      );
+      expect(createResponse.status).toBe(200);
+      const { id } = (await createResponse.json()) as { id: string };
+      academyId = id;
+
+      const ownerCookie = await signIn(ownerEmail, "Pending Owner");
+      const ownerId = await sessionUserId(ownerCookie);
+      await claimPendingAcademy(ownerId, ownerEmail);
+
+      await deactivateAcademy(
+        new Request(`${origin}/api/admin/academies/${id}/deactivate`, {
+          method: "POST",
+          headers: { origin, cookie: superCookie },
+        }),
+        { params: Promise.resolve({ academyId: id }) },
+      );
+
+      const secondCreate = await createAcademy(
+        new Request(`${origin}/api/admin/academies`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie: superCookie,
+          },
+          body: JSON.stringify({
+            name: "Second Academy",
+            slug: secondSlug,
+            pendingOwnerEmail: ownerEmail,
+          }),
+        }),
+      );
+      expect(secondCreate.status).toBe(409);
+      expect(await secondCreate.json()).toEqual({
+        error: "email-already-owns-academy",
+      });
     });
 
     it("lets the pending Owner claim via magic link", async () => {

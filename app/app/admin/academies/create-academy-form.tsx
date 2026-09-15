@@ -5,6 +5,23 @@ import { useRouter } from "next/navigation";
 import { isAcademySlug, suggestAcademySlug } from "@/lib/academy-slug";
 import { SLUG_HELP } from "@/lib/constants";
 
+function createAcademyErrorCopy(error: string | undefined): string | null {
+  switch (error) {
+    case "super-admin-email":
+      return "That email is a Super-admin and cannot own an Academy.";
+    case "email-already-owns-academy":
+      return "That email already owns an Academy (including deactivated ones).";
+    case "slug-taken":
+      return "That slug is already taken. Pick another.";
+    case "invalid-slug":
+      return "Use lowercase letters, numbers, and hyphens only.";
+    case "invalid-input":
+      return "Fill in the required fields to continue.";
+    default:
+      return error ?? null;
+  }
+}
+
 export function CreateAcademyForm() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -35,7 +52,7 @@ export function CreateAcademyForm() {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(body?.error ?? "Could not create Academy.");
+      setError(createAcademyErrorCopy(body?.error) ?? "Could not create Academy.");
       setSubmitting(false);
       return;
     }

@@ -34,7 +34,12 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
-    const status = result.error === "slug-taken" ? 409 : 400;
+    const status =
+      result.error === "slug-taken" ||
+      result.error === "super-admin-email" ||
+      result.error === "email-already-owns-academy"
+        ? 409
+        : 400;
     return NextResponse.json({ error: result.error }, { status });
   }
 

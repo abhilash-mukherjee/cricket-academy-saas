@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { academies } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
@@ -23,7 +23,9 @@ export type CreateAdminAcademyInput = {
 export type CreateAdminAcademyError =
   | "invalid-input"
   | "invalid-slug"
-  | "slug-taken";
+  | "slug-taken"
+  | "super-admin-email"
+  | "email-already-owns-academy";
 
 export type CreateAdminAcademyResult =
   | { ok: true; id: string; slug: string }
@@ -86,6 +88,31 @@ export async function createAdminAcademy(
   }
 
   const db = getDb();
+
+  const [superAdminUser] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(
+      and(
+        sql`lower(${user.email}) = ${pendingOwnerEmail}`,
+        eq(user.isSuperAdmin, true),
+      ),
+    )
+    .limit(1);
+  if (superAdminUser) {
+    return { ok: false, error: "super-admin-email" };
+  }
+
+  const [existingOwned] = await db
+    .select({ id: academies.id })
+    .from(academies)
+    .innerJoin(user, eq(academies.ownerUserId, user.id))
+    .where(sql`lower(${user.email}) = ${pendingOwnerEmail}`)
+    .limit(1);
+  if (existingOwned) {
+    return { ok: false, error: "email-already-owns-academy" };
+  }
+
   const id = crypto.randomUUID();
 
   try {
