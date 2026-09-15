@@ -274,6 +274,46 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).not.toContain("Previous");
     });
 
+    it("allows another gallery upload after three images are already saved", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const keys: string[] = [];
+      for (let index = 0; index < 3; index += 1) {
+        const uploaded = await uploadImage(
+          cookie,
+          "brochure-gallery",
+          pngFile(`gallery-${index}.png`),
+          index,
+        );
+        keys.push(uploaded.storageKey);
+      }
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            imageStorageKeys: keys,
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      const fourth = await uploadImage(
+        cookie,
+        "brochure-gallery",
+        pngFile("gallery-3.png"),
+        3,
+      );
+      expect(fourth.storageKey).toBeTruthy();
+    });
+
     it("shows DaisyUI carousel chrome when the gallery has two photos", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);
