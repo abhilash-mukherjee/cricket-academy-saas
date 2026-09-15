@@ -7,7 +7,11 @@ import { resolvePublicAssetUrl } from "@/lib/academy-assets";
 import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
 import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
 
-/** Safety TTL for Conversion HTML if a purge trigger is missed (ADR 0028). */
+/**
+ * Safety TTL for Conversion HTML if a purge trigger is missed (ADR 0028).
+ * The Conversion page `export const revalidate` must use this same numeric literal;
+ * Next.js cannot statically analyze an imported binding.
+ */
 export const PUBLIC_CONVERSION_CACHE_SECONDS = 300;
 
 export type PublicConversion = {

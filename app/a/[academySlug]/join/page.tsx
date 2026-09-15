@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Image from "next/image";
-import { getPublicConversion, PUBLIC_CONVERSION_CACHE_SECONDS } from "@/lib/public-conversion";
+import { getPublicConversion } from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
 
 type ConversionPageProps = PageProps<"/a/[academySlug]/join">;
 
-/** Conversion profile: purge on mutation plus safety TTL (ADR 0028). */
-export const revalidate = PUBLIC_CONVERSION_CACHE_SECONDS;
+/**
+ * Conversion profile: purge on mutation plus safety TTL (ADR 0028).
+ * Next.js requires a numeric literal here; keep in sync with PUBLIC_CONVERSION_CACHE_SECONDS.
+ */
+export const revalidate = 300;
 
 const noindex = { index: false, follow: false } as const;
 
