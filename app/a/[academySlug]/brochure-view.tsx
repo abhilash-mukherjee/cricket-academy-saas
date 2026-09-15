@@ -3,6 +3,8 @@ import { BrochureCta } from "./brochure-cta";
 import { BrochureCarousel } from "./brochure-gallery";
 import { BrochureLocation } from "./brochure-location";
 import { BrochurePhone } from "./brochure-phone";
+import { BrochureYoutube } from "./brochure-youtube";
+import Image from "next/image";
 
 type BrochureViewProps = {
   brochure: PublicBrochure;
@@ -17,11 +19,16 @@ function Gallery({ images }: { images: { url: string }[] }) {
   if (images.length === 1) {
     return (
       <section aria-label="Photos">
-        <img
-          src={images[0].url}
-          alt=""
-          className="aspect-[4/3] w-full rounded-box object-cover"
-        />
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-box">
+          <Image
+            src={images[0].url}
+            alt=""
+            fill
+            priority
+            sizes="(min-width: 1024px) 32rem, 100vw"
+            className="object-cover"
+          />
+        </div>
       </section>
     );
   }
@@ -52,13 +59,7 @@ export function BrochureView({
         aria-label="Videos"
       >
         {brochure.youtubeVideoIds.map((videoId) => (
-          <iframe
-            key={videoId}
-            src={`https://www.youtube.com/embed/${videoId}`}
-            title="YouTube video"
-            className="aspect-video w-full rounded-box"
-            allowFullScreen
-          />
+          <BrochureYoutube key={videoId} videoId={videoId} />
         ))}
       </section>
     ) : null;
@@ -89,9 +90,12 @@ export function BrochureView({
             <article key={coach.fullName} className="card bg-base-200">
               <div className="card-body gap-2">
                 {coach.imageUrl ? (
-                  <img
+                  <Image
                     src={coach.imageUrl}
                     alt=""
+                    width={128}
+                    height={128}
+                    sizes="8rem"
                     className="h-32 w-32 rounded-box object-cover"
                   />
                 ) : null}

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
+import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
-import { listBatches } from "@/lib/batches";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
@@ -9,20 +9,23 @@ import Link from "next/link";
 
 export default async function DashboardPage() {
   const session = await requireStaffSession();
-  if (session.user.isSuperAdmin) {
-    redirect("/app");
+  const impersonation = await getImpersonationState(session);
+
+  if (session.user.isSuperAdmin && !impersonation) {
+    redirect("/app/admin/academies");
   }
 
-  const academy = await getOwnedAcademy(session.user.id);
+  const academy =
+    impersonation?.academy ?? (await getOwnedAcademy(session.user.id));
   if (!academy) {
     redirect("/app/onboarding");
   }
 
-  const academyBatches = await listBatches(academy.id);
-  const firstBatch = academyBatches[0];
+  const displayName = impersonation
+    ? impersonation.subjectEmail
+    : session.user.name;
   const origin = publicOrigin();
   const brochureUrl = `${origin}/a/${academy.slug}`;
-  const conversionUrl = `${origin}/a/${academy.slug}/join`;
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -31,7 +34,7 @@ export default async function DashboardPage() {
           <div className="card-body gap-2">
             <h1 className="card-title">Dashboard</h1>
             <p>
-              Hello {session.user.name}. {academy.name} is live.
+              Hello {displayName}. {academy.name} is live.
             </p>
           </div>
         </section>
@@ -41,23 +44,10 @@ export default async function DashboardPage() {
             <h2 className="card-title text-lg">Setup next steps</h2>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                {firstBatch
-                  ? firstBatch.isOpenForRegistration
-                    ? `${firstBatch.name} is open for Registration.`
-                    : `${firstBatch.name} is closed for Registration. Open it when you are ready.`
-                  : "Add a Batch when you are ready for intake."}
-              </li>
-              <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure
                 </Link>{" "}
                 photos, YouTube, Batch blurbs, and Coach profiles.
-              </li>
-              <li>
-                <Link className="link" href="/app/conversion">
-                  Upload your conversion page UPI QR
-                </Link>{" "}
-                for visitors when intake is open.
               </li>
               <li>
                 Share your public {APP_NAME} links so visitors can find you.
@@ -70,7 +60,6 @@ export default async function DashboardPage() {
           <div className="card-body gap-4">
             <h2 className="card-title text-lg">Public links</h2>
             <CopyLink label="Brochure" href={brochureUrl} />
-            <CopyLink label="Conversion page" href={conversionUrl} />
           </div>
         </section>
       </div>

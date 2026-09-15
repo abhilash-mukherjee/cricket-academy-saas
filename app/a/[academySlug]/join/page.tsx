@@ -1,9 +1,16 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Image from "next/image";
 import { getPublicConversion } from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
 
 type ConversionPageProps = PageProps<"/a/[academySlug]/join">;
+
+/**
+ * Conversion profile: purge on mutation plus safety TTL (ADR 0028).
+ * Next.js requires a numeric literal here; keep in sync with PUBLIC_CONVERSION_CACHE_SECONDS.
+ */
+export const revalidate = 300;
 
 const noindex = { index: false, follow: false } as const;
 
@@ -39,9 +46,12 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
             {conversion.upiQrUrl ? (
               <section className="flex flex-col gap-2" aria-label="UPI QR">
                 <h2 className="text-lg font-semibold">Pay with UPI</h2>
-                <img
+                <Image
                   src={conversion.upiQrUrl}
                   alt="Academy UPI QR"
+                  width={256}
+                  height={256}
+                  sizes="16rem"
                   className="h-64 w-64 rounded-box object-contain"
                 />
               </section>

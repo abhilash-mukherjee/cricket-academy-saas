@@ -1,16 +1,24 @@
 import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
-import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { getImpersonationState } from "@/lib/impersonation";
+import { resolveStaffAccess } from "@/lib/staff-access";
 import { OnboardingWizard } from "./onboarding-wizard";
 
 export default async function OnboardingPage() {
   const session = await requireStaffSession();
-  if (session.user.isSuperAdmin) {
-    redirect("/app");
+  const impersonation = await getImpersonationState(session);
+
+  if (session.user.isSuperAdmin || impersonation) {
+    redirect(impersonation ? "/app/dashboard" : "/app/admin/academies");
   }
 
-  const academy = await getOwnedAcademy(session.user.id);
-  if (academy) {
+  const access = await resolveStaffAccess({
+    id: session.user.id,
+    email: session.user.email,
+    isSuperAdmin: false,
+  });
+
+  if (access.kind !== "needs-onboarding") {
     redirect("/app/dashboard");
   }
 

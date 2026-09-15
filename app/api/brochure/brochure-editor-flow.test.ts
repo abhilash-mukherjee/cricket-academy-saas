@@ -252,10 +252,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain("Contact +919876543210");
+      expect(html).toContain("Call to Register");
       expect(html).toContain("+919876543210");
-      expect(html).not.toContain("Register");
-      expect(html).not.toContain(`/a/${slug}/join`);
+      expect(html).not.toContain(`href="/a/${slug}/join"`);
     });
 
     it("links Register to the conversion page when intake is available", async () => {
@@ -344,7 +343,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       const html = renderToStaticMarkup(await BrochureEditorPage());
 
-      expect(html).toContain("Contact +919876543210");
+      expect(html).toContain("Call to Register");
       expect(html).toContain(
         "A place name or a map link.",
       );
@@ -399,7 +398,12 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       expect(html).toContain("U-14 evening");
       expect(html).toContain("U-14 evening batting and bowling");
-      expect(html).toContain("https://www.youtube.com/embed/jNQXAC9IVRw");
+      expect(html).toContain(
+        encodeURIComponent("img.youtube.com/vi/jNQXAC9IVRw/hqdefault.jpg"),
+      );
+      expect(html).toContain("Play YouTube video");
+      expect(html).not.toContain("https://www.youtube.com/embed/jNQXAC9IVRw");
+      expect(html).not.toContain("<iframe");
       expect(html).toContain("Ravi Kumar");
       expect(html).toContain("Head Coach");
     });

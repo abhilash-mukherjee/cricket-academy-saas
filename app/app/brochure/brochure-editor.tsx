@@ -6,6 +6,7 @@ import { BrochureView } from "@/app/a/[academySlug]/brochure-view";
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import type { PublicBrochure } from "@/lib/public-brochure";
+import Link from "next/link";
 
 type BrochureEditorProps = {
   brochure: BrochureEditorState;
@@ -88,11 +89,11 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
   const [coaches, setCoaches] = useState<CoachDraft[]>(
     brochure.coaches.length > 0
       ? brochure.coaches.map((coach) => ({
-          fullName: coach.fullName,
-          imageStorageKey: coach.imageStorageKey,
-          imageUrl: coach.imageUrl,
-          blurb: coach.blurb ?? "",
-        }))
+        fullName: coach.fullName,
+        imageStorageKey: coach.imageStorageKey,
+        imageUrl: coach.imageUrl,
+        blurb: coach.blurb ?? "",
+      }))
       : [{ fullName: "", imageStorageKey: null, imageUrl: null, blurb: "" }],
   );
   const [submitting, setSubmitting] = useState(false);
@@ -228,243 +229,251 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex max-w-lg flex-col gap-6">
-      <label className="form-control w-full">
-        <span className="label-text mb-1">Academy name</span>
-        <input
-          className="input input-bordered w-full"
-          name="name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className="form-control w-full">
-        <span className="label-text mb-1">Tagline</span>
-        <textarea
-          className="textarea textarea-bordered w-full"
-          name="tagline"
-          rows={8}
-          value={tagline}
-          onChange={(event) => setTagline(event.target.value)}
-        />
-      </label>
-      <label className="form-control w-full">
-        <span className="label-text mb-1">Location</span>
-        <p className="text-base-content/70 mb-1 text-sm">
-          A place name or a map link.
-        </p>
-        <input
-          className="input input-bordered w-full"
-          name="location"
-          value={location}
-          onChange={(event) => setLocation(event.target.value)}
-        />
-      </label>
-      <label className="form-control w-full">
-        <span className="label-text mb-1">Phone</span>
-        <input
-          className="input input-bordered w-full"
-          name="phone"
-          placeholder="+919876543210"
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-        />
-      </label>
-
-      <fieldset className="flex flex-col gap-3">
-        <legend className="font-medium">Gallery images</legend>
-        {images.map((image) => (
-          <div key={image.storageKey} className="flex flex-col gap-2">
-            {image.url ? (
-              <img
-                src={image.url}
-                alt=""
-                className="h-32 w-full rounded-box object-cover"
-              />
-            ) : null}
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm self-start"
-              onClick={() =>
-                setImages((current) =>
-                  current.filter((item) => item.storageKey !== image.storageKey),
-                )
-              }
-            >
-              Remove image
-            </button>
-          </div>
-        ))}
-        {images.length < MAX_BROCHURE_GALLERY_IMAGES ? (
-          <label className="btn btn-neutral btn-sm self-start">
-            Add image
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              disabled={uploading}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  void addGalleryImage(file);
-                }
-                event.target.value = "";
-              }}
-            />
-          </label>
-        ) : null}
-      </fieldset>
-
-      <fieldset className="flex flex-col gap-3">
-        <legend className="font-medium">YouTube</legend>
-        {youtubeUrls.map((url, index) => (
+        <label className="form-control w-full">
+          <span className="label-text mb-1">Academy name</span>
           <input
-            key={`youtube-${index}`}
             className="input input-bordered w-full"
-            name={`youtubeUrl-${index}`}
-            placeholder="https://www.youtube.com/watch?v="
-            value={url}
-            onChange={(event) => {
-              const next = [...youtubeUrls];
-              next[index] = event.target.value;
-              setYoutubeUrls(next);
-            }}
+            name="name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
           />
-        ))}
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm self-start"
-          onClick={() => setYoutubeUrls((current) => [...current, ""])}
-        >
-          Add YouTube URL
-        </button>
-      </fieldset>
+        </label>
+        <label className="form-control w-full">
+          <span className="label-text mb-1">Details</span>
+          <textarea
+            className="textarea textarea-bordered w-full"
+            name="tagline"
+            rows={8}
+            value={tagline}
+            onChange={(event) => setTagline(event.target.value)}
+          />
+        </label>
+        <label className="form-control w-full">
+          <span className="label-text mb-1">Location</span>
+          <p className="text-base-content/70 mb-1 text-sm">
+            A place name or a map link.
+          </p>
+          <input
+            className="input input-bordered w-full"
+            name="location"
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+          />
+        </label>
+        <label className="form-control w-full">
+          <span className="label-text mb-1">Phone</span>
+          <input
+            className="input input-bordered w-full"
+            name="phone"
+            placeholder="+919876543210"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+          />
+        </label>
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="font-medium">Batch blurbs</legend>
-        {brochure.batches.map((batch) => (
-          <label
-            key={batch.id}
-            className="form-control w-full"
-            data-batch-id={batch.id}
-          >
-            <span className="label-text mb-1">{batch.name}</span>
-            <textarea
-              className="textarea textarea-bordered w-full"
-              name={`batchBlurb-${batch.id}`}
-              value={batchBlurbs[batch.id] ?? ""}
-              onChange={(event) =>
-                setBatchBlurbs((current) => ({
-                  ...current,
-                  [batch.id]: event.target.value,
-                }))
-              }
-            />
-          </label>
-        ))}
-      </fieldset>
-
-      <fieldset className="flex flex-col gap-4">
-        <legend className="font-medium">Coach profiles</legend>
-        {coaches.map((coach, index) => (
-          <div key={`coach-${index}`} className="flex flex-col gap-2">
-            <input
-              className="input input-bordered w-full"
-              name={`coachName-${index}`}
-              placeholder="Name"
-              value={coach.fullName}
-              onChange={(event) => {
-                const next = [...coaches];
-                next[index] = { ...coach, fullName: event.target.value };
-                setCoaches(next);
-              }}
-            />
-            {coach.imageUrl ? (
-              <img
-                src={coach.imageUrl}
-                alt=""
-                className="h-24 w-24 rounded-box object-cover"
-              />
-            ) : null}
-            <div className="flex flex-wrap gap-2">
-              <label className="btn btn-neutral btn-sm">
-                {coach.imageStorageKey ? "Replace photo" : "Upload photo"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void setCoachImage(index, file);
-                    }
-                    event.target.value = "";
-                  }}
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-medium">Gallery images</legend>
+          {images.map((image) => (
+            <div key={image.storageKey} className="flex flex-col gap-2">
+              {image.url ? (
+                <img
+                  src={image.url}
+                  alt=""
+                  className="h-32 w-full rounded-box object-cover"
                 />
-              </label>
-              {coach.imageStorageKey ? (
-                <button
-                  type="button"
-                  className="btn btn-neutral btn-sm"
-                  onClick={() => {
-                    setCoaches((current) => {
-                      const next = [...current];
-                      next[index] = {
-                        ...next[index],
-                        imageStorageKey: null,
-                        imageUrl: null,
-                      };
-                      return next;
-                    });
-                  }}
-                >
-                  Remove photo
-                </button>
               ) : null}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={() =>
+                  setImages((current) =>
+                    current.filter((item) => item.storageKey !== image.storageKey),
+                  )
+                }
+              >
+                Remove image
+              </button>
             </div>
-            <textarea
-              className="textarea textarea-bordered w-full"
-              name={`coachBlurb-${index}`}
-              placeholder="Optional blurb"
-              value={coach.blurb}
+          ))}
+          {images.length < MAX_BROCHURE_GALLERY_IMAGES ? (
+            <label className="btn btn-neutral btn-sm self-start">
+              {uploading ? "Uploading…" : "Add image"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void addGalleryImage(file);
+                  }
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          ) : null}
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-medium">YouTube</legend>
+          {youtubeUrls.map((url, index) => (
+            <input
+              key={`youtube-${index}`}
+              className="input input-bordered w-full"
+              name={`youtubeUrl-${index}`}
+              placeholder="https://www.youtube.com/watch?v="
+              value={url}
               onChange={(event) => {
-                const next = [...coaches];
-                next[index] = { ...coach, blurb: event.target.value };
-                setCoaches(next);
+                const next = [...youtubeUrls];
+                next[index] = event.target.value;
+                setYoutubeUrls(next);
               }}
             />
-          </div>
-        ))}
+          ))}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm self-start"
+            onClick={() => setYoutubeUrls((current) => [...current, ""])}
+          >
+            Add YouTube URL
+          </button>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-medium">Batch Details</legend>
+          {brochure.batches.map((batch) => (
+            <label
+              key={batch.id}
+              className="form-control w-full"
+              data-batch-id={batch.id}
+            >
+              <span className="label-text mb-1">{batch.name}</span>
+              <textarea
+                className="textarea textarea-bordered w-full"
+                name={`batchBlurb-${batch.id}`}
+                value={batchBlurbs[batch.id] ?? ""}
+                onChange={(event) =>
+                  setBatchBlurbs((current) => ({
+                    ...current,
+                    [batch.id]: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          ))}
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-4">
+          <legend className="font-medium">Coach profiles</legend>
+          {coaches.map((coach, index) => (
+            <div key={`coach-${index}`} className="flex flex-col gap-2">
+              <input
+                className="input input-bordered w-full"
+                name={`coachName-${index}`}
+                placeholder="Name"
+                value={coach.fullName}
+                onChange={(event) => {
+                  const next = [...coaches];
+                  next[index] = { ...coach, fullName: event.target.value };
+                  setCoaches(next);
+                }}
+              />
+              {coach.imageUrl ? (
+                <img
+                  src={coach.imageUrl}
+                  alt=""
+                  className="h-24 w-24 rounded-box object-cover"
+                />
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <label className="btn btn-neutral btn-sm">
+                  {coach.imageStorageKey ? "Replace photo" : "Upload photo"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void setCoachImage(index, file);
+                      }
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                {coach.imageStorageKey ? (
+                  <button
+                    type="button"
+                    className="btn btn-neutral btn-sm"
+                    onClick={() => {
+                      setCoaches((current) => {
+                        const next = [...current];
+                        next[index] = {
+                          ...next[index],
+                          imageStorageKey: null,
+                          imageUrl: null,
+                        };
+                        return next;
+                      });
+                    }}
+                  >
+                    Remove photo
+                  </button>
+                ) : null}
+              </div>
+              <textarea
+                className="textarea textarea-bordered w-full"
+                name={`coachBlurb-${index}`}
+                placeholder="Optional blurb"
+                value={coach.blurb}
+                onChange={(event) => {
+                  const next = [...coaches];
+                  next[index] = { ...coach, blurb: event.target.value };
+                  setCoaches(next);
+                }}
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn-neutral btn-sm self-start"
+            onClick={() =>
+              setCoaches((current) => [
+                ...current,
+                {
+                  fullName: "",
+                  imageStorageKey: null,
+                  imageUrl: null,
+                  blurb: "",
+                },
+              ])
+            }
+          >
+            Add Coach profile
+          </button>
+        </fieldset>
+
+        {error ? <p className="text-error text-sm">{errorCopy(error)}</p> : null}
+        {saved ? <p className="text-success text-sm">Brochure saved.</p> : null}
+
         <button
           type="button"
-          className="btn btn-neutral btn-sm self-start"
-          onClick={() =>
-            setCoaches((current) => [
-              ...current,
-              {
-                fullName: "",
-                imageStorageKey: null,
-                imageUrl: null,
-                blurb: "",
-              },
-            ])
-          }
+          className="btn btn-neutral"
+          disabled={submitting || uploading}
+          onClick={() => void save()}
         >
-          Add Coach profile
+          {submitting ? "Saving…" : "Save brochure"}
         </button>
-      </fieldset>
 
-      {error ? <p className="text-error text-sm">{errorCopy(error)}</p> : null}
-      {saved ? <p className="text-success text-sm">Brochure saved.</p> : null}
+        <Link
+          href={`/a/${brochure.slug}`}
+          className="btn btn-neutral"
+          target="_blank"
+          rel="noopener noreferrer">Visit Page</Link>
 
-      <button
-        type="button"
-        className="btn btn-neutral"
-        disabled={submitting || uploading}
-        onClick={() => void save()}
-      >
-        {submitting ? "Saving…" : "Save brochure"}
-      </button>
+
       </div>
 
       <section className="border-base-300 relative overflow-hidden rounded-box border p-2">
