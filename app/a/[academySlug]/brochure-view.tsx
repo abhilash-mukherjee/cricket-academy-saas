@@ -3,6 +3,7 @@ import { BrochureCta } from "./brochure-cta";
 import { BrochureCarousel } from "./brochure-gallery";
 import { BrochureLocation } from "./brochure-location";
 import { BrochurePhone } from "./brochure-phone";
+import { BrochureYoutube } from "./brochure-youtube";
 import Image from "next/image";
 
 type BrochureViewProps = {
@@ -18,11 +19,16 @@ function Gallery({ images }: { images: { url: string }[] }) {
   if (images.length === 1) {
     return (
       <section aria-label="Photos">
-        <img
-          src={images[0].url}
-          alt=""
-          className="aspect-[4/3] w-full rounded-box object-cover"
-        />
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-box">
+          <Image
+            src={images[0].url}
+            alt=""
+            fill
+            priority
+            sizes="(min-width: 1024px) 32rem, 100vw"
+            className="object-cover"
+          />
+        </div>
       </section>
     );
   }
@@ -53,13 +59,7 @@ export function BrochureView({
         aria-label="Videos"
       >
         {brochure.youtubeVideoIds.map((videoId) => (
-          <iframe
-            key={videoId}
-            src={`https://www.youtube.com/embed/${videoId}`}
-            title="YouTube video"
-            className="aspect-video w-full rounded-box"
-            allowFullScreen
-          />
+          <BrochureYoutube key={videoId} videoId={videoId} />
         ))}
       </section>
     ) : null;

@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { eq, asc } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import {
   academies,
   batches,
@@ -10,6 +12,7 @@ import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
 import { brochureUrl } from "@/lib/public-origin";
 import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
 
 export type PublicBrochure = {
   name: string;
@@ -28,7 +31,7 @@ export type PublicBrochure = {
   }[];
 };
 
-export async function getPublicBrochure(
+async function loadPublicBrochure(
   slug: string,
 ): Promise<PublicBrochure | null> {
   const db = getDb();
@@ -103,6 +106,19 @@ export async function getPublicBrochure(
     })),
   };
 }
+
+function getCachedPublicBrochure(slug: string): Promise<PublicBrochure | null> {
+  return unstable_cache(
+    () => loadPublicBrochure(slug),
+    ["public-brochure", slug],
+    {
+      tags: [publicAcademyCacheTag(slug)],
+      revalidate: false,
+    },
+  )();
+}
+
+export const getPublicBrochure = cache(getCachedPublicBrochure);
 
 export async function listActiveBrochureUrls(): Promise<string[]> {
   const db = getDb();

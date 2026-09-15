@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { updateConversion } from "@/lib/conversion";
+import { revalidatePublicAcademyPages } from "@/lib/public-academy-pages";
 
 type ConversionBody = {
   upiQrStorageKey?: string | null;
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
           : 400;
     return NextResponse.json({ error: result.error }, { status });
   }
+
+  revalidatePublicAcademyPages(academy.slug);
 
   return NextResponse.json({ ok: true });
 }

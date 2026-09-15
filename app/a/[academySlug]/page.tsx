@@ -7,6 +7,9 @@ import { brochureUrl } from "@/lib/public-origin";
 
 type BrochurePageProps = PageProps<"/a/[academySlug]">;
 
+/** Brochure profile: event-driven cache until purged (ADR 0028). */
+export const revalidate = false;
+
 export async function generateMetadata({
   params,
 }: BrochurePageProps): Promise<Metadata> {
