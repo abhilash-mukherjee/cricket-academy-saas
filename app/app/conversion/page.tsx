@@ -1,16 +1,20 @@
 import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
+import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { getConversionEditor } from "@/lib/conversion";
 import { ConversionEditor } from "./conversion-editor";
 
 export default async function ConversionEditorPage() {
   const session = await requireStaffSession();
-  if (session.user.isSuperAdmin) {
-    redirect("/app");
+  const impersonation = await getImpersonationState(session);
+
+  if (session.user.isSuperAdmin && !impersonation) {
+    redirect("/app/admin/academies");
   }
 
-  const academy = await getOwnedAcademy(session.user.id);
+  const academy =
+    impersonation?.academy ?? (await getOwnedAcademy(session.user.id));
   if (!academy) {
     redirect("/app/onboarding");
   }

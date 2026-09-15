@@ -1,28 +1,27 @@
 import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
-import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { resolveStaffAccess } from "@/lib/staff-access";
+import { getImpersonationState } from "@/lib/impersonation";
 
 export default async function AppHomePage() {
   const session = await requireStaffSession();
-  if (session.user.isSuperAdmin) {
-    return (
-      <main className="flex min-h-full flex-col p-6">
-        <section className="card bg-base-200 mx-auto w-full max-w-lg shadow">
-          <div className="card-body gap-3">
-            <h1 className="card-title">Staff home</h1>
-            <p>
-              Signed in as{" "}
-              <span className="font-medium">{session.user.email}</span>
-            </p>
-            <p className="text-base-content/70 text-sm">Super-admin</p>
-          </div>
-        </section>
-      </main>
-    );
+  const impersonation = await getImpersonationState(session);
+
+  if (impersonation) {
+    redirect("/app/dashboard");
   }
 
-  const academy = await getOwnedAcademy(session.user.id);
-  if (!academy) {
+  if (session.user.isSuperAdmin) {
+    redirect("/app/admin/academies");
+  }
+
+  const access = await resolveStaffAccess({
+    id: session.user.id,
+    email: session.user.email,
+    isSuperAdmin: false,
+  });
+
+  if (access.kind === "needs-onboarding") {
     redirect("/app/onboarding");
   }
 
