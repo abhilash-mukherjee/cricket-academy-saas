@@ -3,6 +3,7 @@ import { BrochureCta } from "./brochure-cta";
 import { BrochureCarousel } from "./brochure-gallery";
 import { BrochureLocation } from "./brochure-location";
 import { BrochurePhone } from "./brochure-phone";
+import Image from "next/image";
 
 type BrochureViewProps = {
   brochure: PublicBrochure;
@@ -89,9 +90,12 @@ export function BrochureView({
             <article key={coach.fullName} className="card bg-base-200">
               <div className="card-body gap-2">
                 {coach.imageUrl ? (
-                  <img
+                  <Image
                     src={coach.imageUrl}
                     alt=""
+                    width={128}
+                    height={128}
+                    sizes="8rem"
                     className="h-32 w-32 rounded-box object-cover"
                   />
                 ) : null}
