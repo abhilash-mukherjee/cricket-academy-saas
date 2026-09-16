@@ -1,6 +1,7 @@
 import { APP_NAME } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
+import heroImage from "@/public/product-homepage-hero.webp";
 
 type MarketingShellProps = {
   children: React.ReactNode;
@@ -10,11 +11,12 @@ export function MarketingShell({ children }: MarketingShellProps) {
   return (
     <main className="relative flex min-h-dvh flex-1 flex-col">
       <Image
-        src="/product-homepage-hero.jpg"
+        src={heroImage}
         alt=""
         fill
         priority
-        sizes="100vw"
+        placeholder="blur"
+        sizes="(max-width: 768px) 100vw, 1600px"
         className="object-cover object-[center_40%]"
       />
       <div className="absolute inset-0 bg-neutral/60" />
@@ -28,7 +30,6 @@ export function MarketingShell({ children }: MarketingShellProps) {
               width={897}
               height={145}
               className="h-6 w-auto"
-              priority
             />
           </Link>
         </div>
