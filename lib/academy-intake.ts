@@ -29,7 +29,12 @@ async function academyHasRegistrableBatch(academyId: string): Promise<boolean> {
     const [feeOption] = await db
       .select({ id: batchFeeOptions.id })
       .from(batchFeeOptions)
-      .where(eq(batchFeeOptions.batchId, batch.id))
+      .where(
+        and(
+          eq(batchFeeOptions.batchId, batch.id),
+          eq(batchFeeOptions.isOffered, true),
+        ),
+      )
       .orderBy(asc(batchFeeOptions.sortOrder))
       .limit(1);
 

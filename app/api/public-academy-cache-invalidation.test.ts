@@ -178,6 +178,7 @@ async function enableIntake(slug: string) {
   await db.insert(batchFeeOptions).values({
     academyId: academy!.id,
     batchId: batch!.id,
+    daysPerWeek: 2,
     termMonths: 3,
     feePaise: 1500000,
     sortOrder: 0,

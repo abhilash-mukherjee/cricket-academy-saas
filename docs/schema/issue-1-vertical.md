@@ -1,6 +1,6 @@
 # Issue #1 vertical — domain schema (v1)
 
-Blueprint for the first vertical's Postgres schema. Parent spec: [#1](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/1). Trade-offs: [ADR-0026](../adr/0026-v1-domain-schema.md).
+Blueprint for the first vertical's Postgres schema. Parent spec: [#1](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/1). Trade-offs: [ADR-0026](../adr/0026-v1-domain-schema.md), [ADR-0029](../adr/0029-fee-option-intensity.md).
 
 After implementation, `db/domain-schema.ts` and migrations are canonical; update this doc when the schema changes intentionally.
 
@@ -84,7 +84,7 @@ Standard Better Auth shape. Magic-link only in v1; `account` is likely unused.
 
 **Ordering:** `created_at` (no `sort_order` in v1).
 
-A Batch is registrable only when it has at least one `batch_fee_option` and `is_open_for_registration = true`.
+A Batch is registrable only when it has at least one offered `batch_fee_option` and `is_open_for_registration = true`.
 
 ### `batch_fee_options`
 
@@ -93,12 +93,17 @@ A Batch is registrable only when it has at least one `batch_fee_option` and `is_
 | `id` | `uuid` PK | |
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
+| `days_per_week` | `integer NOT NULL` | Intensity count 1–7; not named weekdays |
 | `term_months` | `integer NOT NULL` | e.g. 1, 3, 6 |
-| `fee_paise` | `integer NOT NULL` | Total fee for that term (INR × 100) |
+| `fee_paise` | `integer NOT NULL` | Total fee for that package (INR × 100) |
+| `label` | `text` nullable | Display name only; not identity |
+| `is_offered` | `boolean NOT NULL DEFAULT true` | `false` hides from conversion; row kept for history |
 | `sort_order` | `integer NOT NULL` | Conversion page order |
 | `created_at` / `updated_at` | `timestamptz` | |
 
-**Constraint:** `UNIQUE (batch_id, term_months)`
+**Constraints:** `UNIQUE (batch_id, days_per_week, term_months)`; `CHECK (days_per_week BETWEEN 1 AND 7)`
+
+Trade-offs: [ADR-0029](../adr/0029-fee-option-intensity.md).
 
 ### `registrations`
 
@@ -109,7 +114,8 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
 | `id` | `uuid` PK | |
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
-| `batch_fee_option_id` | `uuid NOT NULL` FK → `batch_fee_options` | Visitor’s term/fee choice |
+| `batch_fee_option_id` | `uuid NOT NULL` FK → `batch_fee_options` | Visitor’s package choice |
+| `days_per_week` | `integer NOT NULL` | Snapshotted at submit |
 | `term_months` | `integer NOT NULL` | Snapshotted at submit |
 | `fee_paise` | `integer NOT NULL` | Snapshotted at submit |
 | `player_full_name` | `text NOT NULL` | |
@@ -138,6 +144,7 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
   ```
 
 - `(academy_id, status)` for inbox and dashboard pending count
+- `CHECK (days_per_week BETWEEN 1 AND 7)`
 
 Rejected rows are retained; visitors may resubmit after reject.
 
@@ -166,12 +173,15 @@ Accept flow: find by that key → link existing Player, else insert → create `
 | `player_id` | `uuid NOT NULL` FK → `players` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
 | `registration_id` | `uuid NOT NULL` FK → `registrations` | Provenance |
+| `days_per_week` | `integer NOT NULL` | From accepted Registration |
 | `term_months` | `integer NOT NULL` | From accepted Registration |
 | `fee_paise_paid` | `integer NOT NULL` | From accepted Registration |
 | `valid_from` | `date NOT NULL` | Accept date |
 | `valid_until` | `date NOT NULL` | `valid_from` + `term_months` calendar months |
 | `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | Renewal chain |
 | `created_at` / `updated_at` | `timestamptz` | |
+
+**Constraint:** `CHECK (days_per_week BETWEEN 1 AND 7)`
 
 No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 3-month stint and a later 6-month renewal are separate rows).
 
@@ -244,18 +254,20 @@ user ─────────────────────┬──►
 - Claim flow: when `pending_owner_email` matches signed-in `user.email`, set `owner_user_id` and clear `pending_owner_email`
 - `enrollments.academy_id` must match both parent `academy_id` values
 - Impersonation writes → insert `impersonation_audit_events`
-- Conversion page: visitor picks an open Batch and a `batch_fee_option`; thank-you shows snapshotted `fee_paise` and Academy UPI QR (display-only; ADR-0002)
+- Conversion page: visitor picks an open Batch and an offered `batch_fee_option`; thank-you shows snapshotted `days_per_week`, `term_months`, `fee_paise`, and Academy UPI QR (display-only; ADR-0002)
 - Duplicate-pending guard ignores fee option — one pending Registration per phone + Batch + Player name
-- Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = `valid_from` + `term_months` calendar months
+- Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = `valid_from` + `term_months` calendar months; copies snapshotted `days_per_week`
 - Brochure does not list fees; pricing is conversion-page only
 - Onboarding wizard does not require fee options; Owner adds them in batch settings before intake opens
+- `days_per_week` and `term_months` are immutable after create; price, label, sort order, and `is_offered` may change
+- Stop offering a package by setting `is_offered = false`; delete only when no Registration references it
 
 ## P0 (#1) vs deferred (enrollment)
 
 | In #1 | Deferred |
 | --- | --- |
 | Visitor picks Batch + fee option; amount on conversion/thank-you | Expiry reminders / lapsed membership UI |
-| Registration inbox shows Batch · term · fee | Renewal form / overlap handling |
+| Registration inbox shows Batch · days/week · term · fee | Renewal form / overlap handling |
 | Accept writes `enrollments` with dates | Roster “active until” dashboard |
 | Owner manages `batch_fee_options` in `/app/batches` | Brochure “from ₹X” pricing |
 

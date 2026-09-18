@@ -91,8 +91,11 @@ export const batchFeeOptions = pgTable(
     batchId: uuid("batch_id")
       .notNull()
       .references(() => batches.id, { onDelete: "restrict" }),
+    daysPerWeek: integer("days_per_week").notNull(),
     termMonths: integer("term_months").notNull(),
     feePaise: integer("fee_paise").notNull(),
+    label: text("label"),
+    isOffered: boolean("is_offered").notNull().default(true),
     sortOrder: integer("sort_order").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -102,10 +105,17 @@ export const batchFeeOptions = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [unique("batch_fee_options_batch_id_term_months_unique").on(
-    table.batchId,
-    table.termMonths,
-  )],
+  (table) => [
+    unique("batch_fee_options_batch_id_days_per_week_term_months_unique").on(
+      table.batchId,
+      table.daysPerWeek,
+      table.termMonths,
+    ),
+    check(
+      "batch_fee_options_days_per_week_range",
+      sql`${table.daysPerWeek} between 1 and 7`,
+    ),
+  ],
 );
 
 export const players = pgTable(
@@ -149,6 +159,7 @@ export const registrations = pgTable(
     batchFeeOptionId: uuid("batch_fee_option_id")
       .notNull()
       .references(() => batchFeeOptions.id, { onDelete: "restrict" }),
+    daysPerWeek: integer("days_per_week").notNull(),
     termMonths: integer("term_months").notNull(),
     feePaise: integer("fee_paise").notNull(),
     playerFullName: text("player_full_name").notNull(),
@@ -192,39 +203,53 @@ export const registrations = pgTable(
       table.academyId,
       table.status,
     ),
+    check(
+      "registrations_days_per_week_range",
+      sql`${table.daysPerWeek} between 1 and 7`,
+    ),
   ],
 );
 
-export const enrollments = pgTable("enrollments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  academyId: uuid("academy_id")
-    .notNull()
-    .references(() => academies.id, { onDelete: "restrict" }),
-  playerId: uuid("player_id")
-    .notNull()
-    .references(() => players.id, { onDelete: "restrict" }),
-  batchId: uuid("batch_id")
-    .notNull()
-    .references(() => batches.id, { onDelete: "restrict" }),
-  registrationId: uuid("registration_id")
-    .notNull()
-    .references(() => registrations.id, { onDelete: "restrict" }),
-  termMonths: integer("term_months").notNull(),
-  feePaisePaid: integer("fee_paise_paid").notNull(),
-  validFrom: date("valid_from").notNull(),
-  validUntil: date("valid_until").notNull(),
-  renewedFromEnrollmentId: uuid("renewed_from_enrollment_id").references(
-    (): AnyPgColumn => enrollments.id,
-    { onDelete: "restrict" },
-  ),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const enrollments = pgTable(
+  "enrollments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => batches.id, { onDelete: "restrict" }),
+    registrationId: uuid("registration_id")
+      .notNull()
+      .references(() => registrations.id, { onDelete: "restrict" }),
+    daysPerWeek: integer("days_per_week").notNull(),
+    termMonths: integer("term_months").notNull(),
+    feePaisePaid: integer("fee_paise_paid").notNull(),
+    validFrom: date("valid_from").notNull(),
+    validUntil: date("valid_until").notNull(),
+    renewedFromEnrollmentId: uuid("renewed_from_enrollment_id").references(
+      (): AnyPgColumn => enrollments.id,
+      { onDelete: "restrict" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check(
+      "enrollments_days_per_week_range",
+      sql`${table.daysPerWeek} between 1 and 7`,
+    ),
+  ],
+);
 
 export const brochureImages = pgTable("brochure_images", {
   id: uuid("id").primaryKey().defaultRandom(),
