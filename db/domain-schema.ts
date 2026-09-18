@@ -62,24 +62,33 @@ export const academies = pgTable(
   ],
 );
 
-export const batches = pgTable("batches", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  academyId: uuid("academy_id")
-    .notNull()
-    .references(() => academies.id, { onDelete: "restrict" }),
-  name: text("name").notNull(),
-  blurb: text("blurb"),
-  isOpenForRegistration: boolean("is_open_for_registration")
-    .notNull()
-    .default(false),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const batches = pgTable(
+  "batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    blurb: text("blurb"),
+    isOpenForRegistration: boolean("is_open_for_registration")
+      .notNull()
+      .default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("batches_academy_id_name_unique").on(
+      table.academyId,
+      sql`lower(btrim(${table.name}))`,
+    ),
+  ],
+);
 
 export const batchFeeOptions = pgTable(
   "batch_fee_options",

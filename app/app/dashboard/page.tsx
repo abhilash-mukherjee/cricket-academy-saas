@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { listBatches } from "@/lib/batches";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
@@ -21,6 +22,8 @@ export default async function DashboardPage() {
     redirect("/app/onboarding");
   }
 
+  const academyBatches = await listBatches(academy.id);
+  const hasBatches = academyBatches.length > 0;
   const displayName = impersonation
     ? impersonation.subjectEmail
     : session.user.name;
@@ -43,6 +46,20 @@ export default async function DashboardPage() {
           <div className="card-body gap-3">
             <h2 className="card-title text-lg">Setup next steps</h2>
             <ul className="list-disc space-y-2 pl-5">
+              <li>
+                {hasBatches ? (
+                  <>
+                    <Link className="link" href="/app/batches">
+                      Batches
+                    </Link>{" "}
+                    add or rename Batches.
+                  </>
+                ) : (
+                  <Link className="link" href="/app/batches">
+                    Add your first Batch
+                  </Link>
+                )}
+              </li>
               <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure

@@ -77,12 +77,14 @@ Standard Better Auth shape. Magic-link only in v1; `account` is likely unused.
 | --- | --- | --- |
 | `id` | `uuid` PK | |
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
-| `name` | `text NOT NULL` | |
+| `name` | `text NOT NULL` | Stored as typed after trim |
 | `blurb` | `text` nullable | Brochure display-only |
 | `is_open_for_registration` | `boolean NOT NULL DEFAULT false` | |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Ordering:** `created_at` (no `sort_order` in v1).
+
+**Constraints:** `UNIQUE (academy_id, lower(btrim(name)))` — unique at the Academy after trim and case fold; public pages show the stored name.
 
 A Batch is registrable only when it has at least one offered `batch_fee_option` and `is_open_for_registration = true`.
 

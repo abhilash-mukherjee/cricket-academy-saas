@@ -6,6 +6,8 @@ import { POST as completeOnboarding } from "./onboarding/route";
 import { POST as saveBrochure } from "./brochure/route";
 import { POST as saveConversion } from "./conversion/route";
 import { POST as uploadAsset } from "./academy-assets/upload/route";
+import { POST as createBatch } from "./batches/route";
+import { PATCH as renameBatch } from "./batches/[batchId]/route";
 import AcademyBrochurePage from "@/app/a/[academySlug]/page";
 import ConversionPage from "@/app/a/[academySlug]/join/page";
 import {
@@ -25,6 +27,8 @@ import {
 } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+import { listBatches } from "@/lib/batches";
+import { getOwnedAcademy } from "@/lib/owner-onboarding";
 
 const sessionCookie = vi.hoisted(() => ({ value: "" }));
 const blobStore = vi.hoisted(() => new Map<string, Buffer>());
@@ -307,6 +311,89 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       expect(html).toContain(encodeURIComponent(upiQr.storageKey));
       expect(html).toContain("Pay with UPI");
+    });
+
+    it("purges public pages when the Owner adds a Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const createResponse = await createBatch(
+        new Request(`${origin}/api/batches`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ name: "Weekend nets" }),
+        }),
+      );
+      expect(createResponse.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("Weekend nets");
+      expect(html).toContain("U-14 evening");
+    });
+
+    it("purges public pages when the Owner renames a Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+      expect(batch).toBeTruthy();
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const renameResponse = await renameBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ name: "U-14 Morning" }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(renameResponse.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("U-14 Morning");
+      expect(html).not.toContain("U-14 evening");
     });
   },
 );
