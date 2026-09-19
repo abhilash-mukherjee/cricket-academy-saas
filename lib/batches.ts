@@ -1,5 +1,5 @@
 import { eq, and, asc } from "drizzle-orm";
-import { batches } from "@/db/domain-schema";
+import { batchFeeOptions, batches } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 
 export type BatchRecord = {
@@ -19,6 +19,12 @@ export type RenameBatchError = "invalid-input" | "name-taken" | "not-found";
 export type RenameBatchResult =
   | { ok: true }
   | { ok: false; error: RenameBatchError };
+
+export type SetBatchOpenError = "no-offered-package" | "not-found";
+
+export type SetBatchOpenResult =
+  | { ok: true }
+  | { ok: false; error: SetBatchOpenError };
 
 export async function listBatches(academyId: string): Promise<BatchRecord[]> {
   const db = getDb();
@@ -91,6 +97,48 @@ export async function renameBatch(
     }
     throw error;
   }
+}
+
+export async function setBatchOpenForRegistration(
+  academyId: string,
+  batchId: string,
+  isOpenForRegistration: boolean,
+): Promise<SetBatchOpenResult> {
+  const db = getDb();
+  const [batch] = await db
+    .select({ id: batches.id })
+    .from(batches)
+    .where(and(eq(batches.id, batchId), eq(batches.academyId, academyId)))
+    .limit(1);
+
+  if (!batch) {
+    return { ok: false, error: "not-found" };
+  }
+
+  if (isOpenForRegistration) {
+    const [offered] = await db
+      .select({ id: batchFeeOptions.id })
+      .from(batchFeeOptions)
+      .where(
+        and(
+          eq(batchFeeOptions.academyId, academyId),
+          eq(batchFeeOptions.batchId, batchId),
+          eq(batchFeeOptions.isOffered, true),
+        ),
+      )
+      .limit(1);
+
+    if (!offered) {
+      return { ok: false, error: "no-offered-package" };
+    }
+  }
+
+  await db
+    .update(batches)
+    .set({ isOpenForRegistration })
+    .where(and(eq(batches.id, batchId), eq(batches.academyId, academyId)));
+
+  return { ok: true };
 }
 
 function postgresConstraint(error: unknown): string | undefined {

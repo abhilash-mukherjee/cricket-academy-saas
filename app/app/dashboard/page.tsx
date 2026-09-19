@@ -29,6 +29,9 @@ export default async function DashboardPage() {
   ]);
   const hasBatches = academyBatches.length > 0;
   const hasFeeOptions = feeOptions.length > 0;
+  const hasOpenBatch = academyBatches.some(
+    (batch) => batch.isOpenForRegistration,
+  );
   const displayName = impersonation
     ? impersonation.subjectEmail
     : session.user.name;
@@ -79,6 +82,13 @@ export default async function DashboardPage() {
                       Add a fee option
                     </Link>
                   )}
+                </li>
+              ) : null}
+              {hasFeeOptions && !hasOpenBatch ? (
+                <li>
+                  <Link className="link" href="/app/batches">
+                    Open a Batch
+                  </Link>
                 </li>
               ) : null}
               <li>

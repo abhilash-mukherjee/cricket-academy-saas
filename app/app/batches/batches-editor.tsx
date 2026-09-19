@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import type { BatchRecord } from "@/lib/batches";
 import type { FeeOptionRecord } from "@/lib/batch-fee-options";
+import { ErrorToast } from "@/app/error-toast";
 
 type BatchesEditorProps = {
   batches: BatchRecord[];
@@ -50,6 +51,10 @@ function batchErrorCopy(error: string | null | undefined): string | null {
       return "That Batch name is already used at this Academy.";
     case "not-found":
       return "That Batch was not found.";
+    case "no-offered-package":
+      return "Add an offered fee option before opening this Batch.";
+    case "close-first":
+      return "Close this Batch for Registration first.";
     default:
       return error ?? null;
   }
@@ -65,6 +70,8 @@ function feeOptionErrorCopy(error: string | null | undefined): string | null {
       return "That fee option was not found.";
     case "in-use":
       return "This fee option cannot be deleted because a Registration references it. Stop offering it instead.";
+    case "close-first":
+      return "Close this Batch for Registration first.";
     default:
       return error ?? null;
   }
@@ -93,11 +100,19 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
   >({});
   const [submitting, setSubmitting] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [togglingOpenId, setTogglingOpenId] = useState<string | null>(null);
   const [addingFeeBatchId, setAddingFeeBatchId] = useState<string | null>(null);
   const [savingFeeOptionId, setSavingFeeOptionId] = useState<string | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState(0);
+  const dismissError = useCallback(() => setError(null), []);
+
+  function showError(message: string) {
+    setError(message);
+    setErrorId((current) => current + 1);
+  }
 
   async function onAdd(event: FormEvent) {
     event.preventDefault();
@@ -114,7 +129,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(batchErrorCopy(body?.error) ?? "Could not add Batch.");
+      showError(batchErrorCopy(body?.error) ?? "Could not add Batch.");
       setSubmitting(false);
       return;
     }
@@ -139,8 +154,37 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(batchErrorCopy(body?.error) ?? "Could not rename Batch.");
+      showError(batchErrorCopy(body?.error) ?? "Could not rename Batch.");
       setRenamingId(null);
+      return;
+    }
+
+    window.location.assign("/app/batches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
+  }
+
+  async function onToggleOpen(batch: BatchRecord) {
+    setTogglingOpenId(batch.id);
+    setError(null);
+
+    const response = await fetch(`/api/batches/${batch.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        isOpenForRegistration: !batch.isOpenForRegistration,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      showError(
+        batchErrorCopy(body?.error) ??
+          (batch.isOpenForRegistration
+            ? "Could not close this Batch."
+            : "Could not open this Batch."),
+      );
+      setTogglingOpenId(null);
       return;
     }
 
@@ -168,7 +212,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(feeOptionErrorCopy(body?.error) ?? "Could not add fee option.");
+      showError(feeOptionErrorCopy(body?.error) ?? "Could not add fee option.");
       setAddingFeeBatchId(null);
       return;
     }
@@ -198,7 +242,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
       const responseBody = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(feeOptionErrorCopy(responseBody?.error) ?? fallback);
+      showError(feeOptionErrorCopy(responseBody?.error) ?? fallback);
       setSavingFeeOptionId(null);
       return;
     }
@@ -252,7 +296,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(
+      showError(
         feeOptionErrorCopy(body?.error) ?? "Could not delete fee option.",
       );
       setSavingFeeOptionId(null);
@@ -335,6 +379,28 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                       {renamingId === batch.id ? "Saving…" : "Rename"}
                     </button>
                   </form>
+
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm">
+                      {batch.isOpenForRegistration
+                        ? "Open for Registration"
+                        : "Closed for Registration"}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-neutral btn-sm self-start"
+                      disabled={togglingOpenId === batch.id}
+                      onClick={() => void onToggleOpen(batch)}
+                    >
+                      {togglingOpenId === batch.id
+                        ? batch.isOpenForRegistration
+                          ? "Closing…"
+                          : "Opening…"
+                        : batch.isOpenForRegistration
+                          ? "Close for Registration"
+                          : "Open for Registration"}
+                    </button>
+                  </div>
 
                   <section className="flex flex-col gap-3">
                     <h2 className="text-sm font-medium">Fee options</h2>
@@ -570,7 +636,6 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
             required
           />
         </label>
-        {error ? <p className="text-error text-sm">{error}</p> : null}
         <button
           type="submit"
           className="btn btn-primary self-start"
@@ -579,6 +644,11 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
           {submitting ? "Adding…" : "Add Batch"}
         </button>
       </form>
+      <ErrorToast
+        key={errorId}
+        message={error}
+        onDismiss={dismissError}
+      />
     </div>
   );
 }

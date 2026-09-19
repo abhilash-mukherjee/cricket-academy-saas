@@ -26,7 +26,7 @@ export type CreateFeeOptionInput = {
   label?: string | null;
 };
 
-export type UpdateFeeOptionError = "invalid-input" | "not-found";
+export type UpdateFeeOptionError = "invalid-input" | "not-found" | "close-first";
 
 export type UpdateFeeOptionResult =
   | { ok: true }
@@ -39,7 +39,7 @@ export type UpdateFeeOptionInput = {
   isOffered?: boolean;
 };
 
-export type DeleteFeeOptionError = "not-found" | "in-use";
+export type DeleteFeeOptionError = "not-found" | "in-use" | "close-first";
 
 export type DeleteFeeOptionResult =
   | { ok: true }
@@ -191,6 +191,14 @@ export async function updateFeeOption(
     return existing ? { ok: true } : { ok: false, error: "not-found" };
   }
 
+  if (patch.isOffered === false) {
+    if (
+      await wouldRemoveLastOfferedOnOpenBatch(academyId, batchId, feeOptionId)
+    ) {
+      return { ok: false, error: "close-first" };
+    }
+  }
+
   const updated = await db
     .update(batchFeeOptions)
     .set(patch)
@@ -226,6 +234,10 @@ export async function deleteFeeOption(
     return { ok: false, error: "not-found" };
   }
 
+  if (await wouldRemoveLastOfferedOnOpenBatch(academyId, batchId, feeOptionId)) {
+    return { ok: false, error: "close-first" };
+  }
+
   const [referenced] = await db
     .select({ id: registrations.id })
     .from(registrations)
@@ -253,6 +265,52 @@ export async function deleteFeeOption(
     }
     throw error;
   }
+}
+
+async function wouldRemoveLastOfferedOnOpenBatch(
+  academyId: string,
+  batchId: string,
+  feeOptionId: string,
+): Promise<boolean> {
+  const db = getDb();
+  const [option] = await db
+    .select({ isOffered: batchFeeOptions.isOffered })
+    .from(batchFeeOptions)
+    .where(
+      and(
+        eq(batchFeeOptions.id, feeOptionId),
+        eq(batchFeeOptions.academyId, academyId),
+        eq(batchFeeOptions.batchId, batchId),
+      ),
+    )
+    .limit(1);
+
+  if (!option?.isOffered) {
+    return false;
+  }
+
+  const [batch] = await db
+    .select({ isOpenForRegistration: batches.isOpenForRegistration })
+    .from(batches)
+    .where(and(eq(batches.id, batchId), eq(batches.academyId, academyId)))
+    .limit(1);
+
+  if (!batch?.isOpenForRegistration) {
+    return false;
+  }
+
+  const offered = await db
+    .select({ id: batchFeeOptions.id })
+    .from(batchFeeOptions)
+    .where(
+      and(
+        eq(batchFeeOptions.academyId, academyId),
+        eq(batchFeeOptions.batchId, batchId),
+        eq(batchFeeOptions.isOffered, true),
+      ),
+    );
+
+  return offered.length === 1;
 }
 
 function inrToPaise(feeInr: number): number | null {

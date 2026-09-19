@@ -43,7 +43,12 @@ export async function PATCH(request: Request, context: RouteContext) {
   );
 
   if (!result.ok) {
-    const status = result.error === "not-found" ? 404 : 400;
+    const status =
+      result.error === "not-found"
+        ? 404
+        : result.error === "close-first"
+          ? 409
+          : 400;
     return NextResponse.json({ error: result.error }, { status });
   }
 
@@ -74,7 +79,8 @@ export async function DELETE(request: Request, context: RouteContext) {
   );
 
   if (!result.ok) {
-    const status = result.error === "in-use" ? 409 : 404;
+    const status =
+      result.error === "close-first" || result.error === "in-use" ? 409 : 404;
     return NextResponse.json({ error: result.error }, { status });
   }
 
