@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
@@ -36,6 +37,15 @@ export default async function BatchesPage() {
               Registration. Add only the fee options you sell. Batch blurbs
               stay on the brochure editor.
             </p>
+            {academy.isOnlineRegistrationAllowed ? null : (
+              <p className="alert alert-warning text-sm">
+                Visitors will not get a form on the conversion page until{" "}
+                <Link className="link" href="/app/conversion">
+                  online Registration
+                </Link>{" "}
+                is on.
+              </p>
+            )}
             <BatchesEditor
               batches={academyBatches}
               feeOptions={feeOptions}

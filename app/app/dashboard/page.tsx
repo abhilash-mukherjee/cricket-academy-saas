@@ -37,6 +37,7 @@ export default async function DashboardPage() {
     : session.user.name;
   const origin = publicOrigin();
   const brochureUrl = `${origin}/a/${academy.slug}`;
+  const conversionUrl = `${origin}/a/${academy.slug}/join`;
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -98,6 +99,12 @@ export default async function DashboardPage() {
                 photos, YouTube, Batch blurbs, and Coach profiles.
               </li>
               <li>
+                <Link className="link" href="/app/conversion">
+                  Conversion page
+                </Link>{" "}
+                UPI QR (optional) and online Registration.
+              </li>
+              <li>
                 Share your public {APP_NAME} links so visitors can find you.
               </li>
             </ul>
@@ -108,6 +115,7 @@ export default async function DashboardPage() {
           <div className="card-body gap-4">
             <h2 className="card-title text-lg">Public links</h2>
             <CopyLink label="Brochure" href={brochureUrl} />
+            <CopyLink label="Conversion page" href={conversionUrl} />
           </div>
         </section>
       </div>

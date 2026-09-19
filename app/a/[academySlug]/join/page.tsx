@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { getPublicConversion } from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
+import { BrochureCta } from "../brochure-cta";
+import { BrochurePhone } from "../brochure-phone";
 
 type ConversionPageProps = PageProps<"/a/[academySlug]/join">;
 
@@ -49,8 +51,15 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
     notFound();
   }
 
+  const showCopyPhone =
+    !conversion.isOnlineRegistrationAllowed && Boolean(conversion.phone);
+
   return (
-    <div className="bg-base-100 min-h-dvh">
+    <div
+      className={
+        showCopyPhone ? "bg-base-100 min-h-dvh pb-20" : "bg-base-100 min-h-dvh"
+      }
+    >
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 p-6">
         <h1 className="text-3xl font-bold">{conversion.name}</h1>
         {conversion.isIntakeAvailable ? (
@@ -94,15 +103,30 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
               </section>
             ) : null}
           </>
-        ) : (
+        ) : conversion.isOnlineRegistrationAllowed ? (
           <>
             <p>Intake is closed.</p>
             <Link className="link" href={`/a/${conversion.slug}`}>
               Brochure
             </Link>
           </>
+        ) : (
+          <>
+            <p>Online Registration is off.</p>
+            {conversion.phone ? (
+              <BrochurePhone phone={conversion.phone} />
+            ) : null}
+          </>
         )}
       </main>
+      {showCopyPhone ? (
+        <BrochureCta
+          slug={conversion.slug}
+          phone={conversion.phone}
+          isIntakeAvailable={false}
+          placement="viewport"
+        />
+      ) : null}
       <footer className="text-base-content/60 p-6 text-center text-sm">
         Built with {APP_NAME}
       </footer>

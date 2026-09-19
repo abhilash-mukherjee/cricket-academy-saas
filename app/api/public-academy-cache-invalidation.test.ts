@@ -745,5 +745,127 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         joinHtml.indexOf("Full week"),
       );
     });
+
+    it("purges public pages when the Owner toggles online Registration", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+
+      const created = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 3,
+            termMonths: 3,
+            feeInr: 15000,
+            label: "Weekday nets",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(created.status).toBe(200);
+
+      const openResponse = await patchBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOpenForRegistration: true }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(openResponse.status).toBe(200);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const offResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOnlineRegistrationAllowed: false }),
+        }),
+      );
+      expect(offResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterOff = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterOff = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterOff).toContain("Call to Register");
+      expect(brochureAfterOff).not.toContain(`href="/a/${slug}/join"`);
+      expect(joinAfterOff).toMatch(/online Registration is off/i);
+      expect(joinAfterOff).not.toContain("Weekday nets");
+      expect(joinAfterOff).not.toContain("Pay with UPI");
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const onResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOnlineRegistrationAllowed: true }),
+        }),
+      );
+      expect(onResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterOn = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterOn = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterOn).toContain("Register");
+      expect(brochureAfterOn).toContain(`/a/${slug}/join`);
+      expect(joinAfterOn).toContain("U-14 evening");
+      expect(joinAfterOn).toContain("Weekday nets");
+    });
   },
 );

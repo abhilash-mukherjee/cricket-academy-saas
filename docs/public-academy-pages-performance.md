@@ -64,7 +64,7 @@ Call a single helper (e.g. `revalidatePublicAcademyPages(slug)`) from every writ
 | Owner saves brochure (`POST /api/brochure`) | ✓ | ✓ | **#38** (CTA phone and `isIntakeAvailable` are baked into Brochure HTML) |
 | Owner saves conversion / UPI QR (`POST /api/conversion`) | — | ✓ | **#38** |
 | Owner adds or renames a Batch | ✓ | ✓ | **#45** |
-| Owner toggles online Registration for the Academy | ✓ | ✓ | Feature ticket (e.g. #5) |
+| Owner toggles online Registration for the Academy | ✓ | ✓ | **#48** |
 | Owner opens or closes a Batch for Registration | ✓ | ✓ | **#47** |
 | Batch fee options added, removed, or reordered | ✓ | ✓ | **#46** |
 | Super-admin deactivates or reactivates Academy | ✓ | ✓ | Feature ticket (e.g. #8); deactivated → 404; refresh sitemap |
