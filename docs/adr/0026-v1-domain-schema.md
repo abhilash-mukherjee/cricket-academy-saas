@@ -8,7 +8,7 @@ The first vertical's Postgres tables are specified in `docs/schema/issue-1-verti
 
 **`enrollments`, not `player_batches`.** A Player’s placement on a Batch for a term is an Enrollment (created on accept). A Player may have multiple Enrollments on the same Batch over time (renewal history). `renewed_from_enrollment_id` links renewal periods. “Player belongs to more than one Batch” means active or historical Enrollments across Batches.
 
-**`batch_fee_options`, not `batches.fee_paise`.** Each Batch offers discrete term packages (e.g. 3 months @ ₹X, 6 months @ ₹Y). `fee_paise` is the total for that term, not a monthly rate — academies often discount longer commitments. The visitor picks an option at registration; `term_months` and `fee_paise` are snapshotted on the Registration. A Batch with no fee options is not registrable.
+**`batch_fee_options`, not `batches.fee_paise`.** Each Batch offers discrete packages (term length × days per week × total price). `fee_paise` is the total for that package, not a monthly rate — academies often discount longer commitments. The visitor picks an option at registration; intensity, term, and fee are snapshotted on the Registration (ADR-0029). A Batch with no offered fee options is not registrable.
 
 **`storage_key`, not public URLs.** UPI QR, brochure images, and coach photos store an object-storage key; the app resolves URLs. CDN or provider base URL changes do not orphan rows. The Academy UPI QR is one image; the amount shown comes from the visitor’s selected fee option.
 

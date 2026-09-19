@@ -4,7 +4,7 @@ import { unstable_cache } from "next/cache";
 import { academies } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
-import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import { listRegistrableBatches, type RegistrableBatch } from "@/lib/academy-intake";
 import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
 
 /**
@@ -19,6 +19,7 @@ export type PublicConversion = {
   slug: string;
   isIntakeAvailable: boolean;
   upiQrUrl: string | null;
+  batches: RegistrableBatch[];
 };
 
 async function loadPublicConversion(
@@ -42,10 +43,10 @@ async function loadPublicConversion(
     return null;
   }
 
-  const isIntakeAvailable = await isAcademyIntakeAvailable({
-    academyId: academy.id,
-    isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
-  });
+  const batches = academy.isOnlineRegistrationAllowed
+    ? await listRegistrableBatches(academy.id)
+    : [];
+  const isIntakeAvailable = batches.length > 0;
 
   return {
     name: academy.name,
@@ -54,6 +55,7 @@ async function loadPublicConversion(
     upiQrUrl: isIntakeAvailable
       ? resolvePublicAssetUrl(academy.upiQrStorageKey)
       : null,
+    batches,
   };
 }
 

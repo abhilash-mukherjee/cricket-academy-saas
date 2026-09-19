@@ -1,6 +1,18 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { batches, batchFeeOptions } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
+
+export type RegistrableFeeOption = {
+  label: string | null;
+  daysPerWeek: number;
+  termMonths: number;
+  feePaise: number;
+};
+
+export type RegistrableBatch = {
+  name: string;
+  feeOptions: RegistrableFeeOption[];
+};
 
 export async function isAcademyIntakeAvailable(options: {
   academyId: string;
@@ -13,30 +25,82 @@ export async function isAcademyIntakeAvailable(options: {
   return academyHasRegistrableBatch(options.academyId);
 }
 
-async function academyHasRegistrableBatch(academyId: string): Promise<boolean> {
+export async function listRegistrableBatches(
+  academyId: string,
+): Promise<RegistrableBatch[]> {
   const db = getDb();
   const openBatches = await db
-    .select({ id: batches.id })
+    .select({ id: batches.id, name: batches.name })
     .from(batches)
     .where(
       and(
         eq(batches.academyId, academyId),
         eq(batches.isOpenForRegistration, true),
       ),
-    );
+    )
+    .orderBy(asc(batches.createdAt));
 
-  for (const batch of openBatches) {
-    const [feeOption] = await db
-      .select({ id: batchFeeOptions.id })
-      .from(batchFeeOptions)
-      .where(eq(batchFeeOptions.batchId, batch.id))
-      .orderBy(asc(batchFeeOptions.sortOrder))
-      .limit(1);
-
-    if (feeOption) {
-      return true;
-    }
+  if (openBatches.length === 0) {
+    return [];
   }
 
-  return false;
+  const offered = await db
+    .select({
+      batchId: batchFeeOptions.batchId,
+      label: batchFeeOptions.label,
+      daysPerWeek: batchFeeOptions.daysPerWeek,
+      termMonths: batchFeeOptions.termMonths,
+      feePaise: batchFeeOptions.feePaise,
+    })
+    .from(batchFeeOptions)
+    .where(
+      and(
+        eq(batchFeeOptions.academyId, academyId),
+        eq(batchFeeOptions.isOffered, true),
+        inArray(
+          batchFeeOptions.batchId,
+          openBatches.map((batch) => batch.id),
+        ),
+      ),
+    )
+    .orderBy(asc(batchFeeOptions.sortOrder), asc(batchFeeOptions.createdAt));
+
+  const optionsByBatch = new Map<string, RegistrableFeeOption[]>();
+  for (const option of offered) {
+    const list = optionsByBatch.get(option.batchId) ?? [];
+    list.push({
+      label: option.label,
+      daysPerWeek: option.daysPerWeek,
+      termMonths: option.termMonths,
+      feePaise: option.feePaise,
+    });
+    optionsByBatch.set(option.batchId, list);
+  }
+
+  return openBatches.flatMap((batch) => {
+    const feeOptions = optionsByBatch.get(batch.id);
+    if (!feeOptions || feeOptions.length === 0) {
+      return [];
+    }
+    return [{ name: batch.name, feeOptions }];
+  });
+}
+
+async function academyHasRegistrableBatch(academyId: string): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db
+    .select({ id: batchFeeOptions.id })
+    .from(batchFeeOptions)
+    .innerJoin(batches, eq(batches.id, batchFeeOptions.batchId))
+    .where(
+      and(
+        eq(batchFeeOptions.academyId, academyId),
+        eq(batchFeeOptions.isOffered, true),
+        eq(batches.academyId, academyId),
+        eq(batches.isOpenForRegistration, true),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(row);
 }

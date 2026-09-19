@@ -15,6 +15,20 @@
       "when": 1789147433369,
       "tag": "0001_v1_domain_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789715311298,
+      "tag": "0002_fee_option_intensity",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789720831899,
+      "tag": "0003_batch_name_unique",
+      "breakpoints": true
     }
   ]
 }

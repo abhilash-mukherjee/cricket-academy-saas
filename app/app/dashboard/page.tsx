@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
@@ -21,6 +23,15 @@ export default async function DashboardPage() {
     redirect("/app/onboarding");
   }
 
+  const [academyBatches, feeOptions] = await Promise.all([
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+  ]);
+  const hasBatches = academyBatches.length > 0;
+  const hasFeeOptions = feeOptions.length > 0;
+  const hasOpenBatch = academyBatches.some(
+    (batch) => batch.isOpenForRegistration,
+  );
   const displayName = impersonation
     ? impersonation.subjectEmail
     : session.user.name;
@@ -43,6 +54,43 @@ export default async function DashboardPage() {
           <div className="card-body gap-3">
             <h2 className="card-title text-lg">Setup next steps</h2>
             <ul className="list-disc space-y-2 pl-5">
+              <li>
+                {hasBatches ? (
+                  <>
+                    <Link className="link" href="/app/batches">
+                      Batches
+                    </Link>{" "}
+                    add or rename Batches.
+                  </>
+                ) : (
+                  <Link className="link" href="/app/batches">
+                    Add your first Batch
+                  </Link>
+                )}
+              </li>
+              {hasBatches ? (
+                <li>
+                  {hasFeeOptions ? (
+                    <>
+                      <Link className="link" href="/app/batches">
+                        Fee options
+                      </Link>{" "}
+                      add or update packages on a Batch.
+                    </>
+                  ) : (
+                    <Link className="link" href="/app/batches">
+                      Add a fee option
+                    </Link>
+                  )}
+                </li>
+              ) : null}
+              {hasFeeOptions && !hasOpenBatch ? (
+                <li>
+                  <Link className="link" href="/app/batches">
+                    Open a Batch
+                  </Link>
+                </li>
+              ) : null}
               <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure
