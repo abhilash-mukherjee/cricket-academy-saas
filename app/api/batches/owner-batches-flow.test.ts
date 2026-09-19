@@ -236,7 +236,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const second = html.indexOf("Weekend nets");
       expect(first).toBeGreaterThan(-1);
       expect(second).toBeGreaterThan(first);
-      expect(html).not.toMatch(/delete/i);
+      expect(html).not.toMatch(/delete batch/i);
     });
 
     it("lets the Owner rename a Batch and keeps the name as typed", async () => {

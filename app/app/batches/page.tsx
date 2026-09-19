@@ -3,6 +3,7 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
 import { BatchesEditor } from "./batches-editor";
 
 export default async function BatchesPage() {
@@ -19,7 +20,10 @@ export default async function BatchesPage() {
     redirect("/app/onboarding");
   }
 
-  const academyBatches = await listBatches(academy.id);
+  const [academyBatches, feeOptions] = await Promise.all([
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+  ]);
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -29,9 +33,13 @@ export default async function BatchesPage() {
             <h1 className="card-title">Batches</h1>
             <p className="text-base-content/70 text-sm">
               Names are unique at this Academy. New Batches start closed for
-              Registration. Batch blurbs stay on the brochure editor.
+              Registration. Add only the fee options you sell. Batch blurbs
+              stay on the brochure editor.
             </p>
-            <BatchesEditor batches={academyBatches} />
+            <BatchesEditor
+              batches={academyBatches}
+              feeOptions={feeOptions}
+            />
           </div>
         </section>
       </div>

@@ -8,6 +8,11 @@ import { POST as saveConversion } from "./conversion/route";
 import { POST as uploadAsset } from "./academy-assets/upload/route";
 import { POST as createBatch } from "./batches/route";
 import { PATCH as renameBatch } from "./batches/[batchId]/route";
+import { POST as createFeeOption } from "./batches/[batchId]/fee-options/route";
+import {
+  PATCH as updateFeeOption,
+  DELETE as deleteFeeOption,
+} from "./batches/[batchId]/fee-options/[feeOptionId]/route";
 import AcademyBrochurePage from "@/app/a/[academySlug]/page";
 import ConversionPage from "@/app/a/[academySlug]/join/page";
 import {
@@ -394,6 +399,130 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       expect(html).toContain("U-14 Morning");
       expect(html).not.toContain("U-14 evening");
+    });
+
+    it("purges public pages when the Owner adds, updates, or deletes a fee option", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+      expect(batch).toBeTruthy();
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const createResponse = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 3,
+            termMonths: 3,
+            feeInr: 15000,
+            label: "Weekday nets",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(createResponse.status).toBe(200);
+      const created = (await createResponse.json()) as { id: string };
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterCreate = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterCreate = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterCreate).toContain("U-14 evening");
+      expect(joinAfterCreate).toContain("Blitz Cricket Academy");
+      expect(joinAfterCreate).toContain(
+        "Registration is not open for this Academy right now.",
+      );
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const updateResponse = await updateFeeOption(
+        new Request(
+          `${origin}/api/batches/${batch!.id}/fee-options/${created.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              origin,
+              cookie,
+            },
+            body: JSON.stringify({ sortOrder: 2, feeInr: 16000 }),
+          },
+        ),
+        {
+          params: Promise.resolve({
+            batchId: batch!.id,
+            feeOptionId: created.id,
+          }),
+        },
+      );
+      expect(updateResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const deleteResponse = await deleteFeeOption(
+        new Request(
+          `${origin}/api/batches/${batch!.id}/fee-options/${created.id}`,
+          {
+            method: "DELETE",
+            headers: { origin, cookie },
+          },
+        ),
+        {
+          params: Promise.resolve({
+            batchId: batch!.id,
+            feeOptionId: created.id,
+          }),
+        },
+      );
+      expect(deleteResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const joinAfterDelete = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(joinAfterDelete).toContain("Blitz Cricket Academy");
+      expect(joinAfterDelete).toContain(
+        "Registration is not open for this Academy right now.",
+      );
     });
   },
 );

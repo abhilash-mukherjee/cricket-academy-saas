@@ -3,6 +3,7 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
@@ -22,8 +23,12 @@ export default async function DashboardPage() {
     redirect("/app/onboarding");
   }
 
-  const academyBatches = await listBatches(academy.id);
+  const [academyBatches, feeOptions] = await Promise.all([
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+  ]);
   const hasBatches = academyBatches.length > 0;
+  const hasFeeOptions = feeOptions.length > 0;
   const displayName = impersonation
     ? impersonation.subjectEmail
     : session.user.name;
@@ -60,6 +65,22 @@ export default async function DashboardPage() {
                   </Link>
                 )}
               </li>
+              {hasBatches ? (
+                <li>
+                  {hasFeeOptions ? (
+                    <>
+                      <Link className="link" href="/app/batches">
+                        Fee options
+                      </Link>{" "}
+                      add or update packages on a Batch.
+                    </>
+                  ) : (
+                    <Link className="link" href="/app/batches">
+                      Add a fee option
+                    </Link>
+                  )}
+                </li>
+              ) : null}
               <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure

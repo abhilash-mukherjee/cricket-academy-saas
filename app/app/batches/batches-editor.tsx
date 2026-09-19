@@ -2,12 +2,47 @@
 
 import { useState, type FormEvent } from "react";
 import type { BatchRecord } from "@/lib/batches";
+import type { FeeOptionRecord } from "@/lib/batch-fee-options";
 
 type BatchesEditorProps = {
   batches: BatchRecord[];
+  feeOptions: FeeOptionRecord[];
 };
 
-function errorCopy(error: string | null | undefined): string | null {
+type NewFeeOptionDraft = {
+  daysPerWeek: string;
+  termMonths: string;
+  feeInr: string;
+  label: string;
+};
+
+type FeeOptionEditDraft = {
+  feeInr: string;
+  label: string;
+  sortOrder: string;
+};
+
+const emptyNewFeeOptionDraft: NewFeeOptionDraft = {
+  daysPerWeek: "",
+  termMonths: "",
+  feeInr: "",
+  label: "",
+};
+
+function feeOptionEditDraft(
+  option: FeeOptionRecord,
+  drafts: Record<string, FeeOptionEditDraft>,
+): FeeOptionEditDraft {
+  return (
+    drafts[option.id] ?? {
+      feeInr: String(option.feePaise / 100),
+      label: option.label ?? "",
+      sortOrder: String(option.sortOrder),
+    }
+  );
+}
+
+function batchErrorCopy(error: string | null | undefined): string | null {
   switch (error) {
     case "invalid-input":
       return "Batch name is required.";
@@ -20,11 +55,48 @@ function errorCopy(error: string | null | undefined): string | null {
   }
 }
 
-export function BatchesEditor({ batches }: BatchesEditorProps) {
+function feeOptionErrorCopy(error: string | null | undefined): string | null {
+  switch (error) {
+    case "invalid-input":
+      return "Days per week must be 1–7, term a positive number of months, and price a positive amount in INR.";
+    case "identity-taken":
+      return "That days-per-week and term package already exists on this Batch.";
+    case "not-found":
+      return "That fee option was not found.";
+    case "in-use":
+      return "This fee option cannot be deleted because a Registration references it. Stop offering it instead.";
+    default:
+      return error ?? null;
+  }
+}
+
+function formatInr(feePaise: number): string {
+  return `₹${(feePaise / 100).toLocaleString("en-IN")}`;
+}
+
+function daysCopy(daysPerWeek: number): string {
+  return daysPerWeek === 1 ? "1 day per week" : `${daysPerWeek} days per week`;
+}
+
+function termCopy(termMonths: number): string {
+  return termMonths === 1 ? "1 month" : `${termMonths} months`;
+}
+
+export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
   const [name, setName] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [newFeeOptionDrafts, setNewFeeOptionDrafts] = useState<
+    Record<string, NewFeeOptionDraft>
+  >({});
+  const [feeOptionEditDrafts, setFeeOptionEditDrafts] = useState<
+    Record<string, FeeOptionEditDraft>
+  >({});
   const [submitting, setSubmitting] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [addingFeeBatchId, setAddingFeeBatchId] = useState<string | null>(null);
+  const [savingFeeOptionId, setSavingFeeOptionId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   async function onAdd(event: FormEvent) {
@@ -42,7 +114,7 @@ export function BatchesEditor({ batches }: BatchesEditorProps) {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(errorCopy(body?.error) ?? "Could not add Batch.");
+      setError(batchErrorCopy(body?.error) ?? "Could not add Batch.");
       setSubmitting(false);
       return;
     }
@@ -67,12 +139,156 @@ export function BatchesEditor({ batches }: BatchesEditorProps) {
       const body = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
-      setError(errorCopy(body?.error) ?? "Could not rename Batch.");
+      setError(batchErrorCopy(body?.error) ?? "Could not rename Batch.");
       setRenamingId(null);
       return;
     }
 
     window.location.assign("/app/batches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
+  }
+
+  async function onAddFeeOption(event: FormEvent, batch: BatchRecord) {
+    event.preventDefault();
+    setAddingFeeBatchId(batch.id);
+    setError(null);
+
+    const draft = newFeeOptionDrafts[batch.id] ?? emptyNewFeeOptionDraft;
+    const response = await fetch(`/api/batches/${batch.id}/fee-options`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        daysPerWeek: Number(draft.daysPerWeek),
+        termMonths: Number(draft.termMonths),
+        feeInr: Number(draft.feeInr),
+        label: draft.label,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(feeOptionErrorCopy(body?.error) ?? "Could not add fee option.");
+      setAddingFeeBatchId(null);
+      return;
+    }
+
+    window.location.assign("/app/batches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
+  }
+
+  async function patchFeeOption(
+    batchId: string,
+    feeOptionId: string,
+    body: Record<string, unknown>,
+    fallback: string,
+  ) {
+    setSavingFeeOptionId(feeOptionId);
+    setError(null);
+
+    const response = await fetch(
+      `/api/batches/${batchId}/fee-options/${feeOptionId}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!response.ok) {
+      const responseBody = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(feeOptionErrorCopy(responseBody?.error) ?? fallback);
+      setSavingFeeOptionId(null);
+      return;
+    }
+
+    window.location.assign("/app/batches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
+  }
+
+  async function onSaveFeeOption(
+    event: FormEvent,
+    batch: BatchRecord,
+    option: FeeOptionRecord,
+  ) {
+    event.preventDefault();
+    const draft = feeOptionEditDraft(option, feeOptionEditDrafts);
+    await patchFeeOption(
+      batch.id,
+      option.id,
+      {
+        feeInr: Number(draft.feeInr),
+        label: draft.label,
+        sortOrder: Number(draft.sortOrder),
+      },
+      "Could not update fee option.",
+    );
+  }
+
+  async function onToggleOffered(batch: BatchRecord, option: FeeOptionRecord) {
+    await patchFeeOption(
+      batch.id,
+      option.id,
+      { isOffered: !option.isOffered },
+      option.isOffered
+        ? "Could not stop offering this fee option."
+        : "Could not offer this fee option again.",
+    );
+  }
+
+  async function onDeleteFeeOption(
+    batch: BatchRecord,
+    option: FeeOptionRecord,
+  ) {
+    setSavingFeeOptionId(option.id);
+    setError(null);
+
+    const response = await fetch(
+      `/api/batches/${batch.id}/fee-options/${option.id}`,
+      { method: "DELETE" },
+    );
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(
+        feeOptionErrorCopy(body?.error) ?? "Could not delete fee option.",
+      );
+      setSavingFeeOptionId(null);
+      return;
+    }
+
+    window.location.assign("/app/batches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
+  }
+
+  function updateNewFeeOptionDraft(
+    batchId: string,
+    field: keyof NewFeeOptionDraft,
+    value: string,
+  ) {
+    setNewFeeOptionDrafts((current) => ({
+      ...current,
+      [batchId]: {
+        ...(current[batchId] ?? emptyNewFeeOptionDraft),
+        [field]: value,
+      },
+    }));
+  }
+
+  function updateFeeOptionEditDraft(
+    optionId: string,
+    option: FeeOptionRecord,
+    field: keyof FeeOptionEditDraft,
+    value: string,
+  ) {
+    setFeeOptionEditDrafts((current) => ({
+      ...current,
+      [optionId]: {
+        ...feeOptionEditDraft(option, current),
+        [field]: value,
+      },
+    }));
   }
 
   return (
@@ -83,37 +299,264 @@ export function BatchesEditor({ batches }: BatchesEditorProps) {
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {batches.map((batch) => (
-            <li key={batch.id} className="card bg-base-100">
-              <form
-                className="card-body flex flex-col gap-2 py-3"
-                onSubmit={(event) => void onRename(event, batch)}
-              >
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="font-medium">{batch.name}</span>
-                  <input
-                    className="input input-bordered"
-                    value={drafts[batch.id] ?? batch.name}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [batch.id]: event.target.value,
-                      }))
-                    }
-                    aria-label={`Rename ${batch.name}`}
-                    required
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className="btn btn-ghost btn-sm self-start"
-                  disabled={renamingId === batch.id}
-                >
-                  {renamingId === batch.id ? "Saving…" : "Rename"}
-                </button>
-              </form>
-            </li>
-          ))}
+          {batches.map((batch) => {
+            const batchFeeOptions = feeOptions.filter(
+              (option) => option.batchId === batch.id,
+            );
+            const draft = newFeeOptionDrafts[batch.id] ?? emptyNewFeeOptionDraft;
+
+            return (
+              <li key={batch.id} className="card bg-base-100">
+                <div className="card-body flex flex-col gap-4 py-3">
+                  <form
+                    className="flex flex-col gap-2"
+                    onSubmit={(event) => void onRename(event, batch)}
+                  >
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="font-medium">{batch.name}</span>
+                      <input
+                        className="input input-bordered"
+                        value={drafts[batch.id] ?? batch.name}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [batch.id]: event.target.value,
+                          }))
+                        }
+                        aria-label={`Rename ${batch.name}`}
+                        required
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="btn btn-ghost btn-sm self-start"
+                      disabled={renamingId === batch.id}
+                    >
+                      {renamingId === batch.id ? "Saving…" : "Rename"}
+                    </button>
+                  </form>
+
+                  <section className="flex flex-col gap-3">
+                    <h2 className="text-sm font-medium">Fee options</h2>
+                    {batchFeeOptions.length === 0 ? (
+                      <p className="text-base-content/70 text-sm">
+                        No fee options yet. Add a package this Batch sells.
+                      </p>
+                    ) : (
+                      <ul className="flex flex-col gap-2">
+                        {batchFeeOptions.map((option) => {
+                          const saved = feeOptionEditDraft(
+                            option,
+                            feeOptionEditDrafts,
+                          );
+                          const busy = savingFeeOptionId === option.id;
+
+                          return (
+                            <li
+                              key={option.id}
+                              className="rounded-box bg-base-200 flex flex-col gap-2 p-3 text-sm"
+                            >
+                              <p>
+                                {daysCopy(option.daysPerWeek)} ·{" "}
+                                {termCopy(option.termMonths)} ·{" "}
+                                {formatInr(option.feePaise)}
+                              </p>
+                              {option.isOffered ? null : (
+                                <p className="text-base-content/70">
+                                  Not offered
+                                </p>
+                              )}
+                              <form
+                                className="flex flex-col gap-2"
+                                onSubmit={(event) =>
+                                  void onSaveFeeOption(event, batch, option)
+                                }
+                              >
+                                <label className="flex flex-col gap-1">
+                                  Label (optional)
+                                  <input
+                                    className="input input-bordered input-sm"
+                                    value={saved.label}
+                                    onChange={(event) =>
+                                      updateFeeOptionEditDraft(
+                                        option.id,
+                                        option,
+                                        "label",
+                                        event.target.value,
+                                      )
+                                    }
+                                    aria-label={`Label for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termMonths)}`}
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  Price (INR)
+                                  <input
+                                    className="input input-bordered input-sm"
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={saved.feeInr}
+                                    onChange={(event) =>
+                                      updateFeeOptionEditDraft(
+                                        option.id,
+                                        option,
+                                        "feeInr",
+                                        event.target.value,
+                                      )
+                                    }
+                                    aria-label={`Price in INR for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termMonths)}`}
+                                    required
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  Sort order
+                                  <input
+                                    className="input input-bordered input-sm"
+                                    type="number"
+                                    step={1}
+                                    value={saved.sortOrder}
+                                    onChange={(event) =>
+                                      updateFeeOptionEditDraft(
+                                        option.id,
+                                        option,
+                                        "sortOrder",
+                                        event.target.value,
+                                      )
+                                    }
+                                    aria-label={`Sort order for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termMonths)}`}
+                                    required
+                                  />
+                                </label>
+                                <button
+                                  type="submit"
+                                  className="btn btn-ghost btn-sm self-start"
+                                  disabled={busy}
+                                >
+                                  {busy ? "Saving…" : "Save fee option"}
+                                </button>
+                              </form>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void onToggleOffered(batch, option)
+                                  }
+                                >
+                                  {option.isOffered
+                                    ? "Stop offering"
+                                    : "Offer again"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void onDeleteFeeOption(batch, option)
+                                  }
+                                >
+                                  Delete fee option
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    <form
+                      className="flex flex-col gap-2"
+                      onSubmit={(event) => void onAddFeeOption(event, batch)}
+                    >
+                      <label className="flex flex-col gap-1 text-sm">
+                        Days per week
+                        <input
+                          className="input input-bordered"
+                          type="number"
+                          min={1}
+                          max={7}
+                          step={1}
+                          value={draft.daysPerWeek}
+                          onChange={(event) =>
+                            updateNewFeeOptionDraft(
+                              batch.id,
+                              "daysPerWeek",
+                              event.target.value,
+                            )
+                          }
+                          aria-label={`Days per week for ${batch.name}`}
+                          required
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm">
+                        Term (months)
+                        <input
+                          className="input input-bordered"
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={draft.termMonths}
+                          onChange={(event) =>
+                            updateNewFeeOptionDraft(
+                              batch.id,
+                              "termMonths",
+                              event.target.value,
+                            )
+                          }
+                          aria-label={`Term months for ${batch.name}`}
+                          required
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm">
+                        Price (INR)
+                        <input
+                          className="input input-bordered"
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={draft.feeInr}
+                          onChange={(event) =>
+                            updateNewFeeOptionDraft(
+                              batch.id,
+                              "feeInr",
+                              event.target.value,
+                            )
+                          }
+                          aria-label={`Price in INR for ${batch.name}`}
+                          required
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm">
+                        Label (optional)
+                        <input
+                          className="input input-bordered"
+                          value={draft.label}
+                          onChange={(event) =>
+                            updateNewFeeOptionDraft(
+                              batch.id,
+                              "label",
+                              event.target.value,
+                            )
+                          }
+                          aria-label={`Fee option label for ${batch.name}`}
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="btn btn-secondary btn-sm self-start"
+                        disabled={addingFeeBatchId === batch.id}
+                      >
+                        {addingFeeBatchId === batch.id
+                          ? "Adding…"
+                          : "Add fee option"}
+                      </button>
+                    </form>
+                  </section>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

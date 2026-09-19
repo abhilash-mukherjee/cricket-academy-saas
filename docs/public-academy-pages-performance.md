@@ -66,7 +66,7 @@ Call a single helper (e.g. `revalidatePublicAcademyPages(slug)`) from every writ
 | Owner adds or renames a Batch | ✓ | ✓ | **#45** |
 | Owner toggles online Registration for the Academy | ✓ | ✓ | Feature ticket (e.g. #5) |
 | Owner opens or closes a Batch for Registration | ✓ | ✓ | Feature ticket (e.g. #5) |
-| Batch fee options added, removed, or reordered | ✓ | ✓ | Feature ticket (e.g. #5) |
+| Batch fee options added, removed, or reordered | ✓ | ✓ | **#46** |
 | Super-admin deactivates or reactivates Academy | ✓ | ✓ | Feature ticket (e.g. #8); deactivated → 404; refresh sitemap |
 | Brochure gallery / Coach image upload replacing saved keys | ✓ | — | **#38** (via brochure save after upload) |
 | New active Academy (onboarding) | — | — | Sitemap only (`listActiveBrochureUrls`) |
