@@ -79,6 +79,7 @@ describe("public chrome has no Sign out", () => {
       createElement(MarketingShell, null, createElement("p", null, "hello")),
     );
     expect(homepage).not.toContain("Sign out");
+    expect(homepage).not.toContain("Open menu");
 
     const brochure = renderToStaticMarkup(
       createElement(BrochureView, {
@@ -97,6 +98,7 @@ describe("public chrome has no Sign out", () => {
       }),
     );
     expect(brochure).not.toContain("Sign out");
+    expect(brochure).not.toContain("Open menu");
   });
 });
 

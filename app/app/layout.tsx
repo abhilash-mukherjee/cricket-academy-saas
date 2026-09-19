@@ -6,9 +6,9 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { resolveStaffAccess } from "@/lib/staff-access";
 import { getImpersonationState } from "@/lib/impersonation";
 import { APP_NAME } from "@/lib/constants";
-import { SignOutButton } from "./sign-out-button";
 import { AcademyDeactivatedMessage } from "./academy-deactivated-message";
 import { ImpersonationBanner } from "./impersonation-banner";
+import { StaffAppMenu } from "./staff-app-menu";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -59,11 +59,12 @@ export default async function AppLayout({
             />
           </Link>
         </div>
-        <div className="flex flex-none items-center gap-3">
-          <p className="text-base-content/70 text-sm">
-            {impersonation ? impersonation.subjectEmail : session.user.email}
-          </p>
-          <SignOutButton />
+        <div className="flex-none">
+          <StaffAppMenu
+            displayName={session.user.name}
+            email={session.user.email}
+            showOwnerLinks={access.kind === "owner"}
+          />
         </div>
       </header>
       {access.kind === "owner-deactivated" ? (

@@ -6,6 +6,7 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { BatchesEditor } from "./batches-editor";
+import { DashboardBackLink } from "../dashboard-back-link";
 
 export default async function BatchesPage() {
   const session = await requireStaffSession();
@@ -29,6 +30,7 @@ export default async function BatchesPage() {
   return (
     <main className="flex min-h-full flex-col p-6">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+        <DashboardBackLink />
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">Batches</h1>
