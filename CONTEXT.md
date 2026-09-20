@@ -13,11 +13,11 @@ An Academy's public marketing page at `/a/{academy-slug}` on a fixed template, i
 _Avoid_: Landing page, website, homepage
 
 **Conversion page**:
-An Academy's public intake page at `/a/{academy-slug}/join` where a visitor submits a Registration, chooses one registrable Batch and a fee option, and sees the Academy's UPI QR (an image the Owner uploaded) and the selected fee. Unavailable when online Registration is off (explains, no form; Academy phone when set) or when no Batch is registrable (intake is closed, no form, link to the brochure). A deactivated slug returns not found, same as the brochure. After submit, the visitor sees a thank-you screen only (no account, no status link).
+An Academy's public intake page at `/a/{academy-slug}/join` where a visitor submits a Registration and chooses one registrable Batch and a fee option. Layout order is the same on every viewport: packages, then Player details, then pay. The UPI QR (if the Owner uploaded one) and the selected fee appear only after a fee option is chosen and required name, date of birth, and phone are valid — not in a laptop rail and not before that step. Unavailable when online Registration is off (explains, no form; Academy phone when set) or when no Batch is registrable (intake is closed, no form, link to the brochure). A deactivated slug returns not found, same as the brochure. After submit, the visitor sees a thank-you screen only (no account, no status link).
 _Avoid_: Sign-up page, join form
 
 **Registration**:
-Details submitted on an Academy's conversion page (not the brochure). One Registration is one intended Player for exactly one Batch and one fee option: Player full name, date of birth, Batch, and fee option; Guardian full name and phone when the Player is under 18; Player phone when the Player is an adult; optional note. A second submit is blocked while a pending Registration already exists for the same phone, Batch, and Player name (case-insensitive, trimmed), regardless of fee option. The Owner accepts or rejects pending Registrations in the inbox; rejected Registrations may be submitted again. On accept, the Owner links to an existing Player with the same name and phone at the Academy or creates a new Player and creates an Enrollment for that Batch and fee option. The product does not verify that UPI payment happened. A Registration is not a Player and not an Enrollment.
+Details submitted on an Academy's conversion page (not the brochure). One Registration is one intended Player for exactly one Batch and one fee option: Player full name, date of birth, Batch, and fee option; Guardian full name and phone when the Player is under 18; Player phone when the Player is an adult; optional contact email; optional note. Adult Guardian is not collected at intake. Contact email is not a login and is not copied onto the Player in this phase; the product does not send mail to it. A second submit is blocked while a pending Registration already exists for the same phone, Batch, and Player name (case-insensitive, trimmed), regardless of fee option or email — that phone is the Guardian's when the Player is under 18, otherwise the Player's. The Owner accepts or rejects pending Registrations in the inbox; rejected Registrations may be submitted again. On accept, the Owner links to an existing Player with the same name and phone at the Academy or creates a new Player and creates an Enrollment for that Batch and fee option. The product does not verify that UPI payment happened. A Registration is not a Player and not an Enrollment.
 _Avoid_: Membership, payment
 
 **Enrollment**:
@@ -25,7 +25,7 @@ A Player's placement on a Batch for a defined term, created when the Owner accep
 _Avoid_: Subscription, membership
 
 **Guardian**:
-The adult contact for a Player. Required when the Player is under 18; optional when the Player is an adult. Guardians do not have accounts in this phase. The phone you actually use is the Guardian's when one is present.
+The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
 _Avoid_: Parent, customer (the Academy owner is the customer)
 
 **Player**:
