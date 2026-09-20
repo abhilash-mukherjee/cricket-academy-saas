@@ -13,19 +13,19 @@ An Academy's public marketing page at `/a/{academy-slug}` on a fixed template, i
 _Avoid_: Landing page, website, homepage
 
 **Conversion page**:
-An Academy's public intake page at `/a/{academy-slug}/join` where a visitor submits a Registration, chooses one open Batch and a fee option (term and total price), and sees the Academy's UPI QR (an image the Owner uploaded) and the selected fee. Unavailable when online Registration is off for the Academy, when no Batch is open for Registration, when a Batch has no fee options, or when the Academy is deactivated — in those cases the page explains why and does not show a form. After submit, the visitor sees a thank-you screen only (no account, no status link).
+An Academy's public intake page at `/a/{academy-slug}/join` where a visitor submits a Registration and chooses one registrable Batch and a fee option. Layout order is the same on every viewport: packages, then Player details, then pay. The UPI QR (if the Owner uploaded one) and the selected fee appear only after a fee option is chosen and required name, date of birth, and phone are valid — not in a laptop rail and not before that step. Unavailable when online Registration is off (explains, no form; Academy phone when set) or when no Batch is registrable (intake is closed, no form, link to the brochure). A deactivated slug returns not found, same as the brochure. After submit, the visitor sees a thank-you screen only (no account, no status link).
 _Avoid_: Sign-up page, join form
 
 **Registration**:
-Details submitted on an Academy's conversion page (not the brochure). One Registration is one intended Player for exactly one Batch and one fee option: Player full name, date of birth, Batch, and term/fee; Guardian full name and phone when the Player is under 18; Player phone when the Player is an adult; optional note. A second submit is blocked while a pending Registration already exists for the same phone, Batch, and Player name (case-insensitive, trimmed), regardless of fee option. The Owner accepts or rejects pending Registrations in the inbox; rejected Registrations may be submitted again. On accept, the Owner links to an existing Player with the same name and phone at the Academy or creates a new Player and creates an Enrollment for the Batch and term. The product does not verify that UPI payment happened. A Registration is not a Player and not an Enrollment.
+Details submitted on an Academy's conversion page (not the brochure). One Registration is one intended Player for exactly one Batch and one fee option: Player full name, date of birth, Batch, and fee option; Guardian full name and phone when the Player is under 18; Player phone when the Player is an adult; optional contact email; optional note. Adult Guardian is not collected at intake. Contact email is not a login and is not copied onto the Player in this phase; the product does not send mail to it. A second submit is blocked while a pending Registration already exists for the same phone, Batch, and Player name (case-insensitive, trimmed), regardless of fee option or email — that phone is the Guardian's when the Player is under 18, otherwise the Player's. The Owner accepts or rejects pending Registrations in the inbox; rejected Registrations may be submitted again. On accept, the Owner links to an existing Player with the same name and phone at the Academy or creates a new Player and creates an Enrollment for that Batch and fee option. The product does not verify that UPI payment happened. A Registration is not a Player and not an Enrollment.
 _Avoid_: Membership, payment
 
 **Enrollment**:
-A Player's placement on a Batch for a defined term, created when the Owner accepts a Registration. Carries the term length, fee paid, and valid-from / valid-until dates. Renewals add a new Enrollment linked to the prior one. The first vertical captures Enrollment dates but does not enforce expiry or run renewal workflows. An Enrollment is not a Registration.
+A Player's placement on a Batch for a defined term, created when the Owner accepts a Registration. Carries the days per week, term length, fee paid, and valid-from / valid-until dates as they stood at Registration — not a live link to the fee option. Renewals add a new Enrollment linked to the prior one. The first vertical records those facts but does not enforce expiry, attendance caps, or renewal workflows. An Enrollment is not a Registration.
 _Avoid_: Subscription, membership
 
 **Guardian**:
-The adult contact for a Player. Required when the Player is under 18; optional when the Player is an adult. Guardians do not have accounts in this phase. The phone you actually use is the Guardian's when one is present.
+The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
 _Avoid_: Parent, customer (the Academy owner is the customer)
 
 **Player**:
@@ -33,8 +33,12 @@ A person on an Academy roster after the Owner accepts a Registration. A Player c
 _Avoid_: Student, kid, member, registration
 
 **Batch**:
-A standing group of Players at an Academy (for example U-14 evening). Each Batch has one or more fee options (term length and total price in INR). Players are placed on a Batch through Enrollments; one Player may have Enrollments on several Batches, or multiple Enrollments on the same Batch over time (renewals). New Batches start closed for Registration; an Owner opens a Batch when ready and adds fee options before intake. Only open Batches with at least one fee option appear on the conversion page. Fees are shown on the conversion page, not the brochure.
+A standing group of Players at an Academy (for example U-14 evening). Players are placed on a Batch through Enrollments; one Player may have Enrollments on several Batches, or multiple Enrollments on the same Batch over time (renewals). Names are unique at an Academy (case-insensitive, trimmed); public pages show the name as typed. New Batches start closed for Registration; an Owner can open a Batch only when it has at least one offered fee option. A Batch is registrable when it is open for Registration and has at least one offered fee option; only registrable Batches appear on the conversion page.
 _Avoid_: Session, class, group
+
+**Fee option**:
+A sellable package on a Batch: days per week the package covers (a count from 1 to 7, not named weekdays), term length as a positive number of months, and a positive total price in INR. Identity is that days-per-week and term pair; an optional Owner label is display wording only. The Owner creates only the packages they sell — no generated grid — and may stop offering a package and offer the same package again later, or delete one that no Registration has used. Days per week and term do not change after create. A Batch is registrable only with at least one offered fee option. Days per week is what was paid for, not a Session attendance cap. On the conversion page the count, term, and price are always shown; a label, if set, is the name above those facts. Fees are shown on the conversion page, not the brochure.
+_Avoid_: Subscription, plan, pricing tier, timetable, archived fee
 
 **Session**:
 One occurrence of a Batch. Attendance is marked on a Session, not on a Batch.

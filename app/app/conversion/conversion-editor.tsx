@@ -25,6 +25,8 @@ export function ConversionEditor({ conversion }: ConversionEditorProps) {
     conversion.upiQrStorageKey,
   );
   const [upiQrUrl, setUpiQrUrl] = useState<string | null>(conversion.upiQrUrl);
+  const [isOnlineRegistrationAllowed, setIsOnlineRegistrationAllowed] =
+    useState(conversion.isOnlineRegistrationAllowed);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,10 @@ export function ConversionEditor({ conversion }: ConversionEditorProps) {
     const response = await fetch("/api/conversion", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ upiQrStorageKey }),
+      body: JSON.stringify({
+        upiQrStorageKey,
+        isOnlineRegistrationAllowed,
+      }),
     });
 
     if (!response.ok) {
@@ -87,6 +92,25 @@ export function ConversionEditor({ conversion }: ConversionEditorProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          className="checkbox mt-0.5"
+          checked={isOnlineRegistrationAllowed}
+          onChange={(event) =>
+            setIsOnlineRegistrationAllowed(event.target.checked)
+          }
+          aria-label="Online Registration"
+        />
+        <span>
+          <span className="font-medium">Online Registration</span>
+          <span className="text-base-content/70 mt-1 block text-sm">
+            When this is off, visitors cannot submit a Registration. Open
+            Batches stay open.
+          </span>
+        </span>
+      </label>
+
       <p className="text-base-content/70 text-sm">
         Upload the UPI QR visitors see on your conversion page when intake is
         open.

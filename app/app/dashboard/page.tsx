@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
+import { countPendingRegistrations } from "@/lib/registrations";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
@@ -21,11 +24,22 @@ export default async function DashboardPage() {
     redirect("/app/onboarding");
   }
 
+  const [academyBatches, feeOptions, pendingCount] = await Promise.all([
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+    countPendingRegistrations(academy.id),
+  ]);
+  const hasBatches = academyBatches.length > 0;
+  const hasFeeOptions = feeOptions.length > 0;
+  const hasOpenBatch = academyBatches.some(
+    (batch) => batch.isOpenForRegistration,
+  );
   const displayName = impersonation
     ? impersonation.subjectEmail
     : session.user.name;
   const origin = publicOrigin();
   const brochureUrl = `${origin}/a/${academy.slug}`;
+  const conversionUrl = `${origin}/a/${academy.slug}/join`;
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -36,6 +50,7 @@ export default async function DashboardPage() {
             <p>
               Hello {displayName}. {academy.name} is live.
             </p>
+            <p>Pending Registrations: {pendingCount}</p>
           </div>
         </section>
 
@@ -44,10 +59,53 @@ export default async function DashboardPage() {
             <h2 className="card-title text-lg">Setup next steps</h2>
             <ul className="list-disc space-y-2 pl-5">
               <li>
+                {hasBatches ? (
+                  <>
+                    <Link className="link" href="/app/batches">
+                      Batches
+                    </Link>{" "}
+                    add or rename Batches.
+                  </>
+                ) : (
+                  <Link className="link" href="/app/batches">
+                    Add your first Batch
+                  </Link>
+                )}
+              </li>
+              {hasBatches ? (
+                <li>
+                  {hasFeeOptions ? (
+                    <>
+                      <Link className="link" href="/app/batches">
+                        Fee options
+                      </Link>{" "}
+                      add or update packages on a Batch.
+                    </>
+                  ) : (
+                    <Link className="link" href="/app/batches">
+                      Add a fee option
+                    </Link>
+                  )}
+                </li>
+              ) : null}
+              {hasFeeOptions && !hasOpenBatch ? (
+                <li>
+                  <Link className="link" href="/app/batches">
+                    Open a Batch
+                  </Link>
+                </li>
+              ) : null}
+              <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure
                 </Link>{" "}
                 photos, YouTube, Batch blurbs, and Coach profiles.
+              </li>
+              <li>
+                <Link className="link" href="/app/conversion">
+                  Conversion page
+                </Link>{" "}
+                UPI QR (optional) and online Registration.
               </li>
               <li>
                 Share your public {APP_NAME} links so visitors can find you.
@@ -60,6 +118,7 @@ export default async function DashboardPage() {
           <div className="card-body gap-4">
             <h2 className="card-title text-lg">Public links</h2>
             <CopyLink label="Brochure" href={brochureUrl} />
+            <CopyLink label="Conversion page" href={conversionUrl} />
           </div>
         </section>
       </div>

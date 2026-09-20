@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Image from "next/image";
+import Link from "next/link";
 import { getPublicConversion } from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
+import { BrochureCta } from "../brochure-cta";
+import { BrochurePhone } from "../brochure-phone";
+import { RegistrationForm } from "./registration-form";
 
 type ConversionPageProps = PageProps<"/a/[academySlug]/join">;
 
@@ -36,31 +39,47 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
     notFound();
   }
 
+  const showCopyPhone =
+    !conversion.isOnlineRegistrationAllowed && Boolean(conversion.phone);
+
   return (
-    <div className="bg-base-100 min-h-dvh">
+    <div
+      className={
+        showCopyPhone ? "bg-base-100 min-h-dvh pb-20" : "bg-base-100 min-h-dvh"
+      }
+    >
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 p-6">
         <h1 className="text-3xl font-bold">{conversion.name}</h1>
         {conversion.isIntakeAvailable ? (
+          <RegistrationForm
+            academySlug={conversion.slug}
+            batches={conversion.batches}
+            upiQrUrl={conversion.upiQrUrl}
+          />
+        ) : conversion.isOnlineRegistrationAllowed ? (
           <>
-            <p>Registration for this Academy will open here.</p>
-            {conversion.upiQrUrl ? (
-              <section className="flex flex-col gap-2" aria-label="UPI QR">
-                <h2 className="text-lg font-semibold">Pay with UPI</h2>
-                <Image
-                  src={conversion.upiQrUrl}
-                  alt="Academy UPI QR"
-                  width={256}
-                  height={256}
-                  sizes="16rem"
-                  className="h-64 w-64 rounded-box object-contain"
-                />
-              </section>
-            ) : null}
+            <p>Intake is closed.</p>
+            <Link className="link" href={`/a/${conversion.slug}`}>
+              Brochure
+            </Link>
           </>
         ) : (
-          <p>Registration is not open for this Academy right now.</p>
+          <>
+            <p>Online Registration is off.</p>
+            {conversion.phone ? (
+              <BrochurePhone phone={conversion.phone} />
+            ) : null}
+          </>
         )}
       </main>
+      {showCopyPhone ? (
+        <BrochureCta
+          slug={conversion.slug}
+          phone={conversion.phone}
+          isIntakeAvailable={false}
+          placement="viewport"
+        />
+      ) : null}
       <footer className="text-base-content/60 p-6 text-center text-sm">
         Built with {APP_NAME}
       </footer>

@@ -4,7 +4,7 @@ import { unstable_cache } from "next/cache";
 import { academies } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
-import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import { listRegistrableBatches, type RegistrableBatch } from "@/lib/academy-intake";
 import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
 
 /**
@@ -17,8 +17,11 @@ export const PUBLIC_CONVERSION_CACHE_SECONDS = 300;
 export type PublicConversion = {
   name: string;
   slug: string;
+  phone: string | null;
+  isOnlineRegistrationAllowed: boolean;
   isIntakeAvailable: boolean;
   upiQrUrl: string | null;
+  batches: RegistrableBatch[];
 };
 
 async function loadPublicConversion(
@@ -30,6 +33,7 @@ async function loadPublicConversion(
       id: academies.id,
       name: academies.name,
       slug: academies.slug,
+      phone: academies.phone,
       isActive: academies.isActive,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
       upiQrStorageKey: academies.upiQrStorageKey,
@@ -42,18 +46,21 @@ async function loadPublicConversion(
     return null;
   }
 
-  const isIntakeAvailable = await isAcademyIntakeAvailable({
-    academyId: academy.id,
-    isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
-  });
+  const batches = academy.isOnlineRegistrationAllowed
+    ? await listRegistrableBatches(academy.id)
+    : [];
+  const isIntakeAvailable = batches.length > 0;
 
   return {
     name: academy.name,
     slug: academy.slug,
+    phone: academy.phone,
+    isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
     isIntakeAvailable,
     upiQrUrl: isIntakeAvailable
       ? resolvePublicAssetUrl(academy.upiQrStorageKey)
       : null,
+    batches,
   };
 }
 
@@ -62,7 +69,7 @@ function getCachedPublicConversion(
 ): Promise<PublicConversion | null> {
   return unstable_cache(
     () => loadPublicConversion(slug),
-    ["public-conversion", slug],
+    ["public-conversion", slug, "registrable-ids"],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: PUBLIC_CONVERSION_CACHE_SECONDS,
