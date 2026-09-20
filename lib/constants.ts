@@ -1,8 +1,6 @@
 export const APP_NAME = "restartHQ";
-export const APP_DESCRIPTION = "Run your cricket Academy from one place!";
-export const PRODUCT_HOMEPAGE_COPY = `Publish a brochure, collect Registrations, and manage your roster.
-            Built for Academy Owners and Coaches — not for Players or Guardians
-            to log in.`;
+export const APP_DESCRIPTION = "The Operating System for Next Gen Sports Academies!";
+export const PRODUCT_HOMEPAGE_COPY = `Manage athletes, coaches, operations, and growth — all from one dashboard.`;
 
 export const LOGIN_PAGE_COPY = `Sign in to your Academy Pro account`;
 export const ACADEMY_NOT_FOUND = "Academy not found";

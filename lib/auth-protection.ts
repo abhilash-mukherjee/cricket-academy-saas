@@ -12,3 +12,11 @@ export function shouldRedirectAppRouteToLogin(request: NextRequest): boolean {
 
   return !getSessionCookie(request);
 }
+
+export function shouldRedirectHomepageToApp(request: NextRequest): boolean {
+  if (request.nextUrl.pathname !== "/") {
+    return false;
+  }
+
+  return Boolean(getSessionCookie(request));
+}

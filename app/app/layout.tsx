@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = "sin1";
 
 export default async function AppLayout({
   children,
