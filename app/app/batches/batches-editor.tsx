@@ -3,6 +3,7 @@
 import { useCallback, useState, type FormEvent } from "react";
 import type { BatchRecord } from "@/lib/batches";
 import type { FeeOptionRecord } from "@/lib/batch-fee-options";
+import { daysCopy, formatInr, termCopy } from "@/lib/package-copy";
 import { ErrorToast } from "@/app/error-toast";
 
 type BatchesEditorProps = {
@@ -75,18 +76,6 @@ function feeOptionErrorCopy(error: string | null | undefined): string | null {
     default:
       return error ?? null;
   }
-}
-
-function formatInr(feePaise: number): string {
-  return `₹${(feePaise / 100).toLocaleString("en-IN")}`;
-}
-
-function daysCopy(daysPerWeek: number): string {
-  return daysPerWeek === 1 ? "1 day per week" : `${daysPerWeek} days per week`;
-}
-
-function termCopy(termMonths: number): string {
-  return termMonths === 1 ? "1 month" : `${termMonths} months`;
 }
 
 export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {

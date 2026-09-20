@@ -16,6 +16,7 @@ import {
 import { PATCH as patchBatch } from "./batches/[batchId]/route";
 import AcademyBrochurePage from "@/app/a/[academySlug]/page";
 import ConversionPage from "@/app/a/[academySlug]/join/page";
+import { getPublicConversion } from "@/lib/public-conversion";
 import {
   clearCapturedMail,
   disableMailCapture,
@@ -315,8 +316,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain(encodeURIComponent(upiQr.storageKey));
-      expect(html).toContain("Pay with UPI");
+      const conversion = await getPublicConversion(slug);
+      expect(conversion?.upiQrUrl).toContain(upiQr.storageKey);
+      expect(html).toContain("Register for a Batch.");
+      expect(html).not.toContain("Pay with UPI");
     });
 
     it("purges public pages when the Owner adds a Batch", async () => {

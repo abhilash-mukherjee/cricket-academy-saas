@@ -4,6 +4,7 @@ import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
+import { countPendingRegistrations } from "@/lib/registrations";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
@@ -23,9 +24,10 @@ export default async function DashboardPage() {
     redirect("/app/onboarding");
   }
 
-  const [academyBatches, feeOptions] = await Promise.all([
+  const [academyBatches, feeOptions, pendingCount] = await Promise.all([
     listBatches(academy.id),
     listFeeOptions(academy.id),
+    countPendingRegistrations(academy.id),
   ]);
   const hasBatches = academyBatches.length > 0;
   const hasFeeOptions = feeOptions.length > 0;
@@ -48,6 +50,7 @@ export default async function DashboardPage() {
             <p>
               Hello {displayName}. {academy.name} is live.
             </p>
+            <p>Pending Registrations: {pendingCount}</p>
           </div>
         </section>
 

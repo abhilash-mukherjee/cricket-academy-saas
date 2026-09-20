@@ -3,6 +3,7 @@ import { batches, batchFeeOptions } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 
 export type RegistrableFeeOption = {
+  id: string;
   label: string | null;
   daysPerWeek: number;
   termMonths: number;
@@ -10,6 +11,7 @@ export type RegistrableFeeOption = {
 };
 
 export type RegistrableBatch = {
+  id: string;
   name: string;
   feeOptions: RegistrableFeeOption[];
 };
@@ -46,6 +48,7 @@ export async function listRegistrableBatches(
 
   const offered = await db
     .select({
+      id: batchFeeOptions.id,
       batchId: batchFeeOptions.batchId,
       label: batchFeeOptions.label,
       daysPerWeek: batchFeeOptions.daysPerWeek,
@@ -69,6 +72,7 @@ export async function listRegistrableBatches(
   for (const option of offered) {
     const list = optionsByBatch.get(option.batchId) ?? [];
     list.push({
+      id: option.id,
       label: option.label,
       daysPerWeek: option.daysPerWeek,
       termMonths: option.termMonths,
@@ -82,7 +86,7 @@ export async function listRegistrableBatches(
     if (!feeOptions || feeOptions.length === 0) {
       return [];
     }
-    return [{ name: batch.name, feeOptions }];
+    return [{ id: batch.id, name: batch.name, feeOptions }];
   });
 }
 

@@ -469,8 +469,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(joinHtml).toContain("3 days per week");
       expect(joinHtml).toContain("3 months");
       expect(joinHtml).toContain("₹15,000");
-      expect(joinHtml).toMatch(/not a Registration form yet/i);
-      expect(joinHtml).not.toContain("<form");
+      expect(joinHtml).toContain("Register for a Batch.");
+      expect(joinHtml).toContain("<form");
+      expect(joinHtml).not.toMatch(/not a Registration form yet/i);
       expect(joinHtml).not.toMatch(/intake is closed/i);
 
       const brochureHtml = renderToStaticMarkup(

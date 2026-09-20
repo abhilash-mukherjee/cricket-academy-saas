@@ -126,7 +126,8 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
 | `guardian_full_name` | `text` nullable | Required when Player &lt; 18 (app) |
 | `guardian_phone` | `text` nullable | E.164 |
 | `player_phone` | `text` nullable | E.164; required when Player ≥ 18 (app) |
-| `contact_phone` | `text NOT NULL` | E.164; `guardian_phone ?? player_phone` |
+| `contact_phone` | `text NOT NULL` | E.164; Guardian phone when the Player is under 18, otherwise Player phone |
+| `contact_email` | `text` nullable | Optional; not a login; not copied onto `players`; ignored by the duplicate-pending guard |
 | `note` | `text` nullable | |
 | `status` | `registration_status NOT NULL DEFAULT 'pending'` | |
 | `player_id` | `uuid` nullable FK → `players` | Set on accept |
@@ -252,12 +253,14 @@ user ─────────────────────┬──►
 ## App-layer rules (not DB constraints)
 
 - Slug is immutable after create
+- Age 18 is evaluated in `Asia/Kolkata` as of submit: under 18 until the 18th birthday calendar day; adult on that birthday. Adult Guardian is not collected at intake. `contact_phone` is the Guardian phone when the Player is under 18, otherwise the Player phone; the unused Guardian or Player phone/name columns are null.
+- Optional `contact_email` is not copied onto `players` and is not part of the duplicate-pending guard
 - Guardian required when date of birth → age &lt; 18; `player_phone` required when ≥ 18
 - Claim flow: when `pending_owner_email` matches signed-in `user.email`, set `owner_user_id` and clear `pending_owner_email`
 - `enrollments.academy_id` must match both parent `academy_id` values
 - Impersonation writes → insert `impersonation_audit_events`
 - Conversion page: visitor picks an open Batch and an offered `batch_fee_option`; thank-you shows snapshotted `days_per_week`, `term_months`, `fee_paise`, and Academy UPI QR (display-only; ADR-0002)
-- Duplicate-pending guard ignores fee option — one pending Registration per phone + Batch + Player name
+- Duplicate-pending guard ignores fee option **and** email — one pending Registration per phone + Batch + Player name
 - Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = `valid_from` + `term_months` calendar months; copies snapshotted `days_per_week`
 - Brochure does not list fees; pricing is conversion-page only
 - Onboarding wizard does not require fee options; Owner adds them in batch settings before intake opens

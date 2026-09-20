@@ -69,7 +69,7 @@ function getCachedPublicConversion(
 ): Promise<PublicConversion | null> {
   return unstable_cache(
     () => loadPublicConversion(slug),
-    ["public-conversion", slug],
+    ["public-conversion", slug, "registrable-ids"],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: PUBLIC_CONVERSION_CACHE_SECONDS,
