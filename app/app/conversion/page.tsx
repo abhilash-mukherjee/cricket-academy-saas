@@ -4,6 +4,7 @@ import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { getConversionEditor } from "@/lib/conversion";
 import { ConversionEditor } from "./conversion-editor";
+import { DashboardBackLink } from "../dashboard-back-link";
 
 export default async function ConversionEditorPage() {
   const session = await requireStaffSession();
@@ -27,6 +28,7 @@ export default async function ConversionEditorPage() {
   return (
     <main className="flex min-h-full flex-col p-6">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+        <DashboardBackLink />
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">Conversion page</h1>

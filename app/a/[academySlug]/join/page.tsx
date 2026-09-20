@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { getPublicConversion } from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
+import { BrochureCta } from "../brochure-cta";
+import { BrochurePhone } from "../brochure-phone";
+import { RegistrationForm } from "./registration-form";
 
 type ConversionPageProps = PageProps<"/a/[academySlug]/join">;
 
@@ -30,18 +32,6 @@ export async function generateMetadata({
   };
 }
 
-function formatInr(feePaise: number): string {
-  return `₹${(feePaise / 100).toLocaleString("en-IN")}`;
-}
-
-function daysCopy(daysPerWeek: number): string {
-  return daysPerWeek === 1 ? "1 day per week" : `${daysPerWeek} days per week`;
-}
-
-function termCopy(termMonths: number): string {
-  return termMonths === 1 ? "1 month" : `${termMonths} months`;
-}
-
 export default async function ConversionPage({ params }: ConversionPageProps) {
   const { academySlug } = await params;
   const conversion = await getPublicConversion(academySlug);
@@ -49,60 +39,47 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
     notFound();
   }
 
+  const showCopyPhone =
+    !conversion.isOnlineRegistrationAllowed && Boolean(conversion.phone);
+
   return (
-    <div className="bg-base-100 min-h-dvh">
+    <div
+      className={
+        showCopyPhone ? "bg-base-100 min-h-dvh pb-20" : "bg-base-100 min-h-dvh"
+      }
+    >
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 p-6">
         <h1 className="text-3xl font-bold">{conversion.name}</h1>
         {conversion.isIntakeAvailable ? (
-          <>
-            <p>This is not a Registration form yet.</p>
-            {conversion.batches.map((batch) => (
-              <section key={batch.name} className="flex flex-col gap-3">
-                <h2 className="text-xl font-semibold">{batch.name}</h2>
-                <ul className="flex flex-col gap-2">
-                  {batch.feeOptions.map((option) => (
-                    <li
-                      key={`${option.daysPerWeek}-${option.termMonths}`}
-                      className="card bg-base-200"
-                    >
-                      <div className="card-body gap-1 py-3">
-                        {option.label ? (
-                          <p className="font-medium">{option.label}</p>
-                        ) : null}
-                        <p>
-                          {daysCopy(option.daysPerWeek)} ·{" "}
-                          {termCopy(option.termMonths)} ·{" "}
-                          {formatInr(option.feePaise)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-            {conversion.upiQrUrl ? (
-              <section className="flex flex-col gap-2" aria-label="UPI QR">
-                <h2 className="text-lg font-semibold">Pay with UPI</h2>
-                <Image
-                  src={conversion.upiQrUrl}
-                  alt="Academy UPI QR"
-                  width={256}
-                  height={256}
-                  sizes="16rem"
-                  className="h-64 w-64 rounded-box object-contain"
-                />
-              </section>
-            ) : null}
-          </>
-        ) : (
+          <RegistrationForm
+            academySlug={conversion.slug}
+            batches={conversion.batches}
+            upiQrUrl={conversion.upiQrUrl}
+          />
+        ) : conversion.isOnlineRegistrationAllowed ? (
           <>
             <p>Intake is closed.</p>
             <Link className="link" href={`/a/${conversion.slug}`}>
               Brochure
             </Link>
           </>
+        ) : (
+          <>
+            <p>Online Registration is off.</p>
+            {conversion.phone ? (
+              <BrochurePhone phone={conversion.phone} />
+            ) : null}
+          </>
         )}
       </main>
+      {showCopyPhone ? (
+        <BrochureCta
+          slug={conversion.slug}
+          phone={conversion.phone}
+          isIntakeAvailable={false}
+          placement="viewport"
+        />
+      ) : null}
       <footer className="text-base-content/60 p-6 text-center text-sm">
         Built with {APP_NAME}
       </footer>

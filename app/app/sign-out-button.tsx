@@ -30,10 +30,10 @@ export function SignOutButton() {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col gap-1">
       <button
         type="button"
-        className="btn btn-ghost btn-sm"
+        className="btn btn-ghost btn-sm w-full justify-start"
         disabled={pending}
         onClick={() => void handleSignOut()}
       >

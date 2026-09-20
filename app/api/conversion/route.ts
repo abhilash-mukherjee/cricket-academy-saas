@@ -8,6 +8,7 @@ import { revalidatePublicAcademyPages } from "@/lib/public-academy-pages";
 
 type ConversionBody = {
   upiQrStorageKey?: string | null;
+  isOnlineRegistrationAllowed?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -22,7 +23,12 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as ConversionBody;
   const result = await updateConversion(context.academy.id, {
-    upiQrStorageKey: body.upiQrStorageKey ?? null,
+    ...("upiQrStorageKey" in body
+      ? { upiQrStorageKey: body.upiQrStorageKey ?? null }
+      : {}),
+    ...("isOnlineRegistrationAllowed" in body
+      ? { isOnlineRegistrationAllowed: body.isOnlineRegistrationAllowed }
+      : {}),
   });
 
   if (!result.ok) {

@@ -25,3 +25,11 @@ vi.mock("next/cache", () => ({
   updateTag: vi.fn(),
   refresh: vi.fn(),
 }));
+
+vi.mock("next/navigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/navigation")>();
+  return {
+    ...actual,
+    usePathname: () => "",
+  };
+});

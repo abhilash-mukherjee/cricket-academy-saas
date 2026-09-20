@@ -178,6 +178,7 @@ export const registrations = pgTable(
     guardianPhone: text("guardian_phone"),
     playerPhone: text("player_phone"),
     contactPhone: text("contact_phone").notNull(),
+    contactEmail: text("contact_email"),
     note: text("note"),
     status: registrationStatusEnum("status").notNull().default("pending"),
     playerId: uuid("player_id").references(() => players.id, {

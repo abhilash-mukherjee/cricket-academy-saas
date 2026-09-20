@@ -17,6 +17,8 @@ export const PUBLIC_CONVERSION_CACHE_SECONDS = 300;
 export type PublicConversion = {
   name: string;
   slug: string;
+  phone: string | null;
+  isOnlineRegistrationAllowed: boolean;
   isIntakeAvailable: boolean;
   upiQrUrl: string | null;
   batches: RegistrableBatch[];
@@ -31,6 +33,7 @@ async function loadPublicConversion(
       id: academies.id,
       name: academies.name,
       slug: academies.slug,
+      phone: academies.phone,
       isActive: academies.isActive,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
       upiQrStorageKey: academies.upiQrStorageKey,
@@ -51,6 +54,8 @@ async function loadPublicConversion(
   return {
     name: academy.name,
     slug: academy.slug,
+    phone: academy.phone,
+    isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
     isIntakeAvailable,
     upiQrUrl: isIntakeAvailable
       ? resolvePublicAssetUrl(academy.upiQrStorageKey)
@@ -64,7 +69,7 @@ function getCachedPublicConversion(
 ): Promise<PublicConversion | null> {
   return unstable_cache(
     () => loadPublicConversion(slug),
-    ["public-conversion", slug],
+    ["public-conversion", slug, "registrable-ids"],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: PUBLIC_CONVERSION_CACHE_SECONDS,
