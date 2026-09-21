@@ -5,11 +5,17 @@ import heroImage from "@/public/product-homepage-hero.webp";
 
 type MarketingShellProps = {
   children: React.ReactNode;
+  className?: string;
 };
 
-export function MarketingShell({ children }: MarketingShellProps) {
+export function MarketingShell({ children, className }: MarketingShellProps) {
   return (
-    <main className="relative flex min-h-dvh flex-1 flex-col">
+    <main
+      className={[
+        "relative flex flex-1 flex-col",
+        className ?? "min-h-dvh",
+      ].join(" ")}
+    >
       <Image
         src={heroImage}
         alt=""
