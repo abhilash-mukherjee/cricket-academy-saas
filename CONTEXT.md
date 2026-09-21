@@ -28,6 +28,10 @@ _Avoid_: Subscription, membership
 The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
 _Avoid_: Parent, customer (the Academy owner is the customer)
 
+**Phone**:
+A contact number for an Academy, a Guardian, or a Player. The same number written in different local or international forms is one Phone — that is how pending Registrations and Players are matched. Numbers without a country prefix are Indian; numbers that already name another country are accepted. The product shows the canonical Phone, not the original typing.
+_Avoid_: mobile (when we mean any Phone), cell
+
 **Player**:
 A person on an Academy roster after the Owner accepts a Registration. A Player can have Enrollments on more than one Batch at a time.
 _Avoid_: Student, kid, member, registration
