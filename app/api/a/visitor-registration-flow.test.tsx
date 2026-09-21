@@ -450,6 +450,32 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
     });
 
+    it("blocks a second pending Registration when the two submits use different writings of the same Phone", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug, "U-14 evening");
+      const opened = await openRegistrableBatch(cookie, slug);
+
+      const first = await postRegistration(slug, {
+        batchFeeOptionId: opened.feeOptionId,
+        ...adultBody,
+        playerPhone: "9876543210",
+      });
+      expect(first.status).toBe(200);
+      await expect(first.json()).resolves.toMatchObject({
+        snapshot: { contactPhone: "+919876543210" },
+      });
+
+      const duplicate = await postRegistration(slug, {
+        batchFeeOptionId: opened.feeOptionId,
+        ...adultBody,
+        playerPhone: "+91 98765 43210",
+      });
+      expect(duplicate.status).toBe(409);
+      await expect(duplicate.json()).resolves.toEqual({
+        error: "duplicate-pending",
+      });
+    });
+
     it("allows a sibling on the same phone and Batch", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug, "U-14 evening");

@@ -26,6 +26,10 @@ export function StaffAppMenu({
   const currentPath = usePathname();
   const menuRef = useRef<HTMLDetailsElement>(null);
 
+  function closeMenu() {
+    menuRef.current?.removeAttribute("open");
+  }
+
   useEffect(() => {
     function closeIfClickedOutside(event: PointerEvent) {
       const menu = menuRef.current;
@@ -35,7 +39,7 @@ export function StaffAppMenu({
       if (menu.contains(event.target as Node)) {
         return;
       }
-      menu.removeAttribute("open");
+      closeMenu();
     }
 
     document.addEventListener("pointerdown", closeIfClickedOutside);
@@ -71,6 +75,7 @@ export function StaffAppMenu({
                       href={link.href}
                       className={current ? "menu-active" : undefined}
                       aria-current={current ? "page" : undefined}
+                      onClick={closeMenu}
                     >
                       {link.label}
                     </Link>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { isAcademySlug, suggestAcademySlug } from "@/lib/academy-slug";
 import { SLUG_HELP } from "@/lib/constants";
 import { onboardingSubmitSucceeded } from "@/lib/onboarding-submit";
+import { PHONE_INVALID_COPY } from "@/lib/phone";
 
 const STEPS = ["You", "Academy", "Batch", "Brochure"] as const;
 
@@ -37,7 +38,7 @@ function errorCopy(error: string | null): string | null {
     case "already-owns-academy":
       return "This login already owns an Academy.";
     case "invalid-phone":
-      return "Phone must be E.164, for example +919876543210.";
+      return PHONE_INVALID_COPY;
     case "invalid-input":
       return "Fill in the required fields to continue.";
     default:

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { BrochureEditorState } from "@/lib/brochure";
 import { BrochureView } from "@/app/a/[academySlug]/brochure-view";
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
+import { PHONE_INVALID_COPY } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import Link from "next/link";
@@ -27,7 +28,7 @@ type CoachDraft = {
 function errorCopy(error: string | null): string | null {
   switch (error) {
     case "invalid-phone":
-      return "Phone must be E.164, for example +919876543210.";
+      return PHONE_INVALID_COPY;
     case "invalid-storage-key":
       return "Images must belong to your Academy.";
     case "invalid-youtube-url":
