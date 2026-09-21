@@ -26,14 +26,26 @@ const FEATURE_CARDS = [
 
 export default function FeatureShell() {
     return (
-        <section className="bg-base-100 flex min-h-dvh snap-start flex-col">
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-6 p-6">
+        <section className="relative flex min-h-dvh snap-start flex-col overflow-hidden bg-base-100">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 left-[10%] size-72 rounded-full bg-[#C6D5FC]/25 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-[18%] right-[8%] size-96 rounded-full bg-[#C6D5FC]/20 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-16 left-1/3 size-80 rounded-full bg-[#C6D5FC]/15 blur-3xl"
+        />
+        <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-6 p-6">
           <h2 className="text-center text-2xl font-bold">
             {FEATURE_LIST_HEADING}
           </h2>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 p-2">
             {FEATURE_CARDS.map((card) => (
-              <article key={card.title} className="card bg-base-200">
+              <article key={card.title} className="card">
                 <div className="card-body">
                   <card.Icon />
                   <h3 className="card-title">{card.title}</h3>
@@ -43,7 +55,7 @@ export default function FeatureShell() {
             ))}
           </div>
         </div>
-        <footer className="text-base-content/60 p-6 text-center text-sm">
+        <footer className="relative z-10 p-6 text-center text-sm text-base-content/60">
           {`© 2026 ${APP_NAME}`}
         </footer>
       </section>
