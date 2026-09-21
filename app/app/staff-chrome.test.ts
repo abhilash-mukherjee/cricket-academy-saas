@@ -175,6 +175,27 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(menu).toContain("Sign out");
     });
 
+    it("keeps the header when the page body is the Loading fallback", async () => {
+      const cookie = await signIn(ownerEmail, "Asha Rao");
+      await onboardOwner(cookie, slug);
+      sessionCookie.value = cookie;
+
+      const { default: AppLayout } = await import("./layout");
+      const { default: Loading } = await import("./loading");
+      const html = renderToStaticMarkup(
+        await AppLayout({
+          children: createElement(Loading),
+          params: Promise.resolve({}),
+        }),
+      );
+
+      const headerEnd = html.indexOf("</header>");
+      const spinner = html.indexOf("loading-spinner");
+      expect(headerEnd).toBeGreaterThan(0);
+      expect(spinner).toBeGreaterThan(headerEnd);
+      expect(html).toContain("Loading");
+    });
+
     it("keeps Owner links out of the Super-admin Academies menu", async () => {
       const cookie = await signIn(superAdminEmail, "Super Admin");
       const db = getDb();

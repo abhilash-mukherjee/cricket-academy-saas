@@ -183,6 +183,38 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).not.toContain("Koramangala");
     });
 
+    it("shows the canonical Phone and tel: link after saving a 10-digit Indian mobile", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            phone: "9876543210",
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("+919876543210");
+      expect(html).toContain('href="tel:+919876543210"');
+      expect(html).not.toContain(">9876543210<");
+    });
+
     it("shows a location URL as a link and a place name as text", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);

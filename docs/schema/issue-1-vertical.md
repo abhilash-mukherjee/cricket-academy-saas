@@ -1,6 +1,6 @@
 # Issue #1 vertical — domain schema (v1)
 
-Blueprint for the first vertical's Postgres schema. Parent spec: [#1](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/1). Trade-offs: [ADR-0026](../adr/0026-v1-domain-schema.md), [ADR-0029](../adr/0029-fee-option-intensity.md).
+Blueprint for the first vertical's Postgres schema. Parent spec: [#1](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/1). Trade-offs: [ADR-0026](../adr/0026-v1-domain-schema.md), [ADR-0029](../adr/0029-fee-option-intensity.md), [ADR-0032](../adr/0032-phone-parsed-to-canonical-e164.md).
 
 After implementation, `db/domain-schema.ts` and migrations are canonical; update this doc when the schema changes intentionally.
 
@@ -10,7 +10,7 @@ After implementation, `db/domain-schema.ts` and migrations are canonical; update
 - **Timestamps:** `created_at timestamptz NOT NULL DEFAULT now()` on all tables; `updated_at` on mutable domain rows
 - **Tenant isolation:** every Academy-scoped row carries `academy_id` (ADR-0008)
 - **Foreign keys:** `ON DELETE RESTRICT` on all FKs
-- **Phones:** normalized to E.164 on write in the data layer
+- **Phones:** parsed then stored as E.164 on write (ADR 0032); identity keys compare that canonical value
 - **Files:** store `storage_key text` (object-storage path); app resolves to a URL
 
 ## Repo layout

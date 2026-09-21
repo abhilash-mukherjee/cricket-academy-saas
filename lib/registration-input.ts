@@ -39,10 +39,20 @@ const optionalTrimmed = z
   .optional()
   .transform(blankToNull);
 
-const optionalPhone = optionalTrimmed.refine(
-  (value) => value === null || normalizeRequiredPhone(value).ok,
-  PHONE_INVALID_COPY,
-);
+const optionalPhone = optionalTrimmed.transform((value, ctx) => {
+  if (value === null) {
+    return null;
+  }
+  const parsed = normalizeRequiredPhone(value);
+  if (!parsed.ok) {
+    ctx.addIssue({
+      code: "custom",
+      message: PHONE_INVALID_COPY,
+    });
+    return z.NEVER;
+  }
+  return parsed.phone;
+});
 
 const optionalEmail = optionalTrimmed.refine((value) => {
   if (value === null) {
