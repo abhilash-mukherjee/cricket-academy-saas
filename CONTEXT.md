@@ -17,15 +17,15 @@ An Academy's public intake page at `/a/{academy-slug}/join` where a visitor subm
 _Avoid_: Sign-up page, join form
 
 **Registration**:
-Details submitted on an Academy's conversion page (not the brochure). One Registration is one intended Player for exactly one Batch and one fee option: Player full name, date of birth, Batch, and fee option; Guardian full name and phone when the Player is under 18; Player phone when the Player is an adult; optional contact email; optional note. Adult Guardian is not collected at intake. Contact email is not a login and is not copied onto the Player in this phase; the product does not send mail to it. A second submit is blocked while a pending Registration already exists for the same phone, Batch, and Player name (case-insensitive, trimmed), regardless of fee option or email — that phone is the Guardian's when the Player is under 18, otherwise the Player's. The Owner accepts or rejects pending Registrations in the inbox; rejected Registrations may be submitted again. On accept, the Owner links to an existing Player with the same name and phone at the Academy or creates a new Player and creates an Enrollment for that Batch and fee option. The product does not verify that UPI payment happened. A Registration is not a Player and not an Enrollment.
+Details submitted on an Academy's conversion page (not the brochure). One Registration is one intended Player for exactly one Batch and one fee option: Player full name, date of birth, Batch, and fee option; Guardian full name and phone when the Player is under 18; Player phone when the Player is an adult; optional contact email; optional note. Adult Guardian is not collected at intake. Contact email is not a login and is not copied onto the Player in this phase; the product does not send mail to it. A second submit is blocked while a pending Registration already exists for the same phone, Batch, and Player name (case-insensitive, trimmed), regardless of fee option or email — that phone is the Guardian's when the Player is under 18, otherwise the Player's. The Owner accepts or rejects pending Registrations in the inbox; rejected Registrations may be submitted again. On accept, the Owner links to an existing Player with the same name and phone at the Academy or creates a new Player (copying Guardian onto the Player when under 18) and creates an Enrollment for that Batch and fee option. The product does not verify that UPI payment happened. A Registration is not a Player and not an Enrollment.
 _Avoid_: Membership, payment
 
 **Enrollment**:
-A Player's placement on a Batch for a defined term, created when the Owner accepts a Registration. Carries the days per week, term length, fee paid, and valid-from / valid-until dates as they stood at Registration — not a live link to the fee option. Renewals add a new Enrollment linked to the prior one. The first vertical records those facts but does not enforce expiry, attendance caps, or renewal workflows. An Enrollment is not a Registration.
-_Avoid_: Subscription, membership
+A Player's placement on a Batch for a defined term, created when the Owner accepts a Registration or adds a Player directly (no Registration). Carries the days per week, term length, fee paid, and valid-from / valid-until dates as they stood at create — not a live link to the fee option. Renewals add a new Enrollment linked to the prior one. An Enrollment may be paused: while paused it is excluded from Session attendance lists. On resume, valid-until is extended by the number of calendar days the pause lasted (“paused days are added back”). Pause may be open-ended (explicit resume) or dated. Lapsed means valid-until is in the past while not paused. An Enrollment is not a Registration.
+_Avoid_: Subscription, membership (domain language prefers Enrollment; UI may say membership)
 
 **Guardian**:
-The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
+The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. On accept or manual add, Guardian name and phone are copied onto the Player for roster contact. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
 _Avoid_: Parent, customer (the Academy owner is the customer)
 
 **Phone**:
@@ -33,7 +33,7 @@ A contact number for an Academy, a Guardian, or a Player. The same number writte
 _Avoid_: mobile (when we mean any Phone), cell
 
 **Player**:
-A person on an Academy roster after the Owner accepts a Registration. A Player can have Enrollments on more than one Batch at a time.
+A person on an Academy roster after the Owner accepts a Registration or adds them directly. Identity at an Academy is name + phone; under-18 Players also carry Guardian name and phone copied at create. A Player can have Enrollments on more than one Batch at a time.
 _Avoid_: Student, kid, member, registration
 
 **Batch**:
@@ -45,11 +45,11 @@ A sellable package on a Batch: days per week the package covers (a count from 1 
 _Avoid_: Subscription, plan, pricing tier, timetable, archived fee
 
 **Session**:
-One occurrence of a Batch. Attendance is marked on a Session, not on a Batch.
+One occurrence of a Batch on a calendar date. The Owner creates or opens a Session ad hoc (Batch + date) to mark Player attendance; there is no Batch weekday timetable in this phase. Present is marked explicitly; unmarked Players on the list count as absent when the Owner saves.
 _Avoid_: Batch, class, practice
 
 **Owner**:
-The logged-in user who runs an Academy: brochure, conversion page, Registration inbox (accept and reject), and roster. Signs up from the product homepage via email magic link (or claims an Academy a Super-admin assigned); provides a display name during onboarding. One login owns one Academy in this phase. Staff screens live under `/app/…`. The same user can also be a Coach. SaaS billing is not part of the first slice.
+The logged-in user who runs an Academy: brochure, conversion page, Registration inbox (accept and reject), roster, Enrollment lifecycle, and Player attendance on Sessions. Signs up from the product homepage via email magic link (or claims an Academy a Super-admin assigned); provides a display name during onboarding. One login owns one Academy in this phase. Staff screens live under `/app/…`. The same user can also be a Coach. SaaS billing is not part of the first slice.
 _Avoid_: Admin, manager
 
 **Super-admin**:
@@ -57,5 +57,5 @@ A platform operator with cross-Academy access at `/app/admin/…`. Provisioned o
 _Avoid_: Admin (in Owner-facing language), root user
 
 **Coach**:
-A logged-in user who marks Session attendance for an Academy. The same user can also be the Owner. An Owner may add display-only Coach profiles on the brochure (name, image, optional blurb); these may or may not match a logged-in Coach. Parents and Guardians do not have accounts in this phase.
+A logged-in user who will mark Session attendance for an Academy when Coach login ships. Until then, the Owner marks Player attendance (including while a Super-admin is impersonating that Owner). The same user can also be the Owner. An Owner may add display-only Coach profiles on the brochure (name, image, optional blurb); these may or may not match a logged-in Coach. Parents and Guardians do not have accounts in this phase.
 _Avoid_: Trainer, teacher
