@@ -17,7 +17,7 @@ export default function Home() {
               {PRODUCT_HOMEPAGE_COPY}
             </p>
           </div>
-          <Link href="/login" className="btn btn-lg">
+          <Link href="/app" className="btn btn-lg">
             Start your Academy
           </Link>
         </section>

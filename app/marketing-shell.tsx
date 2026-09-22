@@ -40,7 +40,7 @@ export function MarketingShell({ children, className }: MarketingShellProps) {
           </Link>
         </div>
         <div className="flex-none">
-          <Link href="/login" className="btn btn-ghost btn-sm text-base-100">
+          <Link href="/app" className="btn btn-ghost btn-sm text-base-100">
             Sign in
           </Link>
         </div>
