@@ -96,16 +96,16 @@ A Batch is registrable only when it has at least one offered `batch_fee_option` 
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
 | `days_per_week` | `integer NOT NULL` | Intensity count 1–7; not named weekdays |
-| `term_months` | `integer NOT NULL` | e.g. 1, 3, 6 |
+| `term_days` | `integer NOT NULL` | Whole calendar days of coverage, at least 1. e.g. 45, 90, 100 |
 | `fee_paise` | `integer NOT NULL` | Total fee for that package (INR × 100) |
 | `label` | `text` nullable | Display name only; not identity |
 | `is_offered` | `boolean NOT NULL DEFAULT true` | `false` hides from conversion; row kept for history |
 | `sort_order` | `integer NOT NULL` | Conversion page order |
 | `created_at` / `updated_at` | `timestamptz` | |
 
-**Constraints:** `UNIQUE (batch_id, days_per_week, term_months)`; `CHECK (days_per_week BETWEEN 1 AND 7)`
+**Constraints:** `UNIQUE (batch_id, days_per_week, term_days)`; `CHECK (days_per_week BETWEEN 1 AND 7)`
 
-Trade-offs: [ADR-0029](../adr/0029-fee-option-intensity.md).
+End state after the cutover. Stored months become this column in two releases ([ADR-0033](../adr/0033-fee-option-term-in-days.md)). Trade-offs: [ADR-0029](../adr/0029-fee-option-intensity.md), [ADR-0033](../adr/0033-fee-option-term-in-days.md).
 
 ### `registrations`
 
@@ -118,7 +118,7 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
 | `batch_fee_option_id` | `uuid NOT NULL` FK → `batch_fee_options` | Visitor’s package choice |
 | `days_per_week` | `integer NOT NULL` | Snapshotted at submit |
-| `term_months` | `integer NOT NULL` | Snapshotted at submit |
+| `term_days` | `integer NOT NULL` | Snapshotted at submit. Whole calendar days, at least 1 |
 | `fee_paise` | `integer NOT NULL` | Snapshotted at submit |
 | `player_full_name` | `text NOT NULL` | |
 | `player_full_name_normalized` | `text NOT NULL` | `lower(trim(name))` on insert |
@@ -177,16 +177,16 @@ Accept flow: find by that key → link existing Player, else insert → create `
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
 | `registration_id` | `uuid NOT NULL` FK → `registrations` | Provenance |
 | `days_per_week` | `integer NOT NULL` | From accepted Registration |
-| `term_months` | `integer NOT NULL` | From accepted Registration |
+| `term_days` | `integer NOT NULL` | From accepted Registration. Whole calendar days, at least 1 |
 | `fee_paise_paid` | `integer NOT NULL` | From accepted Registration |
 | `valid_from` | `date NOT NULL` | Accept date |
-| `valid_until` | `date NOT NULL` | `valid_from` + `term_months` calendar months |
+| `valid_until` | `date NOT NULL` | Last covered day. `valid_from` counts as day one, so `valid_from` + `term_days` − 1 day. The cutover does not rewrite a date already stored |
 | `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | Renewal chain |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Constraint:** `CHECK (days_per_week BETWEEN 1 AND 7)`
 
-No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 3-month stint and a later 6-month renewal are separate rows).
+No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 90-day stint and a later 180-day renewal are separate rows).
 
 ### `brochure_images`
 
@@ -259,12 +259,12 @@ user ─────────────────────┬──►
 - Claim flow: when `pending_owner_email` matches signed-in `user.email`, set `owner_user_id` and clear `pending_owner_email`
 - `enrollments.academy_id` must match both parent `academy_id` values
 - Impersonation writes → insert `impersonation_audit_events`
-- Conversion page: visitor picks an open Batch and an offered `batch_fee_option`; thank-you shows snapshotted `days_per_week`, `term_months`, `fee_paise`, and Academy UPI QR (display-only; ADR-0002)
+- Conversion page: visitor picks an open Batch and an offered `batch_fee_option`; thank-you shows snapshotted `days_per_week`, `term_days` as a day count, `fee_paise`, and Academy UPI QR (display-only; ADR-0002)
 - Duplicate-pending guard ignores fee option **and** email — one pending Registration per phone + Batch + Player name
-- Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = `valid_from` + `term_months` calendar months; copies snapshotted `days_per_week`
+- Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = last covered day (`valid_from` + `term_days` − 1 day); copies snapshotted `days_per_week`
 - Brochure does not list fees; pricing is conversion-page only
 - Onboarding wizard does not require fee options; Owner adds them in batch settings before intake opens
-- `days_per_week` and `term_months` are immutable after create; price, label, sort order, and `is_offered` may change
+- `days_per_week` and `term_days` are immutable after create; price, label, sort order, and `is_offered` may change
 - Stop offering a package by setting `is_offered = false`; delete only when no Registration references it
 
 ## P0 (#1) vs deferred (enrollment)

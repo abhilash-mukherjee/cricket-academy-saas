@@ -152,7 +152,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await deleteOwnerByEmail(otherEmail);
     });
 
-    it("lets the Owner create a package they sell: days per week, term months, positive INR price, optional label", async () => {
+    it("lets the Owner create a package they sell: days per week, term in days, positive INR price, optional label", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug, "U-14 evening");
 
@@ -171,7 +171,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "  Weekday nets  ",
           }),
@@ -184,7 +184,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         expect.objectContaining({
           batchId: batch!.id,
           daysPerWeek: 3,
-          termMonths: 3,
+          termDays: 3,
           feePaise: 1500000,
           label: "Weekday nets",
           isOffered: true,
@@ -194,10 +194,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       sessionCookie.value = cookie;
       const { default: BatchesPage } = await import("@/app/app/batches/page");
       const html = renderToStaticMarkup(await BatchesPage());
-      expect(html).toContain("Weekday nets");
-      expect(html).toContain("3 days per week");
-      expect(html).toContain("3 months");
-      expect(html).toContain("₹15,000");
+      expect(html.indexOf("Weekday nets")).toBeLessThan(
+        html.indexOf("3 days per week · 3 days · ₹15,000"),
+      );
+      expect(html).toContain("3 days per week · 3 days · ₹15,000");
     });
 
     it("rejects days per week outside 1–7, a non-positive term, and a non-positive INR price", async () => {
@@ -207,11 +207,12 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const [batch] = await listBatches(academy!.id);
 
       const invalidBodies = [
-        { daysPerWeek: 0, termMonths: 3, feeInr: 15000 },
-        { daysPerWeek: 8, termMonths: 3, feeInr: 15000 },
-        { daysPerWeek: 3, termMonths: 0, feeInr: 15000 },
-        { daysPerWeek: 3, termMonths: 3, feeInr: 0 },
-        { daysPerWeek: 3, termMonths: 3, feeInr: -100 },
+        { daysPerWeek: 0, termDays: 3, feeInr: 15000 },
+        { daysPerWeek: 8, termDays: 3, feeInr: 15000 },
+        { daysPerWeek: 3, termDays: 0, feeInr: 15000 },
+        { daysPerWeek: 3, termDays: 1.5, feeInr: 15000 },
+        { daysPerWeek: 3, termDays: 3, feeInr: 0 },
+        { daysPerWeek: 3, termDays: 3, feeInr: -100 },
       ];
 
       for (const body of invalidBodies) {
@@ -236,6 +237,49 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await expect(listFeeOptions(academy!.id)).resolves.toEqual([]);
     });
 
+    it("lets the Owner sell 1, 45, and 100 day terms, with the label above the day count", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug, "U-14 evening");
+      const academy = await getOwnedAcademy(await sessionUserId(cookie));
+      const [batch] = await listBatches(academy!.id);
+
+      for (const termDays of [45, 100, 1]) {
+        const response = await createFeeOption(
+          new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              origin,
+              cookie,
+            },
+            body: JSON.stringify({
+              daysPerWeek: 3,
+              termDays,
+              feeInr: 15000,
+              label: termDays === 45 ? "Quarterly" : null,
+            }),
+          }),
+          { params: Promise.resolve({ batchId: batch!.id }) },
+        );
+        expect(response.status).toBe(200);
+      }
+
+      await expect(listFeeOptions(academy!.id)).resolves.toEqual([
+        expect.objectContaining({ daysPerWeek: 3, termDays: 45, label: "Quarterly" }),
+        expect.objectContaining({ daysPerWeek: 3, termDays: 100, label: null }),
+        expect.objectContaining({ daysPerWeek: 3, termDays: 1, label: null }),
+      ]);
+
+      sessionCookie.value = cookie;
+      const { default: BatchesPage } = await import("@/app/app/batches/page");
+      const html = renderToStaticMarkup(await BatchesPage());
+      expect(html.indexOf("Quarterly")).toBeGreaterThan(-1);
+      expect(html.indexOf("Quarterly")).toBeLessThan(html.indexOf("45 days"));
+      expect(html).toContain("100 days");
+      expect(html).toContain("1 day");
+      expect(html).not.toContain("1 days");
+    });
+
     it("rejects creating a second package with the same days per week and term on a Batch", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug, "U-14 evening");
@@ -252,7 +296,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -270,7 +314,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 18000,
             label: "Evening",
           }),
@@ -285,7 +329,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await expect(listFeeOptions(academy!.id)).resolves.toEqual([
         expect.objectContaining({
           daysPerWeek: 3,
-          termMonths: 3,
+          termDays: 3,
           feePaise: 1500000,
           label: null,
         }),
@@ -308,7 +352,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -328,7 +372,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 5,
-            termMonths: 6,
+            termDays: 6,
             feeInr: 28000,
           }),
         }),
@@ -351,7 +395,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
               label: "  Evening package  ",
               sortOrder: 4,
               daysPerWeek: 1,
-              termMonths: 12,
+              termDays: 12,
             }),
           },
         ),
@@ -367,13 +411,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await expect(listFeeOptions(academy!.id)).resolves.toEqual([
         expect.objectContaining({
           daysPerWeek: 5,
-          termMonths: 6,
+          termDays: 6,
           feePaise: 2800000,
         }),
         expect.objectContaining({
           id: created.id,
           daysPerWeek: 3,
-          termMonths: 3,
+          termDays: 3,
           feePaise: 1650000,
           label: "Evening package",
           sortOrder: 4,
@@ -404,7 +448,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -445,7 +489,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -486,7 +530,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           id: created.id,
           isOffered: true,
           daysPerWeek: 3,
-          termMonths: 3,
+          termDays: 3,
         }),
       ]);
 
@@ -511,7 +555,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 2,
-            termMonths: 1,
+            termDays: 1,
             feeInr: 8000,
             label: "Starter",
           }),
@@ -561,7 +605,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -576,7 +620,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         batchId: batch!.id,
         batchFeeOptionId: created.id,
         daysPerWeek: 3,
-        termMonths: 3,
+        termDays: 3,
         feePaise: 1500000,
         playerFullName: "Ravi Kumar",
         playerFullNameNormalized: "ravi kumar",
@@ -628,7 +672,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -688,7 +732,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 2,
-            termMonths: 1,
+            termDays: 1,
             feeInr: 5000,
           }),
         }),
@@ -727,7 +771,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),

@@ -207,7 +207,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -260,7 +260,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -320,7 +320,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -435,7 +435,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 45,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -465,10 +465,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
       expect(joinHtml).toContain("U-14 evening");
-      expect(joinHtml).toContain("Weekday nets");
-      expect(joinHtml).toContain("3 days per week");
-      expect(joinHtml).toContain("3 months");
-      expect(joinHtml).toContain("₹15,000");
+      expect(joinHtml.indexOf("Weekday nets")).toBeLessThan(
+        joinHtml.indexOf("3 days per week · 45 days · ₹15,000"),
+      );
+      expect(joinHtml).toContain("3 days per week · 45 days · ₹15,000");
       expect(joinHtml).toContain("Register for a Batch.");
       expect(joinHtml).toContain("<form");
       expect(joinHtml).not.toMatch(/not a Registration form yet/i);
@@ -507,7 +507,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -553,7 +553,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -602,7 +602,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -621,7 +621,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 1,
-            termMonths: 1,
+            termDays: 1,
             feeInr: 4000,
             label: "Hidden package",
           }),
@@ -675,7 +675,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 2,
-            termMonths: 1,
+            termDays: 1,
             feeInr: 8000,
             label: "Closed package",
           }),

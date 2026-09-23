@@ -11,7 +11,7 @@ import { parseRegistrationInput } from "@/lib/registration-input";
 export type RegistrationSnapshot = {
   batchName: string;
   daysPerWeek: number;
-  termMonths: number;
+  termDays: number;
   feePaise: number;
   contactPhone: string;
   contactEmail: string | null;
@@ -72,7 +72,7 @@ export async function createRegistration(
       feeOptionId: batchFeeOptions.id,
       batchId: batchFeeOptions.batchId,
       daysPerWeek: batchFeeOptions.daysPerWeek,
-      termMonths: batchFeeOptions.termMonths,
+      termDays: batchFeeOptions.termDays,
       feePaise: batchFeeOptions.feePaise,
       label: batchFeeOptions.label,
       isOffered: batchFeeOptions.isOffered,
@@ -116,7 +116,7 @@ export async function createRegistration(
         batchId: offered.batchId,
         batchFeeOptionId: offered.feeOptionId,
         daysPerWeek: offered.daysPerWeek,
-        termMonths: offered.termMonths,
+        termDays: offered.termDays,
         feePaise: offered.feePaise,
         playerFullName: parsed.value.playerFullName,
         playerFullNameNormalized: parsed.value.playerFullName.toLowerCase(),
@@ -131,7 +131,7 @@ export async function createRegistration(
       })
       .returning({
         daysPerWeek: registrations.daysPerWeek,
-        termMonths: registrations.termMonths,
+        termDays: registrations.termDays,
         feePaise: registrations.feePaise,
         contactPhone: registrations.contactPhone,
         contactEmail: registrations.contactEmail,
@@ -142,7 +142,7 @@ export async function createRegistration(
       snapshot: {
         batchName: offered.batchName,
         daysPerWeek: created.daysPerWeek,
-        termMonths: created.termMonths,
+        termDays: created.termDays,
         feePaise: created.feePaise,
         contactPhone: created.contactPhone,
         contactEmail: created.contactEmail,

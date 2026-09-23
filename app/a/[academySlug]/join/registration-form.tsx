@@ -233,7 +233,7 @@ export function RegistrationForm({
                 <label
                   key={
                     option.id ||
-                    `${batch.id || batch.name}-${option.daysPerWeek}-${option.termMonths}`
+                    `${batch.id || batch.name}-${option.daysPerWeek}-${option.termDays}`
                   }
                   className="card bg-base-200 cursor-pointer"
                 >

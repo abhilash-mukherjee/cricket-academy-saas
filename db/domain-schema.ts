@@ -101,7 +101,7 @@ export const batchFeeOptions = pgTable(
       .notNull()
       .references(() => batches.id, { onDelete: "restrict" }),
     daysPerWeek: integer("days_per_week").notNull(),
-    termMonths: integer("term_months").notNull(),
+    termDays: integer("term_days").notNull(),
     feePaise: integer("fee_paise").notNull(),
     label: text("label"),
     isOffered: boolean("is_offered").notNull().default(true),
@@ -115,10 +115,10 @@ export const batchFeeOptions = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    unique("batch_fee_options_batch_id_days_per_week_term_months_unique").on(
+    unique("batch_fee_options_batch_id_days_per_week_term_days_unique").on(
       table.batchId,
       table.daysPerWeek,
-      table.termMonths,
+      table.termDays,
     ),
     check(
       "batch_fee_options_days_per_week_range",
@@ -169,7 +169,7 @@ export const registrations = pgTable(
       .notNull()
       .references(() => batchFeeOptions.id, { onDelete: "restrict" }),
     daysPerWeek: integer("days_per_week").notNull(),
-    termMonths: integer("term_months").notNull(),
+    termDays: integer("term_days").notNull(),
     feePaise: integer("fee_paise").notNull(),
     playerFullName: text("player_full_name").notNull(),
     playerFullNameNormalized: text("player_full_name_normalized").notNull(),
@@ -237,7 +237,7 @@ export const enrollments = pgTable(
       .notNull()
       .references(() => registrations.id, { onDelete: "restrict" }),
     daysPerWeek: integer("days_per_week").notNull(),
-    termMonths: integer("term_months").notNull(),
+    termDays: integer("term_days").notNull(),
     feePaisePaid: integer("fee_paise_paid").notNull(),
     validFrom: date("valid_from").notNull(),
     validUntil: date("valid_until").notNull(),

@@ -10,7 +10,7 @@ type RouteContext = { params: Promise<{ batchId: string }> };
 
 type CreateBody = {
   daysPerWeek?: number;
-  termMonths?: number;
+  termDays?: number;
   feeInr?: number;
   label?: string | null;
 };
@@ -29,7 +29,7 @@ export async function POST(request: Request, context: RouteContext) {
   const body = (await request.json()) as CreateBody;
   const result = await createFeeOption(ownerContext.academy.id, batchId, {
     daysPerWeek: Number(body.daysPerWeek),
-    termMonths: Number(body.termMonths),
+    termDays: Number(body.termDays),
     feeInr: Number(body.feeInr),
     label: body.label,
   });

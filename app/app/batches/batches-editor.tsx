@@ -13,7 +13,7 @@ type BatchesEditorProps = {
 
 type NewFeeOptionDraft = {
   daysPerWeek: string;
-  termMonths: string;
+  termDays: string;
   feeInr: string;
   label: string;
 };
@@ -26,7 +26,7 @@ type FeeOptionEditDraft = {
 
 const emptyNewFeeOptionDraft: NewFeeOptionDraft = {
   daysPerWeek: "",
-  termMonths: "",
+  termDays: "",
   feeInr: "",
   label: "",
 };
@@ -64,7 +64,7 @@ function batchErrorCopy(error: string | null | undefined): string | null {
 function feeOptionErrorCopy(error: string | null | undefined): string | null {
   switch (error) {
     case "invalid-input":
-      return "Days per week must be 1–7, term a positive number of months, and price a positive amount in INR.";
+      return "Days per week must be 1–7, term a whole number of days from 1 up, and price a positive amount in INR.";
     case "identity-taken":
       return "That days-per-week and term package already exists on this Batch.";
     case "not-found":
@@ -191,7 +191,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         daysPerWeek: Number(draft.daysPerWeek),
-        termMonths: Number(draft.termMonths),
+        termDays: Number(draft.termDays),
         feeInr: Number(draft.feeInr),
         label: draft.label,
       }),
@@ -411,9 +411,12 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                               key={option.id}
                               className="rounded-box bg-base-200 flex flex-col gap-2 p-3 text-sm"
                             >
+                              {option.label ? (
+                                <p className="font-medium">{option.label}</p>
+                              ) : null}
                               <p>
                                 {daysCopy(option.daysPerWeek)} ·{" "}
-                                {termCopy(option.termMonths)} ·{" "}
+                                {termCopy(option.termDays)} ·{" "}
                                 {formatInr(option.feePaise)}
                               </p>
                               {option.isOffered ? null : (
@@ -440,7 +443,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                                         event.target.value,
                                       )
                                     }
-                                    aria-label={`Label for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termMonths)}`}
+                                    aria-label={`Label for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termDays)}`}
                                   />
                                 </label>
                                 <label className="flex flex-col gap-1">
@@ -459,7 +462,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                                         event.target.value,
                                       )
                                     }
-                                    aria-label={`Price in INR for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termMonths)}`}
+                                    aria-label={`Price in INR for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termDays)}`}
                                     required
                                   />
                                 </label>
@@ -478,7 +481,7 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                                         event.target.value,
                                       )
                                     }
-                                    aria-label={`Sort order for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termMonths)}`}
+                                    aria-label={`Sort order for ${daysCopy(option.daysPerWeek)}, ${termCopy(option.termDays)}`}
                                     required
                                   />
                                 </label>
@@ -545,21 +548,21 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-sm">
-                        Term (months)
+                        Term (days)
                         <input
                           className="input input-bordered"
                           type="number"
                           min={1}
                           step={1}
-                          value={draft.termMonths}
+                          value={draft.termDays}
                           onChange={(event) =>
                             updateNewFeeOptionDraft(
                               batch.id,
-                              "termMonths",
+                              "termDays",
                               event.target.value,
                             )
                           }
-                          aria-label={`Term months for ${batch.name}`}
+                          aria-label={`Term days for ${batch.name}`}
                           required
                         />
                       </label>

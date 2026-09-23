@@ -152,7 +152,7 @@ async function openRegistrableBatch(
   slug: string,
   options: {
     daysPerWeek?: number;
-    termMonths?: number;
+    termDays?: number;
     feeInr?: number;
     label?: string | null;
   } = {},
@@ -172,7 +172,7 @@ async function openRegistrableBatch(
       },
       body: JSON.stringify({
         daysPerWeek: options.daysPerWeek ?? 3,
-        termMonths: options.termMonths ?? 3,
+        termDays: options.termDays ?? 45,
         feeInr: options.feeInr ?? 15000,
         label: options.label ?? "Weekday nets",
       }),
@@ -266,7 +266,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         snapshot: {
           batchName: "U-14 evening",
           daysPerWeek: 3,
-          termMonths: 3,
+          termDays: 45,
           feePaise: 1500000,
           contactPhone: "+919876543210",
           contactEmail: "arjun@example.com",
@@ -287,7 +287,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         batchId: opened.batch.id,
         batchFeeOptionId: opened.feeOptionId,
         daysPerWeek: 3,
-        termMonths: 3,
+        termDays: 45,
         feePaise: 1500000,
         playerFullName: "Arjun Rao",
         playerFullNameNormalized: "arjun rao",
@@ -413,7 +413,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 5,
-            termMonths: 6,
+            termDays: 6,
             feeInr: 22000,
             label: "Weekend",
           }),
@@ -522,7 +522,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 5,
-            termMonths: 6,
+            termDays: 6,
             feeInr: 22000,
           }),
         }),
@@ -747,7 +747,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           snapshot={{
             batchName: "U-14 evening",
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 1,
             feePaise: 1500000,
             contactPhone: "+919876543210",
             contactEmail: "arjun@example.com",
@@ -762,9 +762,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         "The Academy will contact you on +919876543210 and arjun@example.com.",
       );
       expect(html).toContain("U-14 evening");
-      expect(html).toContain("Weekday nets");
+      expect(html.indexOf("Weekday nets")).toBeLessThan(html.indexOf("1 day"));
       expect(html).toContain("3 days per week");
-      expect(html).toContain("3 months");
+      expect(html).toContain("1 day");
+      expect(html).not.toContain("1 days");
       expect(html).toContain("₹15,000");
       expect(html).toContain(`Pay ${formatInr(1500000)} with UPI`);
       expect(html).toContain(
