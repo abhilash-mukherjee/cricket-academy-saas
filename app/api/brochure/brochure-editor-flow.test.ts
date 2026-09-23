@@ -316,7 +316,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         academyId: academy!.id,
         batchId: batch!.id,
         daysPerWeek: 2,
-        termMonths: 3,
+        termDays: 3,
         feePaise: 1500000,
         sortOrder: 0,
       });

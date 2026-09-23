@@ -6,7 +6,7 @@ export type FeeOptionRecord = {
   id: string;
   batchId: string;
   daysPerWeek: number;
-  termMonths: number;
+  termDays: number;
   feePaise: number;
   label: string | null;
   isOffered: boolean;
@@ -21,7 +21,7 @@ export type CreateFeeOptionResult =
 
 export type CreateFeeOptionInput = {
   daysPerWeek: number;
-  termMonths: number;
+  termDays: number;
   feeInr: number;
   label?: string | null;
 };
@@ -54,7 +54,7 @@ export async function listFeeOptions(
       id: batchFeeOptions.id,
       batchId: batchFeeOptions.batchId,
       daysPerWeek: batchFeeOptions.daysPerWeek,
-      termMonths: batchFeeOptions.termMonths,
+      termDays: batchFeeOptions.termDays,
       feePaise: batchFeeOptions.feePaise,
       label: batchFeeOptions.label,
       isOffered: batchFeeOptions.isOffered,
@@ -71,7 +71,7 @@ export async function createFeeOption(
   input: CreateFeeOptionInput,
 ): Promise<CreateFeeOptionResult> {
   const daysPerWeek = input.daysPerWeek;
-  const termMonths = input.termMonths;
+  const termDays = input.termDays;
   const feePaise = inrToPaise(input.feeInr);
   const label = normalizeLabel(input.label);
 
@@ -79,8 +79,8 @@ export async function createFeeOption(
     !Number.isInteger(daysPerWeek) ||
     daysPerWeek < 1 ||
     daysPerWeek > 7 ||
-    !Number.isInteger(termMonths) ||
-    termMonths < 1 ||
+    !Number.isInteger(termDays) ||
+    termDays < 1 ||
     feePaise === null
   ) {
     return { ok: false, error: "invalid-input" };
@@ -116,7 +116,7 @@ export async function createFeeOption(
         academyId,
         batchId,
         daysPerWeek,
-        termMonths,
+        termDays,
         feePaise,
         label,
         isOffered: true,
@@ -128,7 +128,7 @@ export async function createFeeOption(
   } catch (error) {
     if (
       postgresConstraint(error) ===
-      "batch_fee_options_batch_id_days_per_week_term_months_unique"
+      "batch_fee_options_batch_id_days_per_week_term_days_unique"
     ) {
       return { ok: false, error: "identity-taken" };
     }

@@ -190,7 +190,7 @@ async function enableIntake(slug: string) {
     academyId: academy!.id,
     batchId: batch!.id,
     daysPerWeek: 2,
-    termMonths: 3,
+    termDays: 3,
     feePaise: 1500000,
     sortOrder: 0,
   });
@@ -434,7 +434,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -551,7 +551,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -660,7 +660,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),
@@ -679,7 +679,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 5,
-            termMonths: 6,
+            termDays: 6,
             feeInr: 28000,
             label: "Full week",
           }),
@@ -774,7 +774,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),

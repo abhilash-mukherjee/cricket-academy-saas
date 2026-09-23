@@ -6,14 +6,14 @@ export function daysCopy(daysPerWeek: number): string {
   return daysPerWeek === 1 ? "1 day per week" : `${daysPerWeek} days per week`;
 }
 
-export function termCopy(termMonths: number): string {
-  return termMonths === 1 ? "1 month" : `${termMonths} months`;
+export function termCopy(termDays: number): string {
+  return termDays === 1 ? "1 day" : `${termDays} days`;
 }
 
 export function packageFactsCopy(option: {
   daysPerWeek: number;
-  termMonths: number;
+  termDays: number;
   feePaise: number;
 }): string {
-  return `${daysCopy(option.daysPerWeek)} · ${termCopy(option.termMonths)} · ${formatInr(option.feePaise)}`;
+  return `${daysCopy(option.daysPerWeek)} · ${termCopy(option.termDays)} · ${formatInr(option.feePaise)}`;
 }

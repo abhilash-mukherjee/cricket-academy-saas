@@ -6,7 +6,7 @@ export type RegistrableFeeOption = {
   id: string;
   label: string | null;
   daysPerWeek: number;
-  termMonths: number;
+  termDays: number;
   feePaise: number;
 };
 
@@ -52,7 +52,7 @@ export async function listRegistrableBatches(
       batchId: batchFeeOptions.batchId,
       label: batchFeeOptions.label,
       daysPerWeek: batchFeeOptions.daysPerWeek,
-      termMonths: batchFeeOptions.termMonths,
+      termDays: batchFeeOptions.termDays,
       feePaise: batchFeeOptions.feePaise,
     })
     .from(batchFeeOptions)
@@ -75,7 +75,7 @@ export async function listRegistrableBatches(
       id: option.id,
       label: option.label,
       daysPerWeek: option.daysPerWeek,
-      termMonths: option.termMonths,
+      termDays: option.termDays,
       feePaise: option.feePaise,
     });
     optionsByBatch.set(option.batchId, list);
