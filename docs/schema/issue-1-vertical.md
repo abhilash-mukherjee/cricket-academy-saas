@@ -165,7 +165,7 @@ Rejected rows are retained; visitors may resubmit after reject.
 
 **Constraint:** `UNIQUE (academy_id, full_name_normalized, phone)`
 
-Accept flow: find by that key → link existing Player, else insert → create `enrollments` row.
+Accept flow: find by that key → link existing Player, else insert → create `enrollments` row. Guardian columns on this table, and the copy rules, are in [issue #61 operations](./issue-61-operations.md).
 
 ### `enrollments`
 
@@ -175,11 +175,11 @@ Accept flow: find by that key → link existing Player, else insert → create `
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `player_id` | `uuid NOT NULL` FK → `players` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
-| `registration_id` | `uuid NOT NULL` FK → `registrations` | Provenance |
+| `registration_id` | `uuid` nullable FK → `registrations` | Provenance. Null for manual add and renew. Unique when set. See [issue #61 operations](./issue-61-operations.md) |
 | `days_per_week` | `integer NOT NULL` | From accepted Registration |
 | `term_days` | `integer NOT NULL` | From accepted Registration. Whole calendar days, at least 1 |
 | `fee_paise_paid` | `integer NOT NULL` | From accepted Registration |
-| `valid_from` | `date NOT NULL` | Accept date |
+| `valid_from` | `date NOT NULL` | Owner-chosen start. valid-until is derived from the term |
 | `valid_until` | `date NOT NULL` | Last covered day. `valid_from` counts as day one, so `valid_from` + `term_days` − 1 day. The cutover does not rewrite a date already stored |
 | `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | Renewal chain |
 | `created_at` / `updated_at` | `timestamptz` | |
@@ -284,6 +284,6 @@ user ─────────────────────┬──►
 | `player_batches` | Replaced by `enrollments` |
 | `impersonation_sessions` | Active state lives in session |
 | `onboarding_drafts` | Infer from missing Academy |
-| Coach auth / `sessions` (attendance) | Out of scope for #1 |
+| Coach auth / `batch_sessions` (attendance) | Out of scope for #1 |
 | SaaS billing / payment verification | Out of scope (ADR-0002) |
 | Hard delete / cascades | Deactivate only; RESTRICT on FKs |

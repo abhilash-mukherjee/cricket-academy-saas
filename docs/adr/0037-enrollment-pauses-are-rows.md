@@ -1,0 +1,5 @@
+# Each pause is its own row
+
+An Enrollment can be paused, resumed, and paused again in one term. The longer valid-until is the result of those intervals, and a later pause must not erase the previous one. `enrollment_pauses` stores the first paused day, the Owner’s planned last paused day (empty when the pause is open-ended; kept if they resume earlier), and the first day that is not paused (empty while it is open). Paused days are the first paused day inclusive through that end day exclusive. When a dated pause ends itself, the end day is the day after the planned last day. An early or open-ended resume sets the end day to today. Same-day resume stores the end day equal to the first paused day, which adds no days. At most one open pause per Enrollment. Columns on the Enrollment were the smaller shape, and clearing them on resume would leave the extra days unexplained.
+
+**Considered options:** Three date columns on `enrollments`, cleared when the pause ends (rejected — the second pause destroys the record of the first).

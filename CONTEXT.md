@@ -21,11 +21,15 @@ Details submitted on an Academy's conversion page (not the brochure). One Regist
 _Avoid_: Membership, payment
 
 **Enrollment**:
-A Player's placement on a Batch for a defined term, created when the Owner accepts a Registration or adds a Player directly (no Registration). Carries the days per week, term length in calendar days, fee paid, and valid-from / valid-until dates as they stood at create — not a live link to the fee option. valid-until is the last covered day, counting valid-from as day one of the term. Renewals add a new Enrollment linked to the prior one. An Enrollment may be paused: while paused it is excluded from Session attendance lists. On resume, valid-until is extended by the number of calendar days the pause lasted (“paused days are added back”). Pause may be open-ended (explicit resume) or dated. Lapsed means valid-until is in the past while not paused. An Enrollment is not a Registration.
+A Player's placement on a Batch for a defined term, created when the Owner accepts a Registration or adds a Player directly (no Registration). The Owner chooses valid-from at create. valid-from is today or earlier, and the term must still cover today, so a new Enrollment is Active. A later Enrollment on that pair may leave idle days after a lapsed one, and it still has to cover today. The Enrollment carries the days per week, term length in calendar days, fee paid, and valid-from / valid-until dates as they stood at create — not a live link to the fee option. valid-until is the last covered day, counting valid-from as day one of the term. Two Enrollments for the same Player and Batch do not cover the same calendar day. While one of them is paused, another cannot be created for that pair. Renew is the action that links a new Enrollment to the prior one. Accept and manual add do not set that link. An Enrollment may be paused: while paused it is excluded from Session attendance lists. On resume, valid-until is extended by the number of calendar days the pause lasted (“paused days are added back”). The day the Owner resumes is not a paused day; pausing and resuming on the same day adds no days. An open-ended pause waits for an explicit resume. A dated pause names a last paused day: the Enrollment stays paused through that day and is Active again the next day, with valid-until extended, without another action. The first paused day is on or after valid-from, and today or earlier. A dated last day may fall after valid-until. The Owner may resume earlier, and the planned last day is then discarded. Lapsed means valid-until is in the past while not paused. An Enrollment is not a Registration.
 _Avoid_: Subscription, membership (domain language prefers Enrollment; UI may say membership)
 
+**Active**:
+An Enrollment that is not paused and whose valid-until is today or later. A paused Enrollment stays paused even when valid-until is still in the past, until resume extends it.
+_Avoid_: current, live, ongoing
+
 **Guardian**:
-The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. On accept or manual add, Guardian name and phone are copied onto the Player for roster contact. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
+The adult contact for a Player under 18. Full name and phone are required on the Conversion page when the Player is under 18, and are not collected when the Player is 18 or older. On accept, Guardian name and phone are copied from the Registration when those fields are present and the Player has none. Accept does not recompute age. On manual add, under-18 is decided as of today, and Guardian is copied when the Player has none. Linking a Player who already has a Guardian keeps that Guardian. Guardians do not have accounts in this phase. The phone on a Registration is the Guardian's when the Player is under 18, otherwise the Player's.
 _Avoid_: Parent, customer (the Academy owner is the customer)
 
 **Phone**:
@@ -33,11 +37,11 @@ A contact number for an Academy, a Guardian, or a Player. The same number writte
 _Avoid_: mobile (when we mean any Phone), cell
 
 **Player**:
-A person on an Academy roster after the Owner accepts a Registration or adds them directly. Identity at an Academy is name + phone; under-18 Players also carry Guardian name and phone copied at create. A Player can have Enrollments on more than one Batch at a time.
+A person on an Academy roster after the Owner accepts a Registration or adds them directly. Identity at an Academy is name + phone; under-18 Players also carry Guardian name and phone copied at create. Name, phone, date of birth, and Guardian stay as stored after that. A Player can have Enrollments on more than one Batch at a time.
 _Avoid_: Student, kid, member, registration
 
 **Batch**:
-A standing group of Players at an Academy (for example U-14 evening). Players are placed on a Batch through Enrollments; one Player may have Enrollments on several Batches, or multiple Enrollments on the same Batch over time (renewals). Names are unique at an Academy (case-insensitive, trimmed); public pages show the name as typed. New Batches start closed for Registration; an Owner can open a Batch only when it has at least one offered fee option. A Batch is registrable when it is open for Registration and has at least one offered fee option; only registrable Batches appear on the conversion page.
+A standing group of Players at an Academy (for example U-14 evening). Players are placed on a Batch through Enrollments; one Player may have Enrollments on several Batches, or multiple Enrollments on the same Batch over time (renewals). Names are unique at an Academy (case-insensitive, trimmed); public pages show the name as typed. The Batch roster is the Players with an Active or paused Enrollment on that Batch. New Batches start closed for Registration; an Owner can open a Batch only when it has at least one offered fee option. A Batch is registrable when it is open for Registration and has at least one offered fee option; only registrable Batches appear on the conversion page.
 _Avoid_: Session, class, group
 
 **Fee option**:
@@ -45,8 +49,8 @@ A sellable package on a Batch: days per week the package covers (a count from 1 
 _Avoid_: Subscription, plan, pricing tier, timetable, archived fee
 
 **Session**:
-One occurrence of a Batch on a calendar date. The Owner creates or opens a Session ad hoc (Batch + date) to mark Player attendance; there is no Batch weekday timetable in this phase. Present is marked explicitly; unmarked Players on the list count as absent when the Owner saves.
-_Avoid_: Batch, class, practice
+One occurrence of a Batch on a calendar date (a Batch session), today or in the past. The Owner creates or opens a Session ad hoc (Batch + date) to mark Player attendance; there is no Batch weekday timetable in this phase. Present is marked explicitly; unmarked Players on the list count as absent when the Owner saves. That save fixes the list. Reopening the Session changes marks for those Players only. The Owner may discard a Session, after which that date has no saved list.
+_Avoid_: login session, class, practice
 
 **Owner**:
 The logged-in user who runs an Academy: brochure, conversion page, Registration inbox (accept and reject), roster, Enrollment lifecycle, and Player attendance on Sessions. Signs up from the product homepage via email magic link (or claims an Academy a Super-admin assigned); provides a display name during onboarding. One login owns one Academy in this phase. Staff screens live under `/app/…`. The same user can also be a Coach. SaaS billing is not part of the first slice.

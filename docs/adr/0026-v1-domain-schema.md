@@ -2,7 +2,7 @@
 
 The first vertical's Postgres tables are specified in `docs/schema/issue-1-vertical.md`. This ADR records the non-obvious trade-offs that shaped that design.
 
-**No `guardians` table in v1.** Guardian contact fields live inline on `registrations`; durable roster identity is `players` only. A separate Guardian entity can be added later if roster contacts need to outlive a single Registration.
+**No `guardians` table in v1.** Guardian contact fields live inline on `registrations`; durable roster identity is `players` only. Roster contact that must exist without a Registration is copied onto the Player (ADR-0034), still without a Guardian entity.
 
 **Stored `contact_phone` on registrations.** The duplicate-pending guard is a partial unique index on `(academy_id, batch_id, contact_phone, player_full_name_normalized) WHERE status = 'pending'`. `contact_phone` is the phone actually used (Guardian phone when present, else Player phone) so the index stays simple and matches `CONTEXT.md`. Fee option is not part of the duplicate key — one pending intake per Player per Batch.
 
