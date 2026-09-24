@@ -4,9 +4,12 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { calendarDateInIst } from "@/lib/player-age";
+import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
 import { listBatchRoster } from "@/lib/players";
 import { DashboardBackLink } from "../../dashboard-back-link";
 import { PlayerPager } from "../../players/player-pager";
+import { BatchEditor } from "../batch-editor";
 
 type BatchRosterPageProps = {
   params: Promise<{ batchId: string }>;
@@ -60,21 +63,33 @@ export default async function BatchRosterPage({
     redirect("/app/onboarding");
   }
 
-  const roster = await listBatchRoster(academy.id, batchId, {
-    page: requestedPage(firstParam(query.page)),
-    today: calendarDateInIst(),
-  });
-  if (!roster) {
+  const [roster, academyBatches, feeOptions] = await Promise.all([
+    listBatchRoster(academy.id, batchId, {
+      page: requestedPage(firstParam(query.page)),
+      today: calendarDateInIst(),
+    }),
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+  ]);
+  const batch = academyBatches.find((item) => item.id === batchId);
+  if (!roster || !batch) {
     notFound();
   }
 
   return (
     <main className="flex min-h-full flex-col p-6">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
-        <DashboardBackLink />
+        <DashboardBackLink href="/app/batches" label="Batches" />
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">{roster.batchName}</h1>
+            <BatchEditor
+              batch={batch}
+              feeOptions={feeOptions.filter(
+                (option) => option.batchId === batchId,
+              )}
+            />
+            <h2 className="text-lg font-medium">Roster</h2>
             {roster.players.length === 0 ? (
               <p>No Players on this Batch.</p>
             ) : (

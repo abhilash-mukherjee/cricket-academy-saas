@@ -64,38 +64,27 @@ export default async function DashboardPage() {
             <ul className="list-disc space-y-2 pl-5">
               <li>
                 {hasBatches ? (
-                  <>
-                    <Link className="link" href="/app/batches">
-                      Batches
-                    </Link>{" "}
-                    add or rename Batches.
-                  </>
+                  <Link className="link" href="/app/batches">
+                    Batches — open one to rename it, edit fee options, or open
+                    it for Registration
+                  </Link>
                 ) : (
                   <Link className="link" href="/app/batches">
                     Add your first Batch
                   </Link>
                 )}
               </li>
-              {hasBatches ? (
+              {hasBatches && !hasFeeOptions ? (
                 <li>
-                  {hasFeeOptions ? (
-                    <>
-                      <Link className="link" href="/app/batches">
-                        Fee options
-                      </Link>{" "}
-                      add or update packages on a Batch.
-                    </>
-                  ) : (
-                    <Link className="link" href="/app/batches">
-                      Add a fee option
-                    </Link>
-                  )}
+                  <Link className="link" href="/app/batches">
+                    Open a Batch and add a fee option
+                  </Link>
                 </li>
               ) : null}
               {hasFeeOptions && !hasOpenBatch ? (
                 <li>
                   <Link className="link" href="/app/batches">
-                    Open a Batch
+                    Open a Batch for Registration.
                   </Link>
                 </li>
               ) : null}
