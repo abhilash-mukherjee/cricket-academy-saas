@@ -50,7 +50,11 @@ export default async function DashboardPage() {
             <p>
               Hello {displayName}. {academy.name} is live.
             </p>
-            <p>Pending Registrations: {pendingCount}</p>
+            <p>
+              <Link className="link" href="/app/registrations">
+                Pending Registrations: {pendingCount}
+              </Link>
+            </p>
           </div>
         </section>
 

@@ -172,6 +172,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(menu).toContain('href="/app/batches"');
       expect(menu).toContain("Conversion page");
       expect(menu).toContain('href="/app/conversion"');
+      expect(menu).toContain("Registrations");
+      expect(menu).toContain('href="/app/registrations"');
       expect(menu).toContain("Sign out");
     });
 

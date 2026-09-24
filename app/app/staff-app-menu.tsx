@@ -9,6 +9,7 @@ const OWNER_LINKS = [
   { href: "/app/brochure", label: "Edit brochure" },
   { href: "/app/batches", label: "Batches" },
   { href: "/app/conversion", label: "Conversion page" },
+  { href: "/app/registrations", label: "Registrations" },
 ] as const;
 
 type StaffAppMenuProps = {
