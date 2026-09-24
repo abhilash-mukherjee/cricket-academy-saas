@@ -13,6 +13,74 @@ type OwnerTx = Parameters<
 
 export type EnrollmentBlock = "overlaps" | "paused";
 
+export type TermStatus = "active" | "paused" | "lapsed";
+
+export type OpenPause = {
+  pausedOn: string;
+  plannedLastPausedOn: string | null;
+};
+
+export type EnrollmentTerm = {
+  status: TermStatus;
+  effectiveValidUntil: string;
+  pausedOn: string | null;
+  plannedLastPausedOn: string | null;
+};
+
+/** Read-only term. A finished dated pause extends valid-until in memory and is not written. */
+export function enrollmentTerm(
+  enrollment: { validUntil: string },
+  openPause: OpenPause | null,
+  today: string,
+): EnrollmentTerm {
+  if (!openPause) {
+    return {
+      status: enrollment.validUntil >= today ? "active" : "lapsed",
+      effectiveValidUntil: enrollment.validUntil,
+      pausedOn: null,
+      plannedLastPausedOn: null,
+    };
+  }
+
+  const finished =
+    openPause.plannedLastPausedOn !== null &&
+    openPause.plannedLastPausedOn < today;
+  if (finished) {
+    const resumedOn = addCalendarDays(openPause.plannedLastPausedOn!, 1);
+    const pausedDays = calendarDaysBetween(openPause.pausedOn, resumedOn);
+    const effectiveValidUntil = addCalendarDays(
+      enrollment.validUntil,
+      pausedDays,
+    );
+    return {
+      status: effectiveValidUntil >= today ? "active" : "lapsed",
+      effectiveValidUntil,
+      pausedOn: null,
+      plannedLastPausedOn: null,
+    };
+  }
+
+  const coversToday =
+    openPause.pausedOn <= today &&
+    (openPause.plannedLastPausedOn === null ||
+      today <= openPause.plannedLastPausedOn);
+  if (coversToday) {
+    return {
+      status: "paused",
+      effectiveValidUntil: enrollment.validUntil,
+      pausedOn: openPause.pausedOn,
+      plannedLastPausedOn: openPause.plannedLastPausedOn,
+    };
+  }
+
+  return {
+    status: enrollment.validUntil >= today ? "active" : "lapsed",
+    effectiveValidUntil: enrollment.validUntil,
+    pausedOn: null,
+    plannedLastPausedOn: null,
+  };
+}
+
 export async function guardNewEnrollment(
   tx: OwnerTx,
   input: {

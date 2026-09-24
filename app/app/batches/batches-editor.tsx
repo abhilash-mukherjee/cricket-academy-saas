@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, type FormEvent } from "react";
+import Link from "next/link";
 import type { BatchRecord } from "@/lib/batches";
 import type { FeeOptionRecord } from "@/lib/batch-fee-options";
 import { daysCopy, formatInr, termCopy } from "@/lib/package-copy";
@@ -346,7 +347,12 @@ export function BatchesEditor({ batches, feeOptions }: BatchesEditorProps) {
                     onSubmit={(event) => void onRename(event, batch)}
                   >
                     <label className="flex flex-col gap-1 text-sm">
-                      <span className="font-medium">{batch.name}</span>
+                      <Link
+                        className="link font-medium"
+                        href={`/app/batches/${batch.id}`}
+                      >
+                        {batch.name}
+                      </Link>
                       <input
                         className="input input-bordered"
                         value={drafts[batch.id] ?? batch.name}

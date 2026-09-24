@@ -40,6 +40,10 @@ _Avoid_: mobile (when we mean any Phone), cell
 A person on an Academy roster after the Owner accepts a Registration or adds them directly. Identity at an Academy is name + phone; under-18 Players also carry Guardian name and phone copied at create. Name, phone, date of birth, and Guardian stay as stored after that. A Player can have Enrollments on more than one Batch at a time.
 _Avoid_: Student, kid, member, registration
 
+**Player directory**:
+The Academy-wide list of every Player, including a Player whose Enrollments are all lapsed.
+_Avoid_: roster (that word is the Batch roster: Active and paused Players on one Batch), student list
+
 **Batch**:
 A standing group of Players at an Academy (for example U-14 evening). Players are placed on a Batch through Enrollments; one Player may have Enrollments on several Batches, or multiple Enrollments on the same Batch over time (renewals). Names are unique at an Academy (case-insensitive, trimmed); public pages show the name as typed. The Batch roster is the Players with an Active or paused Enrollment on that Batch. New Batches start closed for Registration; an Owner can open a Batch only when it has at least one offered fee option. A Batch is registrable when it is open for Registration and has at least one offered fee option; only registrable Batches appear on the conversion page.
 _Avoid_: Session, class, group
