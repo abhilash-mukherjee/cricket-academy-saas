@@ -152,6 +152,8 @@ Pause is rejected when the Enrollment is lapsed or already paused, using compute
 
 The first paused day is on or after `valid_from` and today or earlier. A dated last day is on or after the first day and may fall after `valid_until`. Omit the last day for an open-ended pause.
 
+The new pause’s interval must not share a calendar day with any existing pause on that Enrollment (finished or open). Interval shape matches **Paused on a date D**: closed `[first day, end day)`; open dated `[first day, day after planned last)`; open-ended `[first day, ∞)`. A backdated gap before an earlier finished pause is allowed when the intervals do not touch. Overlap is `409` with `pause-overlaps` so the form can say the dates conflict with a prior pause (distinct from Enrollment coverage `overlaps`).
+
 When the dated last day is already before today, the command inserts the row with `resumed_on` set and extends `valid_until` immediately. The Enrollment is not paused after that save.
 
 Resume requires an open pause. It sets `resumed_on` to today, extends `valid_until` by the paused days, and leaves `planned_last_paused_on` as the Owner typed it. There is no Owner-chosen resume date.
@@ -199,7 +201,7 @@ Owner menu gains **Registrations** (`/app/registrations`) and **Players** (`/app
 
 `plannedLastPausedOn` is `null` for an open-ended pause. `[date]` is `YYYY-MM-DD`.
 
-Command errors use the existing `{ error }` JSON shape. Shared codes: `invalid-input`, `not-found`, `not-pending`, `term-not-covering-today`, `overlaps`, `paused`, `lapsed`, `already-paused`, `not-paused`, `fee-option-not-found`, `stale-list`, `session-date`. Overlap, open pause, and a term that does not cover today are distinct codes so the form can say which rule failed. A stale attendance list is `409` with `stale-list`.
+Command errors use the existing `{ error }` JSON shape. Shared codes: `invalid-input`, `not-found`, `not-pending`, `term-not-covering-today`, `overlaps`, `pause-overlaps`, `paused`, `lapsed`, `already-paused`, `not-paused`, `fee-option-not-found`, `stale-list`, `session-date`. Enrollment coverage overlap, pause-interval overlap, open pause, and a term that does not cover today are distinct codes so the form can say which rule failed. A stale attendance list is `409` with `stale-list`.
 
 ## Tests
 
@@ -208,6 +210,6 @@ HTTP, against the route handlers, with `academyId` isolation on every read and w
 - Accept creates a Player and an Enrollment. A second accept for the same person on another Batch links the Player. Reject then allows that visitor to submit again.
 - Accept of a coverage that overlaps, or of a pair with an open pause, leaves the Registration pending and writes no Player.
 - Manual add writes no Registration. An under-18 add copies Guardian. Linking keeps a Guardian and email already stored. Accept and manual add copy email onto the Player only when the Player has none.
-- Pause excludes the Player from a Session on a paused day. Resume extends `valid_until` by the paused days and not the resume day. A dated pause whose last day is in the past is Active on the next read without a resume button.
+- Pause excludes the Player from a Session on a paused day. Resume extends `valid_until` by the paused days and not the resume day. A dated pause whose last day is in the past is Active on the next read without a resume button. A new pause whose interval overlaps a finished pause returns `pause-overlaps` and writes nothing.
 - The first save stores present and absent for the list shown. A second save changes marks and does not add a Player. A mismatched id set returns `stale-list`. Discard removes the Session.
 - Owner A cannot read or mutate Owner B’s rows.
