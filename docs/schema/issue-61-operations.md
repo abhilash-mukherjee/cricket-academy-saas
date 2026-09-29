@@ -55,8 +55,9 @@ Add:
 | --- | --- | --- |
 | `guardian_full_name` | `text` nullable | Copied at create when the Player is under 18 |
 | `guardian_phone` | `text` nullable | E.164 |
+| `email` | `text` nullable | Optional contact email; not a login; not used for identity. Format-validated in the app when present |
 
-No Guardian table ([ADR-0034](../adr/0034-guardian-copied-onto-player.md)). Identity stays `(academy_id, full_name_normalized, phone)`. Name, phone, date of birth, and Guardian are not edited after create.
+No Guardian table ([ADR-0034](../adr/0034-guardian-copied-onto-player.md)). Identity stays `(academy_id, full_name_normalized, phone)`. Name, phone, date of birth, Guardian, and email are not edited after create (email is only filled when the Player still has none).
 
 `full_name` is the trimmed typed name. `full_name_normalized` is that value lowercased, the same as `registrations.player_full_name_normalized`.
 
@@ -133,13 +134,13 @@ Shared by accept, manual add, and renew. One transaction. Any failure rolls back
 
 The new inclusive range must not share a day with any Enrollment for that Player and Batch, using effective `valid_until`. Idle days after a lapsed term are allowed. A range that sits entirely in the past is rejected. While any Enrollment on that pair has an open pause, the create is rejected.
 
-On the player key `(academy_id, full_name_normalized, phone)`: link the existing Player and keep the stored name, date of birth, and Guardian. If that Player has no Guardian and this intake has Guardian name and phone, copy them. Otherwise insert. A unique-key conflict inside the transaction links the row that won the race.
+On the player key `(academy_id, full_name_normalized, phone)`: link the existing Player and keep the stored name, date of birth, Guardian, and email. If that Player has no Guardian and this intake has Guardian name and phone, copy them. If that Player has no email and this intake has an email, copy it. Otherwise insert. A unique-key conflict inside the transaction links the row that won the race.
 
-Accept copies the Registration’s snapshotted days per week, term days, and fee. It sets `registration_id` and leaves `renewed_from_enrollment_id` null. Guardian is copied from the Registration when both Guardian fields are present and the Player has none. Accept does not recompute age.
+Accept copies the Registration’s snapshotted days per week, term days, and fee. It sets `registration_id` and leaves `renewed_from_enrollment_id` null. Guardian is copied from the Registration when both Guardian fields are present and the Player has none. Contact email is copied from the Registration when present and the Player has none. Accept does not recompute age.
 
 Manual add and renew copy days per week, term days, and fee from a fee option on that Batch, including one that is no longer offered. The Enrollment does not store the fee-option id. The Batch may be closed for Registration. A Batch with no fee option at all cannot be used. `registration_id` is null.
 
-Manual add decides under-18 with `isPlayerUnder18` as of today. Under 18 requires Guardian name and phone. An adult intake leaves Guardian null. `valid_from` does not change the age check. The Player’s phone is the Guardian phone when under 18, otherwise the Player phone. Same contact rule as a Registration.
+Manual add decides under-18 with `isPlayerUnder18` as of today. Under 18 requires Guardian name and phone. An adult intake leaves Guardian null. `valid_from` does not change the age check. The Player’s phone is the Guardian phone when under 18, otherwise the Player phone. Same contact rule as a Registration. Optional email may be set on create; on link, fill-if-empty only.
 
 Renew is offered on a lapsed Enrollment when no Enrollment for that Player and Batch is Active or paused. `renewed_from_enrollment_id` points at the Enrollment the Owner renewed. Accept and manual add do not set it.
 
@@ -206,7 +207,7 @@ HTTP, against the route handlers, with `academyId` isolation on every read and w
 
 - Accept creates a Player and an Enrollment. A second accept for the same person on another Batch links the Player. Reject then allows that visitor to submit again.
 - Accept of a coverage that overlaps, or of a pair with an open pause, leaves the Registration pending and writes no Player.
-- Manual add writes no Registration. An under-18 add copies Guardian. Linking keeps a Guardian already stored.
+- Manual add writes no Registration. An under-18 add copies Guardian. Linking keeps a Guardian and email already stored. Accept and manual add copy email onto the Player only when the Player has none.
 - Pause excludes the Player from a Session on a paused day. Resume extends `valid_until` by the paused days and not the resume day. A dated pause whose last day is in the past is Active on the next read without a resume button.
 - The first save stores present and absent for the list shown. A second save changes marks and does not add a Player. A mismatched id set returns `stale-list`. Discard removes the Session.
 - Owner A cannot read or mutate Owner B’s rows.

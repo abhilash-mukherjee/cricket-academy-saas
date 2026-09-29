@@ -127,7 +127,7 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
 | `guardian_phone` | `text` nullable | E.164 |
 | `player_phone` | `text` nullable | E.164; required when Player ≥ 18 (app) |
 | `contact_phone` | `text NOT NULL` | E.164; Guardian phone when the Player is under 18, otherwise Player phone |
-| `contact_email` | `text` nullable | Optional; not a login; not copied onto `players`; ignored by the duplicate-pending guard |
+| `contact_email` | `text` nullable | Optional; not a login; copied onto `players.email` on accept when the Player has none; ignored by the duplicate-pending guard |
 | `note` | `text` nullable | |
 | `status` | `registration_status NOT NULL DEFAULT 'pending'` | |
 | `player_id` | `uuid` nullable FK → `players` | Set on accept |
@@ -161,11 +161,12 @@ Rejected rows are retained; visitors may resubmit after reject.
 | `full_name_normalized` | `text NOT NULL` | |
 | `phone` | `text NOT NULL` | E.164 |
 | `date_of_birth` | `date NOT NULL` | |
+| `email` | `text` nullable | Optional contact; not a login; not identity. See [issue #61 operations](./issue-61-operations.md) |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Constraint:** `UNIQUE (academy_id, full_name_normalized, phone)`
 
-Accept flow: find by that key → link existing Player, else insert → create `enrollments` row. Guardian columns on this table, and the copy rules, are in [issue #61 operations](./issue-61-operations.md).
+Accept flow: find by that key → link existing Player, else insert → create `enrollments` row. Guardian and email columns on this table, and the copy rules, are in [issue #61 operations](./issue-61-operations.md).
 
 ### `enrollments`
 
@@ -254,7 +255,7 @@ user ─────────────────────┬──►
 
 - Slug is immutable after create
 - Age 18 is evaluated in `Asia/Kolkata` as of submit: under 18 until the 18th birthday calendar day; adult on that birthday. Adult Guardian is not collected at intake. `contact_phone` is the Guardian phone when the Player is under 18, otherwise the Player phone; the unused Guardian or Player phone/name columns are null.
-- Optional `contact_email` is not copied onto `players` and is not part of the duplicate-pending guard
+- Optional `contact_email` is copied onto `players.email` on accept when the Player has none; it is not part of the duplicate-pending guard
 - Guardian required when date of birth → age &lt; 18; `player_phone` required when ≥ 18
 - Claim flow: when `pending_owner_email` matches signed-in `user.email`, set `owner_user_id` and clear `pending_owner_email`
 - `enrollments.academy_id` must match both parent `academy_id` values
