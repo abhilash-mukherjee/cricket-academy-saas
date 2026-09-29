@@ -124,3 +124,20 @@ describe("operations schema for guardian, pause, and batch sessions", () => {
     expect(sql).not.toMatch(/ALTER TABLE "registrations"/);
   });
 });
+
+describe("players email for manual add and accept fill-if-empty", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0008_players_email.sql",
+  );
+
+  it("adds nullable players.email without touching identity or registrations", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain('ALTER TABLE "players" ADD COLUMN "email" text;');
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+    expect(sql).not.toMatch(/ALTER TABLE "registrations"/);
+    expect(sql).not.toMatch(/full_name_normalized|guardian_/i);
+  });
+});

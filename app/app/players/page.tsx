@@ -3,9 +3,12 @@ import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
 import { calendarDateInIst } from "@/lib/player-age";
 import { listPlayerDirectory, type TermStatus } from "@/lib/players";
 import { DashboardBackLink } from "../dashboard-back-link";
+import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
 
 type PlayersPageProps = {
@@ -65,11 +68,18 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
     redirect("/app/onboarding");
   }
 
-  const directory = await listPlayerDirectory(academy.id, {
-    q,
-    page: requestedPage(firstParam(params.page)),
-    today: calendarDateInIst(),
-  });
+  const today = calendarDateInIst();
+  const [directory, batches, feeOptions] = await Promise.all([
+    listPlayerDirectory(academy.id, {
+      q,
+      page: requestedPage(firstParam(params.page)),
+      today,
+    }),
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+  ]);
+
+  const canManualAdd = Boolean(impersonation || !session.user.isSuperAdmin);
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -78,6 +88,14 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">Players</h1>
+            {canManualAdd ? (
+              <ManualAddForm
+                mode="directory"
+                batches={batches}
+                feeOptions={feeOptions}
+                today={today}
+              />
+            ) : null}
             <form action="/app/players" method="get" className="flex gap-2">
               <input
                 className="input input-bordered w-full"

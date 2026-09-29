@@ -145,6 +145,7 @@ export const players = pgTable(
     dateOfBirth: date("date_of_birth").notNull(),
     guardianFullName: text("guardian_full_name"),
     guardianPhone: text("guardian_phone"),
+    email: text("email"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

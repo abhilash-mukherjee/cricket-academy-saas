@@ -39,6 +39,21 @@ vi.mock("next/headers", () => ({
   },
 }));
 
+vi.mock("next/navigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/navigation")>();
+  return {
+    ...actual,
+    useRouter: () => ({
+      refresh: () => undefined,
+      push: () => undefined,
+      replace: () => undefined,
+      prefetch: () => undefined,
+      back: () => undefined,
+      forward: () => undefined,
+    }),
+  };
+});
+
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
   return {
@@ -174,7 +189,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Players");
       expect(html).toContain('href="/app/players"');
       expect(html).toContain("No Players yet.");
-      expect(html).not.toContain("Add Player");
+      expect(html).toContain("Add Player");
     });
 
     it("lists a Player with an Active Enrollment, phone link, and no fee or Guardian", async () => {
@@ -538,6 +553,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           dateOfBirth: "2015-06-15",
           guardianFullName: "Asha Rao",
           guardianPhone: "+919111111111",
+          email: "mini@example.com",
         })
         .returning({ id: players.id });
       const [prior] = await db
@@ -588,9 +604,11 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const currentAt = html.indexOf("This term continues the previous one.");
       const lapsedAt = html.indexOf("Lapsed");
       expect(html).toContain("Mini Rao");
+      expect(html).toContain("Add Enrollment");
       expect(html).toContain('href="tel:+919876543210"');
       expect(html).toContain(formatCalendarDate("2015-06-15"));
       expect(html).toContain("Guardian: Asha Rao");
+      expect(html).toContain("Email: mini@example.com");
       expect(html).not.toContain("+919111111111");
       expect(html).toContain(`href="/app/batches/${batch.id}"`);
       expect(html).toContain("3 days per week · 45 days · ₹1,500");

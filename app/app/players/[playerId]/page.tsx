@@ -4,11 +4,14 @@ import { z } from "zod";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
 import { formatCalendarDate } from "@/lib/format-date";
 import { calendarDateInIst } from "@/lib/player-age";
 import { packageFactsCopy } from "@/lib/package-copy";
 import { getPlayer, type TermStatus } from "@/lib/players";
 import { PlayerPageBackLink } from "../../player-page-back-link";
+import { ManualAddForm } from "../manual-add-form";
 
 type PlayerPageProps = {
   params: Promise<{ playerId: string }>;
@@ -72,10 +75,17 @@ export default async function PlayerPage({
     redirect("/app/onboarding");
   }
 
-  const player = await getPlayer(academy.id, playerId, calendarDateInIst());
+  const today = calendarDateInIst();
+  const [player, batches, feeOptions] = await Promise.all([
+    getPlayer(academy.id, playerId, today),
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+  ]);
   if (!player) {
     notFound();
   }
+
+  const canManualAdd = Boolean(impersonation || !session.user.isSuperAdmin);
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -84,6 +94,16 @@ export default async function PlayerPage({
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">{player.fullName}</h1>
+            {canManualAdd ? (
+              <ManualAddForm
+                mode="detail"
+                playerId={player.id}
+                playerName={player.fullName}
+                batches={batches}
+                feeOptions={feeOptions}
+                today={today}
+              />
+            ) : null}
             <span>
               <span>Phone: </span>
               <a className="link" href={`tel:${player.phone}`}>
@@ -95,6 +115,7 @@ export default async function PlayerPage({
             {player.guardianFullName ? (
               <p>Guardian: {player.guardianFullName}</p>
             ) : null}
+            {player.email ? <p>Email: {player.email}</p> : null}
             <ul className="flex flex-col gap-3">
               {player.enrollments.map((enrollment) => (
                 <li key={enrollment.id} className="card bg-base-100">

@@ -551,7 +551,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         "Links to existing Player: Arjun Rao · +919876543210",
       );
       expect(html).toContain(
-        `Existing Player DOB is ${formatCalendarDate("1990-06-15")}; this Registration has ${formatCalendarDate("1991-01-01")} — existing values are kept`,
+        `Existing Player DOB is ${formatCalendarDate("1990-06-15")}; this Registration has ${formatCalendarDate("1991-01-01")} — existing values will be kept`,
       );
       expect(html).toContain("<details");
       expect(html).not.toContain("<details open");

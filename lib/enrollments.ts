@@ -196,7 +196,7 @@ export async function insertEnrollment(
     academyId: string;
     playerId: string;
     batchId: string;
-    registrationId: string;
+    registrationId: string | null;
     daysPerWeek: number;
     termDays: number;
     feePaisePaid: number;

@@ -347,6 +347,7 @@ export async function acceptRegistration(
         dateOfBirth: registration.playerDateOfBirth,
         guardianFullName: registration.guardianFullName,
         guardianPhone: registration.guardianPhone,
+        email: registration.contactEmail,
       });
 
       if (playerId !== existingPlayer?.id) {

@@ -71,6 +71,7 @@ export type PlayerDetail = {
   phone: string;
   dateOfBirth: string;
   guardianFullName: string | null;
+  email: string | null;
   enrollments: PlayerEnrollmentView[];
 };
 
@@ -87,6 +88,14 @@ export type PlayerIntake = {
   dateOfBirth: string;
   guardianFullName: string | null;
   guardianPhone: string | null;
+  email: string | null;
+};
+
+export type PlayerMatchPreview = {
+  id: string;
+  fullName: string;
+  phone: string;
+  dateOfBirth: string;
 };
 
 function intakeGuardian(intake: PlayerIntake): {
@@ -102,19 +111,47 @@ function intakeGuardian(intake: PlayerIntake): {
   };
 }
 
+function fillEmptyPlayerFields(
+  existing: {
+    guardianFullName: string | null;
+    guardianPhone: string | null;
+    email: string | null;
+  },
+  intake: PlayerIntake,
+): {
+  guardianFullName?: string;
+  guardianPhone?: string;
+  email?: string;
+} | null {
+  const patch: {
+    guardianFullName?: string;
+    guardianPhone?: string;
+    email?: string;
+  } = {};
+  const guardian = intakeGuardian(intake);
+  if (!existing.guardianFullName && !existing.guardianPhone && guardian) {
+    patch.guardianFullName = guardian.guardianFullName;
+    patch.guardianPhone = guardian.guardianPhone;
+  }
+  if (!existing.email && intake.email) {
+    patch.email = intake.email;
+  }
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
 export async function findOrCreatePlayer(
   tx: OwnerTx,
   academyId: string,
   intake: PlayerIntake,
 ): Promise<string> {
   const existing = await findPlayer(tx, academyId, intake);
-  const guardian = intakeGuardian(intake);
 
   if (existing) {
-    if (!existing.guardianFullName && !existing.guardianPhone && guardian) {
+    const patch = fillEmptyPlayerFields(existing, intake);
+    if (patch) {
       await tx
         .update(players)
-        .set(guardian)
+        .set(patch)
         .where(
           and(eq(players.id, existing.id), eq(players.academyId, academyId)),
         );
@@ -122,6 +159,7 @@ export async function findOrCreatePlayer(
     return existing.id;
   }
 
+  const guardian = intakeGuardian(intake);
   try {
     const [created] = await tx
       .insert(players)
@@ -133,6 +171,7 @@ export async function findOrCreatePlayer(
         dateOfBirth: intake.dateOfBirth,
         guardianFullName: guardian?.guardianFullName ?? null,
         guardianPhone: guardian?.guardianPhone ?? null,
+        email: intake.email,
       })
       .returning({ id: players.id });
     return created.id;
@@ -144,14 +183,48 @@ export async function findOrCreatePlayer(
     if (!raced) {
       throw error;
     }
-    if (!raced.guardianFullName && !raced.guardianPhone && guardian) {
+    const patch = fillEmptyPlayerFields(raced, intake);
+    if (patch) {
       await tx
         .update(players)
-        .set(guardian)
+        .set(patch)
         .where(and(eq(players.id, raced.id), eq(players.academyId, academyId)));
     }
     return raced.id;
   }
+}
+
+export async function findPlayerMatch(
+  academyId: string,
+  fullName: string,
+  phone: string,
+): Promise<PlayerMatchPreview | null> {
+  const normalizedPhone = normalizeRequiredPhone(phone);
+  if (!normalizedPhone.ok) {
+    return null;
+  }
+  const fullNameNormalized = fullName.trim().toLowerCase();
+  if (!fullNameNormalized) {
+    return null;
+  }
+  const db = getDb();
+  const [row] = await db
+    .select({
+      id: players.id,
+      fullName: players.fullName,
+      phone: players.phone,
+      dateOfBirth: players.dateOfBirth,
+    })
+    .from(players)
+    .where(
+      and(
+        eq(players.academyId, academyId),
+        eq(players.fullNameNormalized, fullNameNormalized),
+        eq(players.phone, normalizedPhone.phone),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 function playerSearch(q: string) {
@@ -402,6 +475,7 @@ export async function getPlayer(
       phone: players.phone,
       dateOfBirth: players.dateOfBirth,
       guardianFullName: players.guardianFullName,
+      email: players.email,
     })
     .from(players)
     .where(and(eq(players.id, playerId), eq(players.academyId, academyId)))
@@ -486,6 +560,7 @@ async function findPlayer(
       id: players.id,
       guardianFullName: players.guardianFullName,
       guardianPhone: players.guardianPhone,
+      email: players.email,
     })
     .from(players)
     .where(
