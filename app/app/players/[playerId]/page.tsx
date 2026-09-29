@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { requireStaffSession } from "@/lib/staff-session";
@@ -8,10 +7,10 @@ import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { formatCalendarDate } from "@/lib/format-date";
 import { calendarDateInIst } from "@/lib/player-age";
-import { packageFactsCopy } from "@/lib/package-copy";
-import { getPlayer, type TermStatus } from "@/lib/players";
+import { getPlayer } from "@/lib/players";
 import { PlayerPageBackLink } from "../../player-page-back-link";
 import { ManualAddForm } from "../manual-add-form";
+import { PlayerEnrollmentList } from "../player-enrollment-list";
 
 type PlayerPageProps = {
   params: Promise<{ playerId: string }>;
@@ -31,29 +30,6 @@ function backHref(fromBatch: string): string {
     return "/app/players";
   }
   return `/app/batches/${parsed.data}`;
-}
-
-function statusLabel(status: TermStatus): string {
-  if (status === "active") {
-    return "Active";
-  }
-  if (status === "paused") {
-    return "Paused";
-  }
-  return "Lapsed";
-}
-
-function pauseCopy(
-  pausedOn: string | null,
-  plannedLastPausedOn: string | null,
-): string | null {
-  if (!pausedOn) {
-    return null;
-  }
-  if (plannedLastPausedOn) {
-    return `Paused ${formatCalendarDate(pausedOn)}, through ${formatCalendarDate(plannedLastPausedOn)}`;
-  }
-  return `Paused ${formatCalendarDate(pausedOn)}, open-ended`;
 }
 
 export default async function PlayerPage({
@@ -85,7 +61,7 @@ export default async function PlayerPage({
     notFound();
   }
 
-  const canManualAdd = Boolean(impersonation || !session.user.isSuperAdmin);
+  const canMutate = Boolean(impersonation || !session.user.isSuperAdmin);
 
   return (
     <main className="flex min-h-full flex-col p-6">
@@ -94,7 +70,7 @@ export default async function PlayerPage({
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">{player.fullName}</h1>
-            {canManualAdd ? (
+            {canMutate ? (
               <ManualAddForm
                 mode="detail"
                 playerId={player.id}
@@ -116,44 +92,11 @@ export default async function PlayerPage({
               <p>Guardian: {player.guardianFullName}</p>
             ) : null}
             {player.email ? <p>Email: {player.email}</p> : null}
-            <ul className="flex flex-col gap-3">
-              {player.enrollments.map((enrollment) => (
-                <li key={enrollment.id} className="card bg-base-100">
-                  <div className="card-body gap-1 py-3">
-                    <Link
-                      className="link font-medium"
-                      href={`/app/batches/${enrollment.batchId}`}
-                    >
-                      {enrollment.batchName}
-                    </Link>
-                    <p>{statusLabel(enrollment.status)}</p>
-                    <p>
-                      {packageFactsCopy({
-                        daysPerWeek: enrollment.daysPerWeek,
-                        termDays: enrollment.termDays,
-                        feePaise: enrollment.feePaisePaid,
-                      })}
-                    </p>
-                    <p>Valid from {formatCalendarDate(enrollment.validFrom)}</p>
-                    <p>
-                      Valid until{" "}
-                      {formatCalendarDate(enrollment.effectiveValidUntil)}
-                    </p>
-                    {enrollment.status === "paused" ? (
-                      <p>
-                        {pauseCopy(
-                          enrollment.pausedOn,
-                          enrollment.plannedLastPausedOn,
-                        )}
-                      </p>
-                    ) : null}
-                    {enrollment.continuesPreviousTerm ? (
-                      <p>This term continues the previous one.</p>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <PlayerEnrollmentList
+              enrollments={player.enrollments}
+              today={today}
+              canMutate={canMutate}
+            />
           </div>
         </section>
       </div>

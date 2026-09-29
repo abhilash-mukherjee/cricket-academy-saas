@@ -34,3 +34,30 @@ export function rangesShareADay(
 ): boolean {
   return leftFrom <= rightUntil && rightFrom <= leftUntil;
 }
+
+/** First day not paused, or null when the pause is open-ended and still open. */
+export function pauseEndExclusive(pause: {
+  pausedOn: string;
+  plannedLastPausedOn: string | null;
+  resumedOn: string | null;
+}): string | null {
+  if (pause.resumedOn !== null) {
+    return pause.resumedOn;
+  }
+  if (pause.plannedLastPausedOn !== null) {
+    return addCalendarDays(pause.plannedLastPausedOn, 1);
+  }
+  return null;
+}
+
+/** Half-open intervals `[start, endExclusive)`; null end means unbounded. */
+export function pauseIntervalsOverlap(
+  left: { start: string; endExclusive: string | null },
+  right: { start: string; endExclusive: string | null },
+): boolean {
+  const leftEndsAfterRightStarts =
+    left.endExclusive === null || left.endExclusive > right.start;
+  const rightEndsAfterLeftStarts =
+    right.endExclusive === null || right.endExclusive > left.start;
+  return leftEndsAfterRightStarts && rightEndsAfterLeftStarts;
+}

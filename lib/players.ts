@@ -63,6 +63,12 @@ export type PlayerEnrollmentView = {
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
   continuesPreviousTerm: boolean;
+  /** All pause intervals on this Enrollment (for overlap preview; not a history UI). */
+  pauseIntervals: {
+    pausedOn: string;
+    plannedLastPausedOn: string | null;
+    resumedOn: string | null;
+  }[];
 };
 
 export type PlayerDetail = {
@@ -519,6 +525,43 @@ export async function getPlayer(
     )
     .orderBy(sql`${enrollments.validFrom} desc`, asc(enrollments.id));
 
+  const enrollmentIds = rows.map((row) => row.id);
+  const pauseRows =
+    enrollmentIds.length === 0
+      ? []
+      : await db
+          .select({
+            enrollmentId: enrollmentPauses.enrollmentId,
+            pausedOn: enrollmentPauses.pausedOn,
+            plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+            resumedOn: enrollmentPauses.resumedOn,
+          })
+          .from(enrollmentPauses)
+          .where(
+            and(
+              eq(enrollmentPauses.academyId, academyId),
+              inArray(enrollmentPauses.enrollmentId, enrollmentIds),
+            ),
+          );
+
+  const pausesByEnrollment = new Map<
+    string,
+    {
+      pausedOn: string;
+      plannedLastPausedOn: string | null;
+      resumedOn: string | null;
+    }[]
+  >();
+  for (const pause of pauseRows) {
+    const list = pausesByEnrollment.get(pause.enrollmentId) ?? [];
+    list.push({
+      pausedOn: pause.pausedOn,
+      plannedLastPausedOn: pause.plannedLastPausedOn,
+      resumedOn: pause.resumedOn,
+    });
+    pausesByEnrollment.set(pause.enrollmentId, list);
+  }
+
   return {
     ...player,
     enrollments: rows.map((row) => {
@@ -545,6 +588,7 @@ export async function getPlayer(
         pausedOn: term.pausedOn,
         plannedLastPausedOn: term.plannedLastPausedOn,
         continuesPreviousTerm: row.renewedFromEnrollmentId !== null,
+        pauseIntervals: pausesByEnrollment.get(row.id) ?? [],
       };
     }),
   };

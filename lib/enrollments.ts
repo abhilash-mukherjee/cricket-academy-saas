@@ -1,11 +1,18 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 import { enrollmentPauses, enrollments } from "@/db/domain-schema";
-import type { getTransactionalDb } from "@/db/client";
+import { getTransactionalDb } from "@/db/client";
 import {
   addCalendarDays,
   calendarDaysBetween,
+  pauseEndExclusive,
+  pauseIntervalsOverlap,
   rangesShareADay,
 } from "@/lib/enrollment-term";
+import {
+  calendarDateInIst,
+  isValidCalendarDate,
+} from "@/lib/player-age";
 
 type OwnerTx = Parameters<
   Parameters<ReturnType<typeof getTransactionalDb>["transaction"]>[0]
@@ -26,6 +33,51 @@ export type EnrollmentTerm = {
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
 };
+
+export type PauseError =
+  | "invalid-input"
+  | "not-found"
+  | "lapsed"
+  | "already-paused"
+  | "pause-overlaps";
+
+export type PauseResult =
+  | {
+      ok: true;
+      outcome: "paused";
+      pausedOn: string;
+      plannedLastPausedOn: string | null;
+    }
+  | {
+      ok: true;
+      outcome: "settled";
+      daysAdded: number;
+      validUntil: string;
+    }
+  | { ok: false; error: PauseError };
+
+export type ResumeError = "not-found" | "not-paused";
+
+export type ResumeResult =
+  | { ok: true; daysAdded: number; validUntil: string }
+  | { ok: false; error: ResumeError };
+
+class PauseFailure extends Error {
+  constructor(readonly code: PauseError) {
+    super(code);
+  }
+}
+
+class ResumeFailure extends Error {
+  constructor(readonly code: ResumeError) {
+    super(code);
+  }
+}
+
+const pauseBodySchema = z.object({
+  pausedOn: z.iso.date(),
+  plannedLastPausedOn: z.union([z.iso.date(), z.null()]),
+});
 
 /** Read-only term. A finished dated pause extends valid-until in memory and is not written. */
 export function enrollmentTerm(
@@ -216,4 +268,267 @@ export async function insertEnrollment(
     validUntil: input.validUntil,
     renewedFromEnrollmentId: null,
   });
+}
+
+export async function pauseEnrollment(
+  academyId: string,
+  enrollmentId: string,
+  input: unknown,
+  today: string = calendarDateInIst(),
+): Promise<PauseResult> {
+  const parsed = pauseBodySchema.safeParse(input);
+  if (
+    !parsed.success ||
+    !isValidCalendarDate(parsed.data.pausedOn) ||
+    (parsed.data.plannedLastPausedOn !== null &&
+      !isValidCalendarDate(parsed.data.plannedLastPausedOn))
+  ) {
+    return { ok: false, error: "invalid-input" };
+  }
+
+  const { pausedOn, plannedLastPausedOn } = parsed.data;
+  if (pausedOn > today) {
+    return { ok: false, error: "invalid-input" };
+  }
+  if (plannedLastPausedOn !== null && plannedLastPausedOn < pausedOn) {
+    return { ok: false, error: "invalid-input" };
+  }
+
+  const db = getTransactionalDb();
+  try {
+    return await db.transaction(async (tx) => {
+      const [enrollment] = await tx
+        .select({
+          id: enrollments.id,
+          validFrom: enrollments.validFrom,
+          validUntil: enrollments.validUntil,
+        })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.id, enrollmentId),
+            eq(enrollments.academyId, academyId),
+          ),
+        )
+        .limit(1);
+
+      if (!enrollment) {
+        throw new PauseFailure("not-found");
+      }
+      if (pausedOn < enrollment.validFrom) {
+        throw new PauseFailure("invalid-input");
+      }
+
+      const settled = await settleFinishedPauses(
+        tx,
+        academyId,
+        enrollment,
+        today,
+      );
+
+      const openPauseRows = await tx
+        .select({
+          pausedOn: enrollmentPauses.pausedOn,
+          plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+        })
+        .from(enrollmentPauses)
+        .where(
+          and(
+            eq(enrollmentPauses.academyId, academyId),
+            eq(enrollmentPauses.enrollmentId, enrollment.id),
+            isNull(enrollmentPauses.resumedOn),
+          ),
+        );
+
+      const openPause = openPauseRows[0] ?? null;
+      const term = enrollmentTerm(
+        { validUntil: settled.validUntil },
+        openPause,
+        today,
+      );
+
+      if (term.status === "lapsed") {
+        throw new PauseFailure("lapsed");
+      }
+      if (term.status === "paused") {
+        throw new PauseFailure("already-paused");
+      }
+
+      const existingPauses = await tx
+        .select({
+          pausedOn: enrollmentPauses.pausedOn,
+          plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+          resumedOn: enrollmentPauses.resumedOn,
+        })
+        .from(enrollmentPauses)
+        .where(
+          and(
+            eq(enrollmentPauses.academyId, academyId),
+            eq(enrollmentPauses.enrollmentId, enrollment.id),
+          ),
+        );
+
+      const proposed = {
+        start: pausedOn,
+        endExclusive: pauseEndExclusive({
+          pausedOn,
+          plannedLastPausedOn,
+          resumedOn: null,
+        }),
+      };
+      const overlapsPrior = existingPauses.some((pause) =>
+        pauseIntervalsOverlap(proposed, {
+          start: pause.pausedOn,
+          endExclusive: pauseEndExclusive(pause),
+        }),
+      );
+      if (overlapsPrior) {
+        throw new PauseFailure("pause-overlaps");
+      }
+
+      const settlesImmediately =
+        plannedLastPausedOn !== null && plannedLastPausedOn < today;
+
+      if (settlesImmediately) {
+        const resumedOn = addCalendarDays(plannedLastPausedOn, 1);
+        const daysAdded = calendarDaysBetween(pausedOn, resumedOn);
+        const validUntil = addCalendarDays(settled.validUntil, daysAdded);
+        await tx.insert(enrollmentPauses).values({
+          academyId,
+          enrollmentId: enrollment.id,
+          pausedOn,
+          plannedLastPausedOn,
+          resumedOn,
+        });
+        await tx
+          .update(enrollments)
+          .set({ validUntil })
+          .where(
+            and(
+              eq(enrollments.id, enrollment.id),
+              eq(enrollments.academyId, academyId),
+            ),
+          );
+        return {
+          ok: true as const,
+          outcome: "settled" as const,
+          daysAdded,
+          validUntil,
+        };
+      }
+
+      await tx.insert(enrollmentPauses).values({
+        academyId,
+        enrollmentId: enrollment.id,
+        pausedOn,
+        plannedLastPausedOn,
+        resumedOn: null,
+      });
+      return {
+        ok: true as const,
+        outcome: "paused" as const,
+        pausedOn,
+        plannedLastPausedOn,
+      };
+    });
+  } catch (error) {
+    if (error instanceof PauseFailure) {
+      return { ok: false, error: error.code };
+    }
+    throw error;
+  }
+}
+
+export async function resumeEnrollment(
+  academyId: string,
+  enrollmentId: string,
+  today: string = calendarDateInIst(),
+): Promise<ResumeResult> {
+  const db = getTransactionalDb();
+  try {
+    return await db.transaction(async (tx) => {
+      const [enrollment] = await tx
+        .select({
+          id: enrollments.id,
+          validFrom: enrollments.validFrom,
+          validUntil: enrollments.validUntil,
+        })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.id, enrollmentId),
+            eq(enrollments.academyId, academyId),
+          ),
+        )
+        .limit(1);
+
+      if (!enrollment) {
+        throw new ResumeFailure("not-found");
+      }
+
+      const settled = await settleFinishedPauses(
+        tx,
+        academyId,
+        enrollment,
+        today,
+      );
+
+      const [openPause] = await tx
+        .select({
+          id: enrollmentPauses.id,
+          pausedOn: enrollmentPauses.pausedOn,
+          plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+        })
+        .from(enrollmentPauses)
+        .where(
+          and(
+            eq(enrollmentPauses.academyId, academyId),
+            eq(enrollmentPauses.enrollmentId, enrollment.id),
+            isNull(enrollmentPauses.resumedOn),
+          ),
+        )
+        .limit(1);
+
+      if (!openPause) {
+        throw new ResumeFailure("not-paused");
+      }
+
+      const term = enrollmentTerm(
+        { validUntil: settled.validUntil },
+        openPause,
+        today,
+      );
+      if (term.status !== "paused") {
+        throw new ResumeFailure("not-paused");
+      }
+
+      const daysAdded = calendarDaysBetween(openPause.pausedOn, today);
+      const validUntil = addCalendarDays(settled.validUntil, daysAdded);
+      await tx
+        .update(enrollmentPauses)
+        .set({ resumedOn: today })
+        .where(
+          and(
+            eq(enrollmentPauses.id, openPause.id),
+            eq(enrollmentPauses.academyId, academyId),
+          ),
+        );
+      await tx
+        .update(enrollments)
+        .set({ validUntil })
+        .where(
+          and(
+            eq(enrollments.id, enrollment.id),
+            eq(enrollments.academyId, academyId),
+          ),
+        );
+
+      return { ok: true as const, daysAdded, validUntil };
+    });
+  } catch (error) {
+    if (error instanceof ResumeFailure) {
+      return { ok: false, error: error.code };
+    }
+    throw error;
+  }
 }

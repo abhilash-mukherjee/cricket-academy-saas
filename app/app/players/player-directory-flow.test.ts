@@ -618,8 +618,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(currentAt).toBeGreaterThan(-1);
       expect(lapsedAt).toBeGreaterThan(currentAt);
+      expect(html).toContain(">Resume<");
       expect(html).not.toContain(">Pause<");
-      expect(html).not.toContain("Resume");
       expect(html).not.toContain("Renew");
     });
 
@@ -731,6 +731,82 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         `Valid until ${formatCalendarDate(addCalendarDays(today, 4))}`,
       );
       expect(html).not.toContain("open-ended");
+      expect(html).toContain(">Pause<");
+      expect(html).not.toContain(">Resume<");
+    });
+
+    it("shows Pause on Active, Resume on paused, and neither on lapsed", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const [batch] = await listBatches(academy.id);
+      const today = calendarDateInIst();
+      const db = getDb();
+      const [player] = await db
+        .insert(players)
+        .values({
+          academyId: academy.id,
+          fullName: "Controls Rao",
+          fullNameNormalized: "controls rao",
+          phone: "+919876543210",
+          dateOfBirth: "2012-04-01",
+        })
+        .returning({ id: players.id });
+      const [paused] = await db
+        .insert(enrollments)
+        .values({
+          academyId: academy.id,
+          playerId: player.id,
+          batchId: batch.id,
+          daysPerWeek: 3,
+          termDays: 10,
+          feePaisePaid: 100000,
+          validFrom: addCalendarDays(today, -20),
+          validUntil: addCalendarDays(today, -11),
+        })
+        .returning({ id: enrollments.id });
+      await db.insert(enrollments).values({
+        academyId: academy.id,
+        playerId: player.id,
+        batchId: batch.id,
+        daysPerWeek: 3,
+        termDays: 10,
+        feePaisePaid: 100000,
+        validFrom: addCalendarDays(today, -40),
+        validUntil: addCalendarDays(today, -31),
+      });
+      await db.insert(enrollments).values({
+        academyId: academy.id,
+        playerId: player.id,
+        batchId: batch.id,
+        daysPerWeek: 3,
+        termDays: 45,
+        feePaisePaid: 150000,
+        validFrom: today,
+        validUntil: addCalendarDays(today, 44),
+      });
+      await db.insert(enrollmentPauses).values({
+        academyId: academy.id,
+        enrollmentId: paused.id,
+        pausedOn: addCalendarDays(today, -12),
+      });
+      sessionCookie.value = cookie;
+
+      const { default: PlayerPage } = await import("./[playerId]/page");
+      const html = renderToStaticMarkup(
+        await PlayerPage({
+          params: Promise.resolve({ playerId: player.id }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      const pauseCount = html.split(">Pause<").length - 1;
+      const resumeCount = html.split(">Resume<").length - 1;
+      expect(pauseCount).toBe(1);
+      expect(resumeCount).toBe(1);
+      expect(html).toContain("Lapsed");
+      expect(html).toContain("Active");
+      expect(html).toContain("Paused");
     });
 
     it("hides another Academy’s Players and unknown ids", async () => {
