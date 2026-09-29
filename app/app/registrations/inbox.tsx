@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { lastCoveredDay } from "@/lib/enrollment-term";
+import { formatCalendarDate, formatDateTime } from "@/lib/format-date";
 import { isValidCalendarDate } from "@/lib/player-age";
 import { packageFactsCopy } from "@/lib/package-copy";
 import type { PendingRegistration } from "@/lib/registrations";
@@ -26,14 +27,6 @@ export function inboxErrorCopy(error: string): string {
     default:
       return "Could not update this Registration.";
   }
-}
-
-function formatSubmittedAt(iso: string): string {
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
 }
 
 export function RegistrationInbox({ registrations, today }: InboxProps) {
@@ -173,10 +166,12 @@ export function RegistrationInbox({ registrations, today }: InboxProps) {
                 ) : null}
                 {row.existingPlayer &&
                 row.existingPlayer.dateOfBirth !== row.playerDateOfBirth ? (
-                  <p>
-                    Existing Player DOB is {row.existingPlayer.dateOfBirth};
-                    this Registration has {row.playerDateOfBirth} — existing
-                    values are kept
+                  <p className="text-error">
+                    Existing Player DOB is{" "}
+                    {formatCalendarDate(row.existingPlayer.dateOfBirth)}; this
+                    Registration has{" "}
+                    {formatCalendarDate(row.playerDateOfBirth)} — existing
+                    values will be kept
                   </p>
                 ) : null}
                 <label className="mt-3 flex flex-col gap-1 text-sm">
@@ -194,12 +189,14 @@ export function RegistrationInbox({ registrations, today }: InboxProps) {
                     }
                   />
                 </label>
-                {coversThrough ? <p>Covers through {coversThrough}</p> : null}
+                {coversThrough ? (
+                  <p>Covers through {formatCalendarDate(coversThrough)}</p>
+                ) : null}
                 {termMissesToday ? (
                   <p>That term would not cover today.</p>
                 ) : null}
                 {error ? (
-                  <p role="alert">{inboxErrorCopy(error)}</p>
+                  <p role="alert" className="text-error text-sm">{inboxErrorCopy(error)}</p>
                 ) : null}
                 <div className="mt-3 flex gap-2">
                   <button
@@ -221,7 +218,9 @@ export function RegistrationInbox({ registrations, today }: InboxProps) {
                 </div>
                 <details className="mt-3">
                   <summary>More details</summary>
-                  <p>Date of birth: {row.playerDateOfBirth}</p>
+                  <p>
+                    Date of birth: {formatCalendarDate(row.playerDateOfBirth)}
+                  </p>
                   {row.guardianFullName && row.guardianPhone ? (
                     <p>
                       Guardian: {row.guardianFullName}, {row.guardianPhone}
@@ -229,7 +228,7 @@ export function RegistrationInbox({ registrations, today }: InboxProps) {
                   ) : null}
                   {row.contactEmail ? <p>Email: {row.contactEmail}</p> : null}
                   {row.note ? <p>Note: {row.note}</p> : null}
-                  <p>Submitted {formatSubmittedAt(row.submittedAt)}</p>
+                  <p>Submitted {formatDateTime(row.submittedAt)}</p>
                 </details>
               </li>
             );

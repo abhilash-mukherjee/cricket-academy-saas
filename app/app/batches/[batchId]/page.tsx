@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { formatCalendarDate } from "@/lib/format-date";
 import { calendarDateInIst } from "@/lib/player-age";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
@@ -39,9 +40,9 @@ function pauseCopy(
     return null;
   }
   if (plannedLastPausedOn) {
-    return `Paused ${pausedOn}, through ${plannedLastPausedOn}`;
+    return `Paused ${formatCalendarDate(pausedOn)}, through ${formatCalendarDate(plannedLastPausedOn)}`;
   }
-  return `Paused ${pausedOn}, open-ended`;
+  return `Paused ${formatCalendarDate(pausedOn)}, open-ended`;
 }
 
 export default async function BatchRosterPage({
@@ -89,7 +90,11 @@ export default async function BatchRosterPage({
                 (option) => option.batchId === batchId,
               )}
             />
-            <h2 className="text-lg font-medium">Roster</h2>
+          </div>
+        </section>
+        <section className="card bg-base-200 shadow">
+          <div className="card-body gap-4">
+            <h2 className="card-title text-lg">Roster</h2>
             {roster.players.length === 0 ? (
               <p>No Players on this Batch.</p>
             ) : (
@@ -99,7 +104,7 @@ export default async function BatchRosterPage({
                     <div className="card-body gap-1 py-3">
                       <Link
                         className="link font-medium after:absolute after:inset-0"
-                        href={`/app/players/${player.id}`}
+                        href={`/app/players/${player.id}?fromBatch=${batchId}`}
                       >
                         {player.fullName}
                       </Link>

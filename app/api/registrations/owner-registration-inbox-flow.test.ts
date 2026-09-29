@@ -29,6 +29,7 @@ import {
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
 import { calendarDateInIst } from "@/lib/player-age";
+import { formatCalendarDate } from "@/lib/format-date";
 import { lastCoveredDay } from "@/lib/enrollment-term";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
@@ -543,12 +544,14 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Phone: +919876543210");
       expect(html).toContain("U-16 morning");
       expect(html).toContain("3 days per week · 45 days · ₹15,000");
-      expect(html).toContain(`Covers through ${lastCoveredDay(today, 45)}`);
+      expect(html).toContain(
+        `Covers through ${formatCalendarDate(lastCoveredDay(today, 45))}`,
+      );
       expect(html).toContain(
         "Links to existing Player: Arjun Rao · +919876543210",
       );
       expect(html).toContain(
-        "Existing Player DOB is 1990-06-15; this Registration has 1991-01-01 — existing values are kept",
+        `Existing Player DOB is ${formatCalendarDate("1990-06-15")}; this Registration has ${formatCalendarDate("1991-01-01")} — existing values are kept`,
       );
       expect(html).toContain("<details");
       expect(html).not.toContain("<details open");

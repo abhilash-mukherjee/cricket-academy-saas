@@ -1,16 +1,34 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { formatCalendarDate } from "@/lib/format-date";
 import { calendarDateInIst } from "@/lib/player-age";
 import { packageFactsCopy } from "@/lib/package-copy";
 import { getPlayer, type TermStatus } from "@/lib/players";
-import { DashboardBackLink } from "../../dashboard-back-link";
+import { PlayerPageBackLink } from "../../player-page-back-link";
 
 type PlayerPageProps = {
   params: Promise<{ playerId: string }>;
+  searchParams: Promise<{ fromBatch?: string | string[] }>;
 };
+
+function firstParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return value ?? "";
+}
+
+function backHref(fromBatch: string): string {
+  const parsed = z.uuid().safeParse(fromBatch);
+  if (!parsed.success) {
+    return "/app/players";
+  }
+  return `/app/batches/${parsed.data}`;
+}
 
 function statusLabel(status: TermStatus): string {
   if (status === "active") {
@@ -30,13 +48,17 @@ function pauseCopy(
     return null;
   }
   if (plannedLastPausedOn) {
-    return `Paused ${pausedOn}, through ${plannedLastPausedOn}`;
+    return `Paused ${formatCalendarDate(pausedOn)}, through ${formatCalendarDate(plannedLastPausedOn)}`;
   }
-  return `Paused ${pausedOn}, open-ended`;
+  return `Paused ${formatCalendarDate(pausedOn)}, open-ended`;
 }
 
-export default async function PlayerPage({ params }: PlayerPageProps) {
+export default async function PlayerPage({
+  params,
+  searchParams,
+}: PlayerPageProps) {
   const { playerId } = await params;
+  const query = await searchParams;
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 
@@ -58,14 +80,18 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   return (
     <main className="flex min-h-full flex-col p-6">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
-        <DashboardBackLink />
+        <PlayerPageBackLink href={backHref(firstParam(query.fromBatch))} />
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">{player.fullName}</h1>
-            <a className="link" href={`tel:${player.phone}`}>
-              {player.phone}
-            </a>
-            <p>{player.dateOfBirth}</p>
+            <span>
+              <span>Phone: </span>
+              <a className="link" href={`tel:${player.phone}`}>
+                {player.phone}
+              </a>
+            </span>
+
+            <p>Date Of Birth: {formatCalendarDate(player.dateOfBirth)}</p>
             {player.guardianFullName ? (
               <p>Guardian: {player.guardianFullName}</p>
             ) : null}
@@ -87,8 +113,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                         feePaise: enrollment.feePaisePaid,
                       })}
                     </p>
-                    <p>Valid from {enrollment.validFrom}</p>
-                    <p>Valid until {enrollment.effectiveValidUntil}</p>
+                    <p>Valid from {formatCalendarDate(enrollment.validFrom)}</p>
+                    <p>
+                      Valid until{" "}
+                      {formatCalendarDate(enrollment.effectiveValidUntil)}
+                    </p>
                     {enrollment.status === "paused" ? (
                       <p>
                         {pauseCopy(

@@ -22,6 +22,7 @@ import {
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
 import { addCalendarDays } from "@/lib/enrollment-term";
+import { formatCalendarDate } from "@/lib/format-date";
 import { calendarDateInIst } from "@/lib/player-age";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
@@ -500,10 +501,14 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(roster).toContain("U-14 evening");
       expect(roster).toContain("Active Rao");
       expect(roster).toContain("Paused Rao");
-      expect(roster).toContain(`Paused ${pausedOn}, open-ended`);
+      expect(roster).toContain(
+        `Paused ${formatCalendarDate(pausedOn)}, open-ended`,
+      );
       expect(roster).not.toContain("Lapsed Rao");
       expect(roster).not.toContain("Search");
-      expect(roster).toContain(`href="/app/players/${paused.id}"`);
+      expect(roster).toContain(
+        `href="/app/players/${paused.id}?fromBatch=${batch.id}"`,
+      );
 
       const directory = renderToStaticMarkup(
         await PlayersPage({ searchParams: Promise.resolve({}) }),
@@ -575,24 +580,82 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       const { default: PlayerPage } = await import("./[playerId]/page");
       const html = renderToStaticMarkup(
-        await PlayerPage({ params: Promise.resolve({ playerId: player.id }) }),
+        await PlayerPage({
+          params: Promise.resolve({ playerId: player.id }),
+          searchParams: Promise.resolve({}),
+        }),
       );
       const currentAt = html.indexOf("This term continues the previous one.");
       const lapsedAt = html.indexOf("Lapsed");
       expect(html).toContain("Mini Rao");
       expect(html).toContain('href="tel:+919876543210"');
-      expect(html).toContain("2015-06-15");
+      expect(html).toContain(formatCalendarDate("2015-06-15"));
       expect(html).toContain("Guardian: Asha Rao");
       expect(html).not.toContain("+919111111111");
       expect(html).toContain(`href="/app/batches/${batch.id}"`);
       expect(html).toContain("3 days per week · 45 days · ₹1,500");
-      expect(html).toContain(`Valid from ${validFrom}`);
-      expect(html).toContain(`Paused ${validFrom}, through ${plannedLast}`);
+      expect(html).toContain(`Valid from ${formatCalendarDate(validFrom)}`);
+      expect(html).toContain(
+        `Paused ${formatCalendarDate(validFrom)}, through ${formatCalendarDate(plannedLast)}`,
+      );
       expect(currentAt).toBeGreaterThan(-1);
       expect(lapsedAt).toBeGreaterThan(currentAt);
       expect(html).not.toContain(">Pause<");
       expect(html).not.toContain("Resume");
       expect(html).not.toContain("Renew");
+    });
+
+    it("sends Go Back to the Batch roster when opened from it, else the directory", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const [batch] = await listBatches(academy.id);
+      const today = calendarDateInIst();
+      const db = getDb();
+      const [player] = await db
+        .insert(players)
+        .values({
+          academyId: academy.id,
+          fullName: "Backlink Rao",
+          fullNameNormalized: "backlink rao",
+          phone: "+919876543210",
+          dateOfBirth: "2012-04-01",
+        })
+        .returning({ id: players.id });
+      await db.insert(enrollments).values({
+        academyId: academy.id,
+        playerId: player.id,
+        batchId: batch.id,
+        daysPerWeek: 3,
+        termDays: 45,
+        feePaisePaid: 150000,
+        validFrom: today,
+        validUntil: addCalendarDays(today, 44),
+      });
+      sessionCookie.value = cookie;
+
+      const { default: PlayerPage } = await import("./[playerId]/page");
+      const fromDirectory = renderToStaticMarkup(
+        await PlayerPage({
+          params: Promise.resolve({ playerId: player.id }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(fromDirectory).toMatch(
+        /href="\/app\/players"[^>]*>[\s\S]*?Go Back/,
+      );
+
+      const fromRoster = renderToStaticMarkup(
+        await PlayerPage({
+          params: Promise.resolve({ playerId: player.id }),
+          searchParams: Promise.resolve({ fromBatch: batch.id }),
+        }),
+      );
+      expect(fromRoster).toMatch(
+        new RegExp(
+          `href="/app/batches/${batch.id}"[^>]*>[\\s\\S]*?Go Back`,
+        ),
+      );
     });
 
     it("shows a finished dated pause as Active with the extended valid-until", async () => {
@@ -640,10 +703,15 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       const { default: PlayerPage } = await import("./[playerId]/page");
       const html = renderToStaticMarkup(
-        await PlayerPage({ params: Promise.resolve({ playerId: player.id }) }),
+        await PlayerPage({
+          params: Promise.resolve({ playerId: player.id }),
+          searchParams: Promise.resolve({}),
+        }),
       );
       expect(html).toContain("Active");
-      expect(html).toContain(`Valid until ${addCalendarDays(today, 4)}`);
+      expect(html).toContain(
+        `Valid until ${formatCalendarDate(addCalendarDays(today, 4))}`,
+      );
       expect(html).not.toContain("open-ended");
     });
 
@@ -678,7 +746,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(directory).toContain("No Players yet.");
 
       await expect(
-        PlayerPage({ params: Promise.resolve({ playerId: hidden.id }) }),
+        PlayerPage({
+          params: Promise.resolve({ playerId: hidden.id }),
+          searchParams: Promise.resolve({}),
+        }),
       ).rejects.toThrow();
       await expect(
         RosterPage({
@@ -691,6 +762,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           params: Promise.resolve({
             playerId: "00000000-0000-4000-8000-000000000000",
           }),
+          searchParams: Promise.resolve({}),
         }),
       ).rejects.toThrow();
       expect(academy.id).not.toBe(other.id);

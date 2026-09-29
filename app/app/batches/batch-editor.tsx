@@ -274,22 +274,22 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
             />
           </label>
           <div className="flex gap-2">
-            <button type="submit" className="btn btn-ghost btn-sm" disabled={busy}>
+            <button type="submit" className="btn btn-sm" disabled={busy}>
               {busy ? "Saving…" : "Rename"}
             </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={rest}>
+            <button type="button" className="btn btn-sm" onClick={rest}>
               Cancel
             </button>
           </div>
         </form>
       ) : (
-        <button type="button" className="btn btn-ghost btn-sm self-start" onClick={openRename}>
-          Rename
+        <button type="button" className="btn btn-sm self-start" onClick={openRename}>
+          Rename Batch
         </button>
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium">Fee options</h2>
+        <h1 className="text-sm font-medium">Fee options</h1>
         {feeOptions.length === 0 ? (
           <p className="text-base-content/70 text-sm">No fee options yet.</p>
         ) : (
@@ -382,7 +382,7 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
                       </label>
                       <button
                         type="submit"
-                        className="btn btn-ghost btn-sm self-start"
+                        className="btn btn-sm self-start"
                         disabled={busy}
                       >
                         {busy ? "Saving…" : "Save fee option"}
@@ -393,7 +393,7 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-sm"
                             disabled={busy}
                             onClick={() =>
                               void patchFeeOption(
@@ -409,7 +409,7 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
                           </button>
                           <button
                             type="button"
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-sm"
                             disabled={busy}
                             onClick={() => void onDeleteFeeOption(option)}
                           >
@@ -419,7 +419,7 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
                       )}
                       <button
                         type="button"
-                        className="btn btn-ghost btn-sm self-start"
+                        className="btn btn-sm self-start"
                         onClick={rest}
                       >
                         Cancel
@@ -428,7 +428,7 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
                   ) : (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm self-start"
+                      className="btn btn-sm self-start"
                       onClick={() => openEdit(option)}
                     >
                       Edit
@@ -522,7 +522,7 @@ export function BatchEditor({ batch, feeOptions }: BatchEditorProps) {
               >
                 {busy ? "Adding…" : "Add fee option"}
               </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={rest}>
+              <button type="button" className="btn btn-sm" onClick={rest}>
                 Cancel
               </button>
             </div>

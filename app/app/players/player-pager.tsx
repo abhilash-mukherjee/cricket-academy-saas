@@ -19,11 +19,11 @@ export function PlayerPager({
 
   return (
     <p className="flex flex-wrap items-center gap-3 text-sm">
-      {page > 1 ? <Link href={hrefFor(page - 1)}>Previous</Link> : null}
+      {page > 1 ? <Link href={hrefFor(page - 1)} className="btn btn-sm">Previous</Link> : null}
       <span>
         {from}–{to} of {total}
       </span>
-      {to < total ? <Link href={hrefFor(page + 1)}>Next</Link> : null}
+      {to < total ? <Link href={hrefFor(page + 1)} className="btn btn-sm">Next</Link> : null}
     </p>
   );
 }
