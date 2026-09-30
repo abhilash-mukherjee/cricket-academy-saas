@@ -122,6 +122,30 @@ function contactPhoneForMatch(draft: Draft): string {
   return draft.playerPhone.trim();
 }
 
+function matchLookupKey(
+  mode: ManualAddFormProps["mode"],
+  open: boolean,
+  draft: Draft,
+): string | null {
+  if (mode !== "directory" || !open) {
+    return null;
+  }
+  const fullName = draft.playerFullName.trim();
+  const phone = contactPhoneForMatch(draft);
+  if (!fullName || !phone) {
+    return null;
+  }
+  return `${fullName}\u0000${phone}`;
+}
+
+function parseMatchLookupKey(key: string): { fullName: string; phone: string } {
+  const separator = key.indexOf("\u0000");
+  return {
+    fullName: key.slice(0, separator),
+    phone: key.slice(separator + 1),
+  };
+}
+
 export function ManualAddForm(props: ManualAddFormProps) {
   const { batches, feeOptions, today } = props;
   const router = useRouter();
@@ -135,8 +159,16 @@ export function ManualAddForm(props: ManualAddFormProps) {
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [successId, setSuccessId] = useState(0);
-  const [match, setMatch] = useState<PlayerMatchPreview | null>(null);
+  const [fetchedMatch, setFetchedMatch] = useState<{
+    key: string;
+    match: PlayerMatchPreview | null;
+  } | null>(null);
   const dismissSuccess = useCallback(() => setSuccess(null), []);
+  const matchQueryKey = matchLookupKey(props.mode, open, draft);
+  const match =
+    fetchedMatch && matchQueryKey && fetchedMatch.key === matchQueryKey
+      ? fetchedMatch.match
+      : null;
 
   const ctaLabel = props.mode === "directory" ? "Add Player" : "Add Enrollment";
   const submitLabel =
@@ -157,16 +189,11 @@ export function ManualAddForm(props: ManualAddFormProps) {
   const under18 = dobReady && isPlayerUnder18(draft.playerDateOfBirth);
 
   useEffect(() => {
-    if (props.mode !== "directory" || !open) {
-      setMatch(null);
+    if (!matchQueryKey) {
       return;
     }
-    const fullName = draft.playerFullName.trim();
-    const phone = contactPhoneForMatch(draft);
-    if (!fullName || !phone) {
-      setMatch(null);
-      return;
-    }
+    const { fullName, phone } = parseMatchLookupKey(matchQueryKey);
+    const key = matchQueryKey;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       const params = new URLSearchParams({ fullName, phone });
@@ -178,7 +205,7 @@ export function ManualAddForm(props: ManualAddFormProps) {
           const body = (await response.json()) as {
             match: PlayerMatchPreview | null;
           };
-          setMatch(body.match);
+          setFetchedMatch({ key, match: body.match });
         })
         .catch(() => {
           /* aborted or network — ignore */
@@ -188,14 +215,7 @@ export function ManualAddForm(props: ManualAddFormProps) {
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [
-    props.mode,
-    open,
-    draft.playerFullName,
-    draft.playerDateOfBirth,
-    draft.guardianPhone,
-    draft.playerPhone,
-  ]);
+  }, [matchQueryKey]);
 
   function showSuccess(message: string) {
     setSuccess(message);
@@ -206,13 +226,13 @@ export function ManualAddForm(props: ManualAddFormProps) {
     setOpen(false);
     setDraft(emptyDraft(today));
     setInlineError(null);
-    setMatch(null);
+    setFetchedMatch(null);
   }
 
   function openForm() {
     setDraft(emptyDraft(today));
     setInlineError(null);
-    setMatch(null);
+    setFetchedMatch(null);
     setOpen(true);
   }
 
