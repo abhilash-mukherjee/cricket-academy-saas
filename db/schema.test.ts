@@ -62,3 +62,82 @@ describe("fee option term cutover", () => {
     expect(second).not.toMatch(/valid_until/i);
   });
 });
+
+describe("operations schema for guardian, pause, and batch sessions", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0007_player_guardian_enrollment_pause_batch_sessions.sql",
+  );
+
+  it("adds guardian, optional enrollment provenance, pause rows, and batch session attendance without touching registrations", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain(
+      'ALTER TABLE "players" ADD COLUMN "guardian_full_name" text;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "players" ADD COLUMN "guardian_phone" text;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "enrollments" ALTER COLUMN "registration_id" DROP NOT NULL;',
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX "enrollments_registration_id_unique" ON "enrollments" USING btree \("registration_id"\) WHERE "enrollments"\."registration_id" is not null/,
+    );
+
+    expect(sql).toContain('CREATE TABLE "enrollment_pauses"');
+    expect(sql).toMatch(
+      /"planned_last_paused_on" is null or "enrollment_pauses"\."planned_last_paused_on" >= "enrollment_pauses"\."paused_on"/,
+    );
+    expect(sql).toMatch(
+      /"resumed_on" is null or "enrollment_pauses"\."resumed_on" >= "enrollment_pauses"\."paused_on"/,
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX "enrollment_pauses_one_open_per_enrollment" ON "enrollment_pauses" USING btree \("enrollment_id"\) WHERE "enrollment_pauses"\."resumed_on" is null/,
+    );
+
+    expect(sql).toMatch(
+      /CREATE TYPE "public"\."batch_session_attendance_mark" AS ENUM\('present', 'absent'\)/,
+    );
+    expect(sql).toContain('CREATE TABLE "batch_sessions"');
+    expect(sql).toContain(
+      'CONSTRAINT "batch_sessions_academy_id_batch_id_session_date_unique" UNIQUE("academy_id","batch_id","session_date")',
+    );
+    expect(sql).toContain('CREATE TABLE "batch_session_attendance"');
+    expect(sql).toContain(
+      '"mark" "batch_session_attendance_mark" NOT NULL',
+    );
+    expect(sql).toContain(
+      'CONSTRAINT "batch_session_attendance_batch_session_id_player_id_unique" UNIQUE("batch_session_id","player_id")',
+    );
+
+    const foreignKeys = sql
+      .split("--> statement-breakpoint")
+      .filter((statement) => /FOREIGN KEY/i.test(statement));
+    expect(foreignKeys.length).toBeGreaterThan(0);
+    for (const statement of foreignKeys) {
+      expect(statement).toMatch(/ON DELETE restrict/i);
+    }
+
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+    expect(sql).not.toMatch(/ALTER TABLE "registrations"/);
+  });
+});
+
+describe("players email for manual add and accept fill-if-empty", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0008_players_email.sql",
+  );
+
+  it("adds nullable players.email without touching identity or registrations", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain('ALTER TABLE "players" ADD COLUMN "email" text;');
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+    expect(sql).not.toMatch(/ALTER TABLE "registrations"/);
+    expect(sql).not.toMatch(/full_name_normalized|guardian_/i);
+  });
+});

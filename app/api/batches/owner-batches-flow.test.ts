@@ -236,6 +236,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const second = html.indexOf("Weekend nets");
       expect(first).toBeGreaterThan(-1);
       expect(second).toBeGreaterThan(first);
+      expect(html).toContain(`href="/app/batches/`);
+      expect(html).toContain("Closed for Registration");
+      expect(html).toContain("Add Batch");
+      expect(html).not.toContain("<input");
+      expect(html).not.toContain("Rename");
+      expect(html).not.toContain("Add fee option");
+      expect(html).not.toContain("Open for Registration");
       expect(html).not.toMatch(/delete batch/i);
     });
 
@@ -345,6 +352,12 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(academy).toBeTruthy();
       await expect(listBatches(academy!.id)).resolves.toEqual([]);
 
+      sessionCookie.value = cookie;
+      const { default: BatchesPage } = await import("@/app/app/batches/page");
+      const emptyHtml = renderToStaticMarkup(await BatchesPage());
+      expect(emptyHtml).toContain("Add a Batch");
+      expect(emptyHtml).toContain("<input");
+
       const createResponse = await createBatch(
         new Request(`${origin}/api/batches`, {
           method: "POST",
@@ -366,7 +379,6 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       ]);
 
       sessionCookie.value = cookie;
-      const { default: BatchesPage } = await import("@/app/app/batches/page");
       const html = renderToStaticMarkup(await BatchesPage());
       expect(html).toContain("U-16 morning");
     });
@@ -380,8 +392,11 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       const withBatches = renderToStaticMarkup(await DashboardPage());
       expect(withBatches).toContain('href="/app/batches"');
-      expect(withBatches).toContain("Batches");
+      expect(withBatches).toContain(
+        "Batches — open one to rename it, edit fee options, or open it for Registration",
+      );
       expect(withBatches).not.toContain("Add your first Batch");
+      expect(withBatches).not.toContain("add or rename Batches");
 
       const superCookie = await signInOwner(superAdminEmail, "Super Admin");
       await promoteSuperAdmin(superAdminEmail);

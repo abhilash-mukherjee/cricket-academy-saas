@@ -1,0 +1,5 @@
+# Guardian contact is copied onto the Player
+
+ADR-0026 kept Guardian name and phone on the Registration only, and rejected a separate Guardian entity. Accept and manual add need that contact on the roster, including when there is no Registration. `players` stores nullable `guardian_full_name` and `guardian_phone` (canonical E.164). Identity stays Academy + normalized name + phone. Linking an existing Player does not replace a Guardian already stored. Accept copies Guardian from the Registration when those fields are present and the Player has none, and does not recompute age. Manual add decides under-18 as of today on the Asia/Kolkata calendar, the same clock as the conversion page, and copies Guardian when the Player has none. `valid_from` does not change that age check.
+
+**Considered options:** A `guardians` table (rejected — one Guardian per under-18 Player is enough, and the Player remains the roster entity); reading Guardian from the latest Registration (rejected — manual add has no Registration).

@@ -499,9 +499,23 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       sessionCookie.value = cookie;
       const { default: BatchesPage } = await import("@/app/app/batches/page");
+      const { default: BatchPage } = await import(
+        "@/app/app/batches/[batchId]/page"
+      );
       const stoppedHtml = renderToStaticMarkup(await BatchesPage());
-      expect(stoppedHtml).toContain("Weekday nets");
-      expect(stoppedHtml).toContain("Not offered");
+      expect(stoppedHtml).toContain("No fee options yet.");
+      expect(stoppedHtml).not.toContain("Weekday nets");
+      expect(stoppedHtml).not.toContain("Not offered");
+      const batchHtml = renderToStaticMarkup(
+        await BatchPage({
+          params: Promise.resolve({ batchId: batch!.id }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(batchHtml).toContain("Weekday nets");
+      expect(batchHtml).toContain("Not offered");
+      expect(batchHtml).not.toContain("Stop offering");
+      expect(batchHtml).not.toContain("Delete fee option");
 
       const offerAgain = await updateFeeOption(
         new Request(
@@ -757,7 +771,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       const beforeFee = renderToStaticMarkup(await DashboardPage());
       expect(beforeFee).toContain('href="/app/batches"');
-      expect(beforeFee).toContain("Add a fee option");
+      expect(beforeFee).toContain("Open a Batch and add a fee option");
 
       const academy = await getOwnedAcademy(await sessionUserId(cookie));
       const [batch] = await listBatches(academy!.id);
@@ -781,8 +795,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       const afterFee = renderToStaticMarkup(await DashboardPage());
       expect(afterFee).toContain('href="/app/batches"');
-      expect(afterFee).toContain("Fee options");
-      expect(afterFee).not.toContain("Add a fee option");
+      expect(afterFee).toContain("Open a Batch for Registration.");
+      expect(afterFee).not.toContain("Open a Batch and add a fee option");
     });
   },
 );

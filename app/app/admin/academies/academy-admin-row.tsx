@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminAcademyListItem } from "@/lib/admin-academies";
+import { formatDate } from "@/lib/format-date";
 
 type AcademyAdminRowProps = {
   academy: AdminAcademyListItem;
@@ -21,9 +22,7 @@ export function AcademyAdminRow({
 
   const ownerLabel = academy.ownerEmail ?? academy.pendingOwnerEmail ?? "—";
   // Fixed locale/timezone so SSR and client match (avoids hydration mismatch).
-  const createdLabel = new Date(academy.createdAt).toLocaleDateString("en-CA", {
-    timeZone: "UTC",
-  });
+  const createdLabel = formatDate(academy.createdAt);
 
   async function runAction(
     label: string,
