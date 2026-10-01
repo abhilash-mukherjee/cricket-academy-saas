@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LinkPendingMark } from "./link-pending-mark";
 
 export function PlayerPageBackLink({
   href = "/app/players",
@@ -28,6 +29,7 @@ export function PlayerPageBackLink({
         />
       </svg>
       {label}
+      {href.includes("/sessions") ? <LinkPendingMark /> : null}
     </Link>
   );
 }

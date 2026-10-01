@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SuccessToast } from "@/app/success-toast";
@@ -25,6 +25,15 @@ type SavedSession = {
   sessionDate: string;
   presentCount: number;
   listedCount: number;
+};
+
+type AttendanceClick = {
+  preventDefault(): void;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  button?: number;
 };
 
 type AttendanceEditorProps = {
@@ -114,6 +123,7 @@ export function AttendanceEditor({
   pageSize,
 }: AttendanceEditorProps) {
   const router = useRouter();
+  const [isNavigating, startNavigate] = useTransition();
   const snapshot = attendance ?? EMPTY_ATTENDANCE;
   const serverKey = `${snapshot.saved}:${snapshot.pausedPlayersOmitted}:${snapshot.players
     .map((player) => `${player.playerId}:${player.isPresent ? 1 : 0}`)
@@ -153,6 +163,7 @@ export function AttendanceEditor({
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [successId, setSuccessId] = useState(0);
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
   const dismissSuccess = useCallback(() => setSuccess(null), []);
 
   useEffect(() => {
@@ -170,7 +181,13 @@ export function AttendanceEditor({
     setSessionCount(sessionTotalRef.current);
   }, [sessionsKey]);
 
+  useEffect(() => {
+    setPendingDate(null);
+  }, [activeDate, invalidDate]);
+
   const dirty = checksDiffer(checks, baseline, players);
+  const listLoading = pendingDate !== null;
+  const busy = submitting || isNavigating || listLoading;
   const visible = players.filter((player) =>
     matchesPlayerQuery(player, search),
   );
@@ -190,23 +207,56 @@ export function AttendanceEditor({
     setBaseline(nextChecks);
   }
 
-  function guard(event: { preventDefault(): void }, href: string) {
-    if (!dirty) {
+  function go(href: string) {
+    const path = href.split("?")[0];
+    const nextDate = dateOf(href);
+    if (
+      path === `/app/batches/${batchId}/sessions` &&
+      nextDate &&
+      nextDate !== activeDate
+    ) {
+      setPendingDate(nextDate);
+    }
+    startNavigate(() => {
+      router.push(href);
+    });
+  }
+
+  function plainClick(event: AttendanceClick): boolean {
+    return (
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      (event.button === undefined || event.button === 0)
+    );
+  }
+
+  function navigate(
+    event: AttendanceClick,
+    href: string,
+    confirmIfDirty: boolean,
+  ) {
+    if (!plainClick(event)) {
       return;
     }
     event.preventDefault();
-    setConfirmEmpty(false);
-    setConfirmDiscard(false);
-    setPendingHref(href);
+    if (confirmIfDirty && dirty) {
+      setConfirmEmpty(false);
+      setConfirmDiscard(false);
+      setPendingHref(href);
+      return;
+    }
+    go(href);
   }
 
   function changeDate(next: string) {
-    if (!next || next === activeDate) {
+    if (busy || !next || next === activeDate) {
       return;
     }
     const href = attendanceHref(batchId, next);
     if (!dirty) {
-      router.push(href);
+      go(href);
       return;
     }
     setConfirmEmpty(false);
@@ -235,10 +285,13 @@ export function AttendanceEditor({
       setSearch("");
       return;
     }
-    router.push(href);
+    go(href);
   }
 
   function requestSave() {
+    if (busy) {
+      return;
+    }
     if (players.length === 0 && !saved) {
       setPendingHref(null);
       setConfirmDiscard(false);
@@ -279,7 +332,9 @@ export function AttendanceEditor({
         setInlineError(
           "This list changed. Load it again and mark attendance.",
         );
-        router.refresh();
+        startNavigate(() => {
+          router.refresh();
+        });
         return;
       }
       if (!response.ok || !isSnapshot(payload)) {
@@ -313,7 +368,9 @@ export function AttendanceEditor({
         }
       }
       showSuccess("Attendance saved");
-      router.refresh();
+      startNavigate(() => {
+        router.refresh();
+      });
     } catch {
       setInlineError("Could not save attendance.");
     } finally {
@@ -351,7 +408,9 @@ export function AttendanceEditor({
       );
       setSessionCount((count) => Math.max(0, count - 1));
       showSuccess("Session discarded");
-      router.refresh();
+      startNavigate(() => {
+        router.refresh();
+      });
     } catch {
       setInlineError("Could not discard this Session.");
     } finally {
@@ -365,14 +424,23 @@ export function AttendanceEditor({
     );
   }
 
-  const showListTools = !invalidDate && players.length > 0;
+  const showListTools = !listLoading && !invalidDate && players.length > 0;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+      {busy ? (
+        <div
+          className="bg-base-100 sticky top-0 z-20 flex items-center justify-center gap-3 py-3"
+          role="status"
+        >
+          <span className="loading loading-spinner" aria-hidden="true" />
+          Loading
+        </div>
+      ) : null}
       <DashboardBackLink
         href={backHref}
         label="Batch"
-        onClick={guard}
+        onClick={(event, href) => navigate(event, href, true)}
       />
       <section className="card bg-base-200 shadow">
         <div className="card-body gap-4">
@@ -384,25 +452,47 @@ export function AttendanceEditor({
               type="date"
               className="input input-bordered"
               max={today}
-              value={invalidDate || !activeDate ? "" : activeDate}
+              value={
+                pendingDate
+                  ? pendingDate
+                  : invalidDate || !activeDate
+                    ? ""
+                    : activeDate
+              }
               aria-label="Session date"
+              disabled={busy}
               onChange={(event) => changeDate(event.target.value)}
             />
           </label>
-          {invalidDate ? (
+          {listLoading ? (
+            <div
+              className="flex flex-col items-center gap-3 py-8"
+              role="status"
+            >
+              <span className="loading loading-spinner" aria-hidden="true" />
+              Loading
+            </div>
+          ) : null}
+          {!listLoading && invalidDate ? (
             <p className="text-error text-sm">
               Choose today or an earlier date.{" "}
-              <Link href={attendanceHref(batchId, today)} className="link">
+              <Link
+                href={attendanceHref(batchId, today)}
+                className="link"
+                onClick={(event) =>
+                  navigate(event, attendanceHref(batchId, today), true)
+                }
+              >
                 Open today
               </Link>
             </p>
           ) : null}
-          {!invalidDate && saved ? (
+          {!listLoading && !invalidDate && saved ? (
             <p>
               This list is fixed. Discard rebuilds it from current Enrollments.
             </p>
           ) : null}
-          {!invalidDate && !saved && pausedPlayersOmitted ? (
+          {!listLoading && !invalidDate && !saved && pausedPlayersOmitted ? (
             <p>Paused Players are not listed.</p>
           ) : null}
           {showListTools ? (
@@ -419,6 +509,7 @@ export function AttendanceEditor({
               <button
                 type="button"
                 className="btn btn-sm btn-outline"
+                disabled={busy}
                 onClick={() => setAll(true)}
               >
                 Mark all {players.length} present
@@ -426,6 +517,7 @@ export function AttendanceEditor({
               <button
                 type="button"
                 className="btn btn-sm btn-outline"
+                disabled={busy}
                 onClick={() => setAll(false)}
               >
                 Clear all {players.length}
@@ -440,7 +532,7 @@ export function AttendanceEditor({
               Showing {visible.length} of {players.length}
             </p>
           ) : null}
-          {!invalidDate && players.length === 0 ? (
+          {!listLoading && !invalidDate && players.length === 0 ? (
             <p>
               {saved
                 ? "Nobody on this Session"
@@ -470,7 +562,7 @@ export function AttendanceEditor({
                         <Link
                           href={playerHref}
                           className="link font-medium"
-                          onClick={(event) => guard(event, playerHref)}
+                          onClick={(event) => navigate(event, playerHref, true)}
                         >
                           {player.fullName}
                         </Link>
@@ -484,10 +576,10 @@ export function AttendanceEditor({
               })}
             </ul>
           ) : null}
-          {inlineError ? (
+          {!listLoading && inlineError ? (
             <p className="text-error text-sm">{inlineError}</p>
           ) : null}
-          {!invalidDate && confirmEmpty ? (
+          {!listLoading && !invalidDate && confirmEmpty ? (
             <div className="flex flex-col gap-2">
               <p>
                 Nobody is on this Session. Players who become eligible later
@@ -496,7 +588,7 @@ export function AttendanceEditor({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-neutral btn-sm"
                   disabled={submitting}
                   onClick={() => void save()}
                 >
@@ -513,7 +605,7 @@ export function AttendanceEditor({
               </div>
             </div>
           ) : null}
-          {!invalidDate && confirmDiscard ? (
+          {!listLoading && !invalidDate && confirmDiscard ? (
             <div className="flex flex-col gap-2">
               <p>
                 Discard this Session? The list rebuilds from current
@@ -522,7 +614,7 @@ export function AttendanceEditor({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-neutral btn-sm"
                   disabled={submitting}
                   onClick={() => void discard()}
                 >
@@ -539,12 +631,12 @@ export function AttendanceEditor({
               </div>
             </div>
           ) : null}
-          {!invalidDate && !confirmEmpty && !confirmDiscard ? (
+          {!listLoading && !invalidDate && !confirmEmpty && !confirmDiscard ? (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn btn-primary"
-                disabled={submitting}
+                className="btn btn-neutral"
+                disabled={busy}
                 onClick={requestSave}
               >
                 Save
@@ -553,7 +645,7 @@ export function AttendanceEditor({
                 <button
                   type="button"
                   className="btn btn-outline"
-                  disabled={submitting}
+                  disabled={busy}
                   onClick={() => {
                     setPendingHref(null);
                     setConfirmEmpty(false);
@@ -581,7 +673,7 @@ export function AttendanceEditor({
                     <Link
                       href={href}
                       className="card bg-base-100"
-                      onClick={(event) => guard(event, href)}
+                      onClick={(event) => navigate(event, href, true)}
                     >
                       <span className="card-body gap-1 py-3">
                         <span className="font-medium">
@@ -609,6 +701,17 @@ export function AttendanceEditor({
                     sessionPage - 1,
                   )}
                   className="btn btn-sm"
+                  onClick={(event) =>
+                    navigate(
+                      event,
+                      attendanceHref(
+                        batchId,
+                        activeDate ?? today,
+                        sessionPage - 1,
+                      ),
+                      false,
+                    )
+                  }
                 >
                   Previous
                 </Link>
@@ -626,6 +729,17 @@ export function AttendanceEditor({
                     sessionPage + 1,
                   )}
                   className="btn btn-sm"
+                  onClick={(event) =>
+                    navigate(
+                      event,
+                      attendanceHref(
+                        batchId,
+                        activeDate ?? today,
+                        sessionPage + 1,
+                      ),
+                      false,
+                    )
+                  }
                 >
                   Next
                 </Link>
@@ -635,27 +749,35 @@ export function AttendanceEditor({
         </div>
       </section>
       {pendingHref ? (
-        <div className="card bg-base-100 sticky bottom-4 z-10 shadow">
-          <div className="card-body gap-2 p-4">
-            <p>You have unsaved attendance checks.</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={confirmLeave}
-              >
-                Leave
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setPendingHref(null)}
-              >
-                Cancel
-              </button>
+        <>
+          <div className="card bg-base-100 sticky bottom-4 z-20 shadow">
+            <div className="card-body gap-2 p-4">
+              <p>You have unsaved attendance checks.</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn btn-neutral btn-sm"
+                  onClick={confirmLeave}
+                >
+                  Leave
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPendingHref(null)}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+          <button
+            type="button"
+            className="fixed inset-0 z-10 cursor-default bg-transparent"
+            aria-label="Cancel"
+            onClick={() => setPendingHref(null)}
+          />
+        </>
       ) : null}
       <SuccessToast
         key={successId}

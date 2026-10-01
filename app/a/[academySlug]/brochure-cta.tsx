@@ -32,7 +32,7 @@ export function BrochureCta({
       <div className={positionClass}>
         <Link
           href={`/a/${slug}/join`}
-          className="btn btn-primary w-full rounded-none"
+          className="btn btn-neutral w-full rounded-none"
         >
           Register
         </Link>

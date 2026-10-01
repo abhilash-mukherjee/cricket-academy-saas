@@ -312,7 +312,7 @@ export function ManualAddForm(props: ManualAddFormProps) {
       {open ? null : (
         <button
           type="button"
-          className="btn btn-primary self-start"
+          className="btn btn-neutral self-start"
           onClick={openForm}
         >
           {ctaLabel}
@@ -533,7 +533,7 @@ export function ManualAddForm(props: ManualAddFormProps) {
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-neutral"
                 disabled={
                   submitting ||
                   termMissesToday ||

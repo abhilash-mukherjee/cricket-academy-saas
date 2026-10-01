@@ -15,6 +15,7 @@ import { packageFactsCopy } from "@/lib/package-copy";
 import { isValidCalendarDate } from "@/lib/player-age";
 import type { PlayerEnrollmentView } from "@/lib/players";
 import { SuccessToast } from "@/app/success-toast";
+import EnrollmentStatus from "../enrollment-status";
 
 type PlayerEnrollmentListProps = {
   enrollments: PlayerEnrollmentView[];
@@ -384,7 +385,7 @@ export function PlayerEnrollmentList({
                 >
                   {enrollment.batchName}
                 </Link>
-                <p>{statusLabel(enrollment.status)}</p>
+                <EnrollmentStatus status={enrollment.status}/>
                 <p>
                   {packageFactsCopy({
                     daysPerWeek: enrollment.daysPerWeek,

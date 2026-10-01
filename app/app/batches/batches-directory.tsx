@@ -122,7 +122,7 @@ export function BatchesDirectory({
       ) : (
         <button
           type="button"
-          className="btn btn-primary self-start"
+          className="btn btn-neutral self-start"
           onClick={() => setAdding(true)}
         >
           Add Batch

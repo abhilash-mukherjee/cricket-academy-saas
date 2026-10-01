@@ -9,8 +9,10 @@ import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { listBatchRoster } from "@/lib/players";
 import { DashboardBackLink } from "../../dashboard-back-link";
+import { LinkPendingMark } from "../../link-pending-mark";
 import { PlayerPager } from "../../players/player-pager";
 import { BatchEditor } from "../batch-editor";
+import EnrollmentStatus from "../../enrollment-status";
 
 type BatchRosterPageProps = {
   params: Promise<{ batchId: string }>;
@@ -101,6 +103,7 @@ export default async function BatchRosterPage({
                 href={`/app/batches/${batchId}/sessions`}
               >
                 Attendance
+                <LinkPendingMark />
               </Link>
             </div>
             {roster.players.length === 0 ? (
@@ -119,9 +122,7 @@ export default async function BatchRosterPage({
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}
                       </a>
-                      <p>
-                        {player.status === "active" ? "Active" : "Paused"}
-                      </p>
+                      <EnrollmentStatus status={player.status}/>
                       {player.status === "paused" ? (
                         <p>
                           {pauseCopy(
