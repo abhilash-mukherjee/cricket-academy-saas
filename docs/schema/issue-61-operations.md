@@ -1,6 +1,6 @@
 # Issue #61 vertical — academy operations
 
-Blueprint for the Owner roster: Registration accept and reject, manual add, the Player directory, Enrollment pause, and Session attendance. A later term on the same Batch is another Enrollment from accept or manual add. There is no Renew command ([ADR-0040](../adr/0040-no-separate-enrollment-renew.md); [#65](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/65) is closed). Parent spec: [#61](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/61). Children: [#7](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/7), [#62](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/62), [#63](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/63), [#64](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/64), [#66](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/66).
+Blueprint for the Owner roster: Registration accept and reject, manual add, the Player directory, Enrollment pause, and Session attendance. A later term on the same Batch is another Enrollment from accept or manual add. There is no Renew command ([ADR-0040](../adr/0040-no-separate-enrollment-renew.md); [#65](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/65) is closed). Parent spec: [#61](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/61). Children: [#7](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/7), [#62](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/62), [#63](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/63), [#64](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/64), [#66](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/66), [#73](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/73).
 
 Amends [issue #1 vertical](./issue-1-vertical.md) where this file says so. Trade-offs: [ADR-0034](../adr/0034-guardian-copied-onto-player.md), [ADR-0035](../adr/0035-owner-chooses-enrollment-valid-from.md), [ADR-0036](../adr/0036-dated-pause-ends-on-its-last-day.md), [ADR-0037](../adr/0037-enrollment-pauses-are-rows.md), [ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md), [ADR-0040](../adr/0040-no-separate-enrollment-renew.md). Writes that read then decide use a transaction ([ADR-0024](../adr/0024-neon-http-not-session-locks.md)).
 
@@ -110,7 +110,7 @@ The row is inserted on the first save. Opening a date with no row writes nothing
 
 ### `batch_session_attendance`
 
-Postgres enum `batch_session_attendance_mark`: `present` | `absent`
+One row per Player on the saved list. Absent is `is_present = false`. A missing row means that Player was not on the list. Unmarked stays on the screen until save, then it is stored as absent. There is no third stored value (late, excused, left-early). Mark stays the verb.
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ Postgres enum `batch_session_attendance_mark`: `present` | `absent`
 | `batch_session_id` | `uuid NOT NULL` FK → `batch_sessions` | |
 | `player_id` | `uuid NOT NULL` FK → `players` | |
 | `enrollment_id` | `uuid NOT NULL` FK → `enrollments` | The Enrollment that put the Player on the list |
-| `mark` | `batch_session_attendance_mark NOT NULL` | |
+| `is_present` | `boolean NOT NULL` | No default. Present is `true`, absent is `false` |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Constraint:** `UNIQUE (batch_session_id, player_id)`
@@ -164,7 +164,7 @@ The date is today or earlier. With no Session row, the list is Players with an E
 
 The save body is the Player ids that were on screen, and the subset marked present. Present ids must be a subset of that list.
 
-- **No Session yet.** Settle, recompute eligibility, and reject when the id set differs ([ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md)). When it matches, insert the Session and one attendance row per Player. Present marks are `present`. Everyone else on the list is `absent`. An empty eligible list may be saved: a Session with no attendance rows.
+- **No Session yet.** Settle, recompute eligibility, and reject when the id set differs ([ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md)). When it matches, insert the Session and one attendance row per Player. Players marked present are stored as `is_present = true`. Everyone else on the list is `is_present = false`. An empty eligible list may be saved: a Session with no attendance rows.
 - **Session exists.** The id set must equal the stored attendance rows. A match updates marks only. Players are not added or removed.
 
 Discard deletes that Session and its attendance. The next open shows the live list.

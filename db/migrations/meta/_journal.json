@@ -64,6 +64,13 @@
       "when": 1790702124935,
       "tag": "0008_players_email",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790835626907,
+      "tag": "0009_attendance_is_present",
+      "breakpoints": true
     }
   ]
 }
