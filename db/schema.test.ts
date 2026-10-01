@@ -179,3 +179,18 @@ describe("players email for manual add and accept fill-if-empty", () => {
     expect(sql).not.toMatch(/full_name_normalized|guardian_/i);
   });
 });
+
+describe("enrollment lookup by academy and batch", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0010_enrollments_academy_batch_idx.sql",
+  );
+
+  it("indexes enrollments by academy and batch for Session eligibility", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+    expect(sql).toContain(
+      'CREATE INDEX "enrollments_academy_id_batch_id_idx" ON "enrollments" USING btree ("academy_id","batch_id");',
+    );
+  });
+});

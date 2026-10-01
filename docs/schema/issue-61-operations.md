@@ -160,9 +160,11 @@ Resume requires an open pause. It sets `resumed_on` to today, extends `valid_unt
 
 ## Session attendance
 
+Enrollments are indexed by `(academy_id, batch_id)` so eligibility for one date is one query for that Batch.
+
 The date is today or earlier. With no Session row, the list is Players with an Enrollment on that Batch that covers the date and is not paused on that date. A lapsed Enrollment can appear on a past date inside its old range. A backdated Enrollment appears on an unsaved past date. It does not appear on a Session already saved.
 
-The save body is the Player ids that were on screen, and the subset marked present. Present ids must be a subset of that list.
+The save body is every Player id on the list being marked — the eligible list when no Session exists yet, the stored attendance rows when one does — including Players a search is hiding. The present ids are the subset marked present, and must be a subset of that list. Search does not change the id set.
 
 - **No Session yet.** Settle, recompute eligibility, and reject when the id set differs ([ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md)). When it matches, insert the Session and one attendance row per Player. Players marked present are stored as `is_present = true`. Everyone else on the list is `is_present = false`. An empty eligible list may be saved: a Session with no attendance rows.
 - **Session exists.** The id set must equal the stored attendance rows. A match updates marks only. Players are not added or removed.

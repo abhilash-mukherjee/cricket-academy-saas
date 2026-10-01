@@ -71,6 +71,13 @@
       "when": 1790835626907,
       "tag": "0009_attendance_is_present",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790839674369,
+      "tag": "0010_enrollments_academy_batch_idx",
+      "breakpoints": true
     }
   ]
 }

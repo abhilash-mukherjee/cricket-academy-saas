@@ -94,7 +94,15 @@ export default async function BatchRosterPage({
         </section>
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
-            <h2 className="card-title text-lg">Roster</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="card-title text-lg">Roster</h2>
+              <Link
+                className="btn btn-sm btn-outline"
+                href={`/app/batches/${batchId}/sessions`}
+              >
+                Attendance
+              </Link>
+            </div>
             {roster.players.length === 0 ? (
               <p>No Players on this Batch.</p>
             ) : (

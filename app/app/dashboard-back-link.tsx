@@ -3,13 +3,16 @@ import Link from "next/link";
 export function DashboardBackLink({
   href = "/app/dashboard",
   label = "Dashboard",
+  onClick,
 }: {
   href?: string;
   label?: string;
+  onClick?: (event: { preventDefault(): void }, href: string) => void;
 } = {}) {
   return (
     <Link
       href={href}
+      onClick={onClick ? (event) => onClick(event, href) : undefined}
       className="link link-hover inline-flex items-center gap-1 self-start text-sm"
     >
       <svg

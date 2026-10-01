@@ -50,6 +50,22 @@ export function pauseEndExclusive(pause: {
   return null;
 }
 
+/** True when `date` falls in the pause. Closed at the end day (the first day not paused). */
+export function pauseCoversDate(
+  pause: {
+    pausedOn: string;
+    plannedLastPausedOn: string | null;
+    resumedOn: string | null;
+  },
+  date: string,
+): boolean {
+  if (date < pause.pausedOn) {
+    return false;
+  }
+  const end = pauseEndExclusive(pause);
+  return end === null || date < end;
+}
+
 /** Half-open intervals `[start, endExclusive)`; null end means unbounded. */
 export function pauseIntervalsOverlap(
   left: { start: string; endExclusive: string | null },

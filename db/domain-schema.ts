@@ -264,6 +264,10 @@ export const enrollments = pgTable(
     uniqueIndex("enrollments_registration_id_unique")
       .on(table.registrationId)
       .where(sql`${table.registrationId} is not null`),
+    index("enrollments_academy_id_batch_id_idx").on(
+      table.academyId,
+      table.batchId,
+    ),
   ],
 );
 
