@@ -193,6 +193,476 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Add Player");
     });
 
+    it("offers All, Paused, and Lapsed, and names an empty cut", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      sessionCookie.value = cookie;
+      const { default: PlayersPage } = await import("./page");
+
+      const all = renderToStaticMarkup(
+        await PlayersPage({ searchParams: Promise.resolve({}) }),
+      );
+      expect(all).toContain("No Players yet.");
+      expect(all).toContain("Add Player");
+      expect(all).toMatch(/aria-current="page"[^>]*>All</);
+      expect(all).toMatch(/btn-active[^>]*>All</);
+      expect(all.match(/btn-active/g)).toHaveLength(1);
+      expect(all).toMatch(/href="\/app\/players"[^>]*>All</);
+      expect(all).toContain('href="/app/players?status=paused"');
+      expect(all).toContain('href="/app/players?status=lapsed"');
+      expect(all).not.toContain("status=all");
+
+      const paused = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused", q: "   " }),
+        }),
+      );
+      expect(paused).toContain("No paused Players.");
+      expect(paused).not.toContain("No Players match that search.");
+      expect(paused).toContain("Add Player");
+      expect(paused).toMatch(/aria-current="page"[^>]*>Paused</);
+      expect(paused).toMatch(/btn-active[^>]*>Paused</);
+      expect(paused).toContain('name="status"');
+      expect(paused).toContain('value="paused"');
+      expect(paused).toMatch(/href="\/app\/players"[^>]*>All</);
+
+      const lapsed = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "lapsed" }),
+        }),
+      );
+      expect(lapsed).toContain("No lapsed Players.");
+      expect(lapsed).toContain("Add Player");
+      expect(lapsed).toMatch(/aria-current="page"[^>]*>Lapsed</);
+      expect(lapsed).toMatch(/btn-active[^>]*>Lapsed</);
+
+      const other = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "active", q: "rahul" }),
+        }),
+      );
+      expect(other).toContain("No Players match that search.");
+      expect(other).toMatch(/aria-current="page"[^>]*>All</);
+      expect(other).toMatch(/btn-active[^>]*>All</);
+      expect(other).toMatch(/href="\/app\/players\?q=rahul"[^>]*>All</);
+      expect(other).toContain(
+        'href="/app/players?q=rahul&amp;status=paused"',
+      );
+      expect(other).toContain(
+        'href="/app/players?q=rahul&amp;status=lapsed"',
+      );
+      expect(other).not.toContain('name="status"');
+    });
+
+    it("narrows to paused Players, or to Players with no Active or paused Enrollment", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const [evening] = await listBatches(academy.id);
+      const db = getDb();
+      const [morning] = await db
+        .insert(batches)
+        .values({ academyId: academy.id, name: "Morning nets" })
+        .returning({ id: batches.id });
+      const today = calendarDateInIst();
+      const [active, both, pausedOnly, lapsedOnly, unenrolled, tieA, tieB] =
+        await db
+          .insert(players)
+          .values([
+            {
+              academyId: academy.id,
+              fullName: "Active Rao",
+              fullNameNormalized: "active rao",
+              phone: "+919876543210",
+              dateOfBirth: "2012-04-01",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Both Rao",
+              fullNameNormalized: "both rao",
+              phone: "+919876543211",
+              dateOfBirth: "2012-04-02",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Paused Rao",
+              fullNameNormalized: "paused rao",
+              phone: "+919876543212",
+              dateOfBirth: "2012-04-03",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Lapsed Rao",
+              fullNameNormalized: "lapsed rao",
+              phone: "+919876543213",
+              dateOfBirth: "2012-04-04",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Unenrolled Rao",
+              fullNameNormalized: "unenrolled rao",
+              phone: "+919876543214",
+              dateOfBirth: "2012-04-05",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Tie Rao",
+              fullNameNormalized: "tie rao",
+              phone: "+919800000001",
+              dateOfBirth: "2012-04-06",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Tie Rao",
+              fullNameNormalized: "tie rao",
+              phone: "+919800000002",
+              dateOfBirth: "2012-04-07",
+            },
+          ])
+          .returning({ id: players.id, phone: players.phone });
+      const inserted = await db
+        .insert(enrollments)
+        .values([
+          {
+            academyId: academy.id,
+            playerId: active.id,
+            batchId: evening.id,
+            daysPerWeek: 3,
+            termDays: 45,
+            feePaisePaid: 150000,
+            validFrom: today,
+            validUntil: addCalendarDays(today, 44),
+          },
+          {
+            academyId: academy.id,
+            playerId: active.id,
+            batchId: morning.id,
+            daysPerWeek: 2,
+            termDays: 10,
+            feePaisePaid: 100000,
+            validFrom: addCalendarDays(today, -40),
+            validUntil: addCalendarDays(today, -20),
+          },
+          {
+            academyId: academy.id,
+            playerId: both.id,
+            batchId: evening.id,
+            daysPerWeek: 3,
+            termDays: 20,
+            feePaisePaid: 150000,
+            validFrom: addCalendarDays(today, -20),
+            validUntil: addCalendarDays(today, -1),
+          },
+          {
+            academyId: academy.id,
+            playerId: both.id,
+            batchId: morning.id,
+            daysPerWeek: 3,
+            termDays: 36,
+            feePaisePaid: 150000,
+            validFrom: addCalendarDays(today, -5),
+            validUntil: addCalendarDays(today, 30),
+          },
+          {
+            academyId: academy.id,
+            playerId: pausedOnly.id,
+            batchId: evening.id,
+            daysPerWeek: 3,
+            termDays: 31,
+            feePaisePaid: 150000,
+            validFrom: addCalendarDays(today, -10),
+            validUntil: addCalendarDays(today, 20),
+          },
+          {
+            academyId: academy.id,
+            playerId: lapsedOnly.id,
+            batchId: morning.id,
+            daysPerWeek: 2,
+            termDays: 10,
+            feePaisePaid: 100000,
+            validFrom: addCalendarDays(today, -12),
+            validUntil: addCalendarDays(today, -3),
+          },
+          {
+            academyId: academy.id,
+            playerId: lapsedOnly.id,
+            batchId: evening.id,
+            daysPerWeek: 2,
+            termDays: 21,
+            feePaisePaid: 100000,
+            validFrom: addCalendarDays(today, -50),
+            validUntil: addCalendarDays(today, -30),
+          },
+          {
+            academyId: academy.id,
+            playerId: tieA.id,
+            batchId: evening.id,
+            daysPerWeek: 3,
+            termDays: 11,
+            feePaisePaid: 150000,
+            validFrom: today,
+            validUntil: addCalendarDays(today, 10),
+          },
+          {
+            academyId: academy.id,
+            playerId: tieB.id,
+            batchId: evening.id,
+            daysPerWeek: 3,
+            termDays: 11,
+            feePaisePaid: 150000,
+            validFrom: today,
+            validUntil: addCalendarDays(today, 10),
+          },
+        ])
+        .returning({ id: enrollments.id, playerId: enrollments.playerId });
+      const enrollmentId = (playerId: string) =>
+        inserted.find((row) => row.playerId === playerId)!.id;
+      await db.insert(enrollmentPauses).values([
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(both.id),
+          pausedOn: addCalendarDays(today, -2),
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(pausedOnly.id),
+          pausedOn: today,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(tieA.id),
+          pausedOn: today,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(tieB.id),
+          pausedOn: today,
+        },
+      ]);
+      sessionCookie.value = cookie;
+
+      const { default: PlayersPage } = await import("./page");
+      const pausedMarkup = renderToStaticMarkup(
+        EnrollmentStatus({ status: "paused" }),
+      );
+      const activeMarkup = renderToStaticMarkup(
+        EnrollmentStatus({ status: "active" }),
+      );
+      const lapsedMarkup = renderToStaticMarkup(
+        EnrollmentStatus({ status: "lapsed" }),
+      );
+      const [earlierTie, laterTie] = [tieA, tieB].sort((left, right) =>
+        left.id < right.id ? -1 : 1,
+      );
+
+      const pausedHtml = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused" }),
+        }),
+      );
+      expect(pausedHtml).toContain("Both Rao");
+      expect(pausedHtml).toContain("Paused Rao");
+      expect(pausedHtml).toContain(earlierTie.phone);
+      expect(pausedHtml).toContain(laterTie.phone);
+      expect(pausedHtml).not.toContain("Active Rao");
+      expect(pausedHtml).not.toContain("Lapsed Rao");
+      expect(pausedHtml).not.toContain("Unenrolled Rao");
+      expect(pausedHtml).toContain("Add Player");
+      const bothCard = pausedHtml.slice(
+        pausedHtml.indexOf("Both Rao"),
+        pausedHtml.indexOf("Paused Rao"),
+      );
+      expect(bothCard.indexOf("Morning nets")).toBeGreaterThan(-1);
+      expect(bothCard.indexOf("U-14 evening")).toBeGreaterThan(
+        bothCard.indexOf("Morning nets"),
+      );
+      expect(bothCard).toContain(activeMarkup);
+      expect(bothCard).toContain(pausedMarkup);
+      expect(pausedHtml.indexOf(earlierTie.phone)).toBeLessThan(
+        pausedHtml.indexOf(laterTie.phone),
+      );
+      expect(pausedHtml.indexOf("Paused Rao")).toBeLessThan(
+        pausedHtml.indexOf(earlierTie.phone),
+      );
+
+      const lapsedHtml = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "lapsed" }),
+        }),
+      );
+      expect(lapsedHtml).toContain("Lapsed Rao");
+      expect(lapsedHtml).toContain("Unenrolled Rao");
+      expect(lapsedHtml).toContain(unenrolled.phone);
+      expect(lapsedHtml).not.toContain("Active Rao");
+      expect(lapsedHtml).not.toContain("Both Rao");
+      expect(lapsedHtml).not.toContain("Paused Rao");
+      expect(lapsedHtml).not.toContain("Tie Rao");
+      expect(lapsedHtml).not.toContain("U-14 evening");
+      const lapsedCard = lapsedHtml.slice(
+        lapsedHtml.indexOf("Lapsed Rao"),
+        lapsedHtml.indexOf("Unenrolled Rao"),
+      );
+      expect(lapsedCard).toContain("Morning nets");
+      expect(lapsedCard).toContain(lapsedMarkup);
+      expect(lapsedCard.match(/Morning nets/g)).toHaveLength(1);
+
+      const searched = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused", q: "Both" }),
+        }),
+      );
+      expect(searched).toContain("Both Rao");
+      expect(searched).not.toContain("Paused Rao");
+
+      const missed = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "lapsed", q: "zzzz" }),
+        }),
+      );
+      expect(missed).toContain("No Players match that search.");
+
+      const spaces = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused", q: "   " }),
+        }),
+      );
+      expect(spaces).toContain("Both Rao");
+      expect(spaces).toContain("Paused Rao");
+      expect(spaces).not.toContain("No Players match that search.");
+
+      const allHtml = renderToStaticMarkup(
+        await PlayersPage({ searchParams: Promise.resolve({}) }),
+      );
+      expect(allHtml).toContain("Active Rao");
+      expect(allHtml).toContain("Both Rao");
+      expect(allHtml).toContain("Lapsed Rao");
+      expect(allHtml).toContain("Unenrolled Rao");
+    });
+
+    it("pages the paused cut and keeps the search and the choice", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const [batch] = await listBatches(academy.id);
+      const today = calendarDateInIst();
+      const db = getDb();
+      const pausedPlayers = Array.from({ length: 21 }, (_, index) => {
+        const name = `Player ${String(index + 1).padStart(2, "0")}`;
+        return {
+          academyId: academy.id,
+          fullName: name,
+          fullNameNormalized: name.toLowerCase(),
+          phone: `+919800000${String(index).padStart(3, "0")}`,
+          dateOfBirth: "2012-04-01",
+        };
+      });
+      const inserted = await db
+        .insert(players)
+        .values([
+          ...pausedPlayers,
+          {
+            academyId: academy.id,
+            fullName: "Aaa Active",
+            fullNameNormalized: "aaa active",
+            phone: "+919811111111",
+            dateOfBirth: "2012-04-02",
+          },
+        ])
+        .returning({ id: players.id, fullName: players.fullName });
+      await db.insert(enrollments).values(
+        inserted.map((player) => ({
+          academyId: academy.id,
+          playerId: player.id,
+          batchId: batch.id,
+          daysPerWeek: 3,
+          termDays: 45,
+          feePaisePaid: 150000,
+          validFrom: today,
+          validUntil: addCalendarDays(today, 44),
+        })),
+      );
+      const enrollmentRows = await db
+        .select({ id: enrollments.id, playerId: enrollments.playerId })
+        .from(enrollments)
+        .where(eq(enrollments.academyId, academy.id));
+      const active = inserted.find((player) => player.fullName === "Aaa Active")!;
+      await db.insert(enrollmentPauses).values(
+        enrollmentRows
+          .filter((row) => row.playerId !== active.id)
+          .map((row) => ({
+            academyId: academy.id,
+            enrollmentId: row.id,
+            pausedOn: today,
+          })),
+      );
+      sessionCookie.value = cookie;
+      const { default: PlayersPage } = await import("./page");
+
+      const first = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused" }),
+        }),
+      );
+      expect(first).toContain("Player 01");
+      expect(first).toContain("Player 20");
+      expect(first).not.toContain("Player 21");
+      expect(first).not.toContain("Aaa Active");
+      expect(first).toContain("1–20 of 21");
+      expect(first).not.toContain("Previous");
+      expect(first).toContain('href="/app/players?status=paused&amp;page=2"');
+      expect(first).toContain("Next");
+      expect(first).toContain("Add Player");
+
+      const second = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({
+            status: "paused",
+            q: "player",
+            page: "2",
+          }),
+        }),
+      );
+      expect(second).toContain("Player 21");
+      expect(second).not.toContain("Player 01");
+      expect(second).not.toContain("Aaa Active");
+      expect(second).toContain("21–21 of 21");
+      expect(second).toContain("Previous");
+      expect(second).not.toContain("Next");
+      expect(second).not.toContain("page=");
+      expect(second).toContain('href="/app/players?q=player&amp;status=paused"');
+      expect(second).toContain('href="/app/players?q=player"');
+      expect(second).toContain(
+        'href="/app/players?q=player&amp;status=lapsed"',
+      );
+      expect(second).not.toContain('name="page"');
+
+      const pastEnd = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused", page: "9" }),
+        }),
+      );
+      expect(pastEnd).toContain("Player 21");
+      expect(pastEnd).toContain("21–21 of 21");
+      expect(pastEnd).not.toContain("Aaa Active");
+
+      const notAPage = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused", page: "two" }),
+        }),
+      );
+      expect(notAPage).toContain("Player 01");
+      expect(notAPage).not.toContain("Player 21");
+
+      const spaces = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused", q: "   " }),
+        }),
+      );
+      expect(spaces).toContain("Player 01");
+      expect(spaces).toContain("1–20 of 21");
+      expect(spaces).not.toContain("No Players match that search.");
+    });
+
     it("lists a Player with an Active Enrollment, phone link, and no fee or Guardian", async () => {
       const cookie = await signInOwner(ownerEmail);
       await onboardOwner(cookie, slug);

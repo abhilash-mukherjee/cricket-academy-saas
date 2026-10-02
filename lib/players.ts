@@ -14,6 +14,15 @@ import { postgresConstraint } from "@/lib/postgres-constraint";
 
 export const PLAYERS_PER_PAGE = 20;
 
+export type DirectoryCut = "all" | "paused" | "lapsed";
+
+export function directoryCut(status: string): DirectoryCut {
+  if (status === "paused" || status === "lapsed") {
+    return status;
+  }
+  return "all";
+}
+
 export type DirectoryLine = {
   batchId: string;
   batchName: string;
@@ -249,14 +258,114 @@ function playerSearch(q: string) {
   return ilike(players.fullName, pattern);
 }
 
-function directoryLines(
-  rows: {
-    batchId: string;
-    batchName: string;
-    validFrom: string;
-    status: TermStatus;
-  }[],
+type DirectoryEnrollmentRow = {
+  playerId: string;
+  batchId: string;
+  batchName: string;
+  validFrom: string;
+  validUntil: string;
+  pausedOn: string | null;
+  plannedLastPausedOn: string | null;
+};
+
+function directoryLineInputs(
+  rows: DirectoryEnrollmentRow[],
+  today: string,
 ): DirectoryLine[] {
+  return rows.map((row) => {
+    const term = enrollmentTerm(
+      { validUntil: row.validUntil },
+      row.pausedOn
+        ? {
+            pausedOn: row.pausedOn,
+            plannedLastPausedOn: row.plannedLastPausedOn,
+          }
+        : null,
+      today,
+    );
+    return {
+      batchId: row.batchId,
+      batchName: row.batchName,
+      validFrom: row.validFrom,
+      status: term.status,
+    };
+  });
+}
+
+function inDirectoryCut(
+  statuses: TermStatus[],
+  cut: Exclude<DirectoryCut, "all">,
+): boolean {
+  if (cut === "paused") {
+    return statuses.some((status) => status === "paused");
+  }
+  return (
+    !statuses.some((status) => status === "paused") &&
+    !statuses.some((status) => status === "active")
+  );
+}
+
+async function directoryLinesByPlayer(
+  academyId: string,
+  playerIds: string[],
+  today: string,
+): Promise<Map<string, DirectoryLine[]>> {
+  const grouped = new Map<string, DirectoryEnrollmentRow[]>();
+  for (const row of await directoryEnrollmentRows(academyId, playerIds)) {
+    const list = grouped.get(row.playerId);
+    if (list) {
+      list.push(row);
+    } else {
+      grouped.set(row.playerId, [row]);
+    }
+  }
+  const lines = new Map<string, DirectoryLine[]>();
+  for (const playerId of playerIds) {
+    lines.set(playerId, directoryLineInputs(grouped.get(playerId) ?? [], today));
+  }
+  return lines;
+}
+
+async function directoryEnrollmentRows(
+  academyId: string,
+  playerIds: string[],
+): Promise<DirectoryEnrollmentRow[]> {
+  if (playerIds.length === 0) {
+    return [];
+  }
+  return getDb()
+    .select({
+      playerId: enrollments.playerId,
+      batchId: enrollments.batchId,
+      batchName: batches.name,
+      validFrom: enrollments.validFrom,
+      validUntil: enrollments.validUntil,
+      pausedOn: enrollmentPauses.pausedOn,
+      plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+    })
+    .from(enrollments)
+    .innerJoin(
+      batches,
+      and(eq(batches.id, enrollments.batchId), eq(batches.academyId, academyId)),
+    )
+    .leftJoin(
+      enrollmentPauses,
+      and(
+        eq(enrollmentPauses.enrollmentId, enrollments.id),
+        eq(enrollmentPauses.academyId, academyId),
+        isNull(enrollmentPauses.resumedOn),
+      ),
+    )
+    .where(
+      and(
+        eq(enrollments.academyId, academyId),
+        inArray(enrollments.playerId, playerIds),
+      ),
+    )
+    .orderBy(sql`${enrollments.validFrom} desc`, asc(enrollments.id));
+}
+
+function directoryLines(rows: DirectoryLine[]): DirectoryLine[] {
   const visible = rows.filter(
     (row) => row.status === "active" || row.status === "paused",
   );
@@ -274,7 +383,7 @@ function directoryLines(
 
 export async function listPlayerDirectory(
   academyId: string,
-  input: { q: string; page: number; today: string },
+  input: { q: string; page: number; today: string; cut: DirectoryCut },
 ): Promise<PlayerList> {
   const db = getDb();
   const search = playerSearch(input.q);
@@ -292,50 +401,35 @@ export async function listPlayerDirectory(
     .where(where)
     .orderBy(asc(players.fullName), asc(players.id));
 
-  const total = matched.length;
-  const pageCount = Math.max(1, Math.ceil(total / PLAYERS_PER_PAGE));
-  const page = total === 0 ? 1 : Math.min(Math.max(input.page, 1), pageCount);
-  const slice = matched.slice(
+  const cut = input.cut;
+  let chosen = matched;
+  let linesByPlayer: Map<string, DirectoryLine[]> | null = null;
+  if (cut !== "all") {
+    const classified = await directoryLinesByPlayer(
+      academyId,
+      matched.map((player) => player.id),
+      input.today,
+    );
+    linesByPlayer = classified;
+    chosen = matched.filter((player) =>
+      inDirectoryCut(
+        (classified.get(player.id) ?? []).map((line) => line.status),
+        cut,
+      ),
+    );
+  }
+
+  const total = chosen.length;
+  const page = clampPage(total, input.page);
+  const slice = chosen.slice(
     (page - 1) * PLAYERS_PER_PAGE,
     page * PLAYERS_PER_PAGE,
   );
-  const ids = slice.map((player) => player.id);
-  const enrollmentRows =
-    ids.length === 0
-      ? []
-      : await db
-          .select({
-            playerId: enrollments.playerId,
-            batchId: enrollments.batchId,
-            batchName: batches.name,
-            validFrom: enrollments.validFrom,
-            validUntil: enrollments.validUntil,
-            pausedOn: enrollmentPauses.pausedOn,
-            plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
-          })
-          .from(enrollments)
-          .innerJoin(
-            batches,
-            and(
-              eq(batches.id, enrollments.batchId),
-              eq(batches.academyId, academyId),
-            ),
-          )
-          .leftJoin(
-            enrollmentPauses,
-            and(
-              eq(enrollmentPauses.enrollmentId, enrollments.id),
-              eq(enrollmentPauses.academyId, academyId),
-              isNull(enrollmentPauses.resumedOn),
-            ),
-          )
-          .where(
-            and(
-              eq(enrollments.academyId, academyId),
-              inArray(enrollments.playerId, ids),
-            ),
-          )
-          .orderBy(sql`${enrollments.validFrom} desc`, asc(enrollments.id));
+  linesByPlayer ??= await directoryLinesByPlayer(
+    academyId,
+    slice.map((player) => player.id),
+    input.today,
+  );
 
   return {
     page,
@@ -344,28 +438,7 @@ export async function listPlayerDirectory(
       id: player.id,
       fullName: player.fullName,
       phone: player.phone,
-      lines: directoryLines(
-        enrollmentRows
-          .filter((row) => row.playerId === player.id)
-          .map((row) => {
-            const term = enrollmentTerm(
-              { validUntil: row.validUntil },
-              row.pausedOn
-                ? {
-                    pausedOn: row.pausedOn,
-                    plannedLastPausedOn: row.plannedLastPausedOn,
-                  }
-                : null,
-              input.today,
-            );
-            return {
-              batchId: row.batchId,
-              batchName: row.batchName,
-              validFrom: row.validFrom,
-              status: term.status,
-            };
-          }),
-      ),
+      lines: directoryLines(linesByPlayer.get(player.id) ?? []),
     })),
   };
 }
