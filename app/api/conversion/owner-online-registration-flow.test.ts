@@ -218,7 +218,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
           }),
         }),
@@ -341,7 +341,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 3,
             feeInr: 15000,
             label: "Weekday nets",
           }),

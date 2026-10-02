@@ -1,17 +1,24 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
+import { z } from "zod";
 import {
   academies,
   batchFeeOptions,
   batches,
+  players,
   registrations,
 } from "@/db/domain-schema";
-import { getDb } from "@/db/client";
+import { getDb, getTransactionalDb } from "@/db/client";
+import { lastCoveredDay } from "@/lib/enrollment-term";
+import { guardNewEnrollment, insertEnrollment } from "@/lib/enrollments";
+import { calendarDateInIst, isValidCalendarDate } from "@/lib/player-age";
+import { findOrCreatePlayer } from "@/lib/players";
+import { postgresConstraint } from "@/lib/postgres-constraint";
 import { parseRegistrationInput } from "@/lib/registration-input";
 
 export type RegistrationSnapshot = {
   batchName: string;
   daysPerWeek: number;
-  termMonths: number;
+  termDays: number;
   feePaise: number;
   contactPhone: string;
   contactEmail: string | null;
@@ -72,7 +79,7 @@ export async function createRegistration(
       feeOptionId: batchFeeOptions.id,
       batchId: batchFeeOptions.batchId,
       daysPerWeek: batchFeeOptions.daysPerWeek,
-      termMonths: batchFeeOptions.termMonths,
+      termDays: batchFeeOptions.termDays,
       feePaise: batchFeeOptions.feePaise,
       label: batchFeeOptions.label,
       isOffered: batchFeeOptions.isOffered,
@@ -116,7 +123,7 @@ export async function createRegistration(
         batchId: offered.batchId,
         batchFeeOptionId: offered.feeOptionId,
         daysPerWeek: offered.daysPerWeek,
-        termMonths: offered.termMonths,
+        termDays: offered.termDays,
         feePaise: offered.feePaise,
         playerFullName: parsed.value.playerFullName,
         playerFullNameNormalized: parsed.value.playerFullName.toLowerCase(),
@@ -131,7 +138,7 @@ export async function createRegistration(
       })
       .returning({
         daysPerWeek: registrations.daysPerWeek,
-        termMonths: registrations.termMonths,
+        termDays: registrations.termDays,
         feePaise: registrations.feePaise,
         contactPhone: registrations.contactPhone,
         contactEmail: registrations.contactEmail,
@@ -142,7 +149,7 @@ export async function createRegistration(
       snapshot: {
         batchName: offered.batchName,
         daysPerWeek: created.daysPerWeek,
-        termMonths: created.termMonths,
+        termDays: created.termDays,
         feePaise: created.feePaise,
         contactPhone: created.contactPhone,
         contactEmail: created.contactEmail,
@@ -157,31 +164,286 @@ export async function createRegistration(
   }
 }
 
-function postgresConstraint(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null) {
-    return undefined;
-  }
+export type PendingRegistration = {
+  id: string;
+  playerFullName: string;
+  contactPhone: string;
+  batchName: string;
+  daysPerWeek: number;
+  termDays: number;
+  feePaise: number;
+  playerDateOfBirth: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  contactEmail: string | null;
+  note: string | null;
+  submittedAt: string;
+  existingPlayer: {
+    fullName: string;
+    phone: string;
+    dateOfBirth: string;
+  } | null;
+};
 
-  if ("constraint" in error && typeof error.constraint === "string") {
-    return error.constraint;
-  }
+export async function listPendingRegistrations(
+  academyId: string,
+): Promise<PendingRegistration[]> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: registrations.id,
+      playerFullName: registrations.playerFullName,
+      contactPhone: registrations.contactPhone,
+      batchName: batches.name,
+      daysPerWeek: registrations.daysPerWeek,
+      termDays: registrations.termDays,
+      feePaise: registrations.feePaise,
+      playerDateOfBirth: registrations.playerDateOfBirth,
+      guardianFullName: registrations.guardianFullName,
+      guardianPhone: registrations.guardianPhone,
+      contactEmail: registrations.contactEmail,
+      note: registrations.note,
+      createdAt: registrations.createdAt,
+      existingPlayerName: players.fullName,
+      existingPlayerPhone: players.phone,
+      existingPlayerDob: players.dateOfBirth,
+    })
+    .from(registrations)
+    .innerJoin(batches, eq(batches.id, registrations.batchId))
+    .leftJoin(
+      players,
+      and(
+        eq(players.academyId, registrations.academyId),
+        eq(players.fullNameNormalized, registrations.playerFullNameNormalized),
+        eq(players.phone, registrations.contactPhone),
+      ),
+    )
+    .where(
+      and(
+        eq(registrations.academyId, academyId),
+        eq(registrations.status, "pending"),
+      ),
+    )
+    .orderBy(desc(registrations.createdAt), desc(registrations.id));
 
-  if (
-    "cause" in error &&
-    typeof error.cause === "object" &&
-    error.cause !== null &&
-    "constraint" in error.cause &&
-    typeof error.cause.constraint === "string"
-  ) {
-    return error.cause.constraint;
-  }
-
-  if ("message" in error && typeof error.message === "string") {
-    const match = error.message.match(/constraint "([^"]+)"/);
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-
-  return undefined;
+  return rows.map((row) => ({
+    id: row.id,
+    playerFullName: row.playerFullName,
+    contactPhone: row.contactPhone,
+    batchName: row.batchName,
+    daysPerWeek: row.daysPerWeek,
+    termDays: row.termDays,
+    feePaise: row.feePaise,
+    playerDateOfBirth: row.playerDateOfBirth,
+    guardianFullName: row.guardianFullName,
+    guardianPhone: row.guardianPhone,
+    contactEmail: row.contactEmail,
+    note: row.note,
+    submittedAt: row.createdAt.toISOString(),
+    existingPlayer: row.existingPlayerName
+      ? {
+          fullName: row.existingPlayerName,
+          phone: row.existingPlayerPhone!,
+          dateOfBirth: row.existingPlayerDob!,
+        }
+      : null,
+  }));
 }
+
+export type RegistrationCommandError =
+  | "invalid-input"
+  | "not-found"
+  | "not-pending"
+  | "term-not-covering-today"
+  | "overlaps"
+  | "paused";
+
+const acceptBodySchema = z.object({
+  validFrom: z.string(),
+});
+
+class RegistrationCommandFailure extends Error {
+  constructor(readonly code: RegistrationCommandError) {
+    super(code);
+  }
+}
+
+export async function acceptRegistration(
+  academyId: string,
+  registrationId: string,
+  input: unknown,
+  acceptedByUserId: string,
+  today: string = calendarDateInIst(),
+): Promise<{ ok: true } | { ok: false; error: RegistrationCommandError }> {
+  const parsed = acceptBodySchema.safeParse(input);
+  if (!parsed.success || !isValidCalendarDate(parsed.data.validFrom)) {
+    return { ok: false, error: "invalid-input" };
+  }
+  if (parsed.data.validFrom > today) {
+    return { ok: false, error: "invalid-input" };
+  }
+
+  const validFrom = parsed.data.validFrom;
+  const db = getTransactionalDb();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [registration] = await tx
+        .select()
+        .from(registrations)
+        .where(
+          and(
+            eq(registrations.id, registrationId),
+            eq(registrations.academyId, academyId),
+          ),
+        )
+        .limit(1);
+
+      if (!registration) {
+        throw new RegistrationCommandFailure("not-found");
+      }
+      if (registration.status !== "pending") {
+        throw new RegistrationCommandFailure("not-pending");
+      }
+
+      const validUntil = lastCoveredDay(validFrom, registration.termDays);
+      if (validUntil < today) {
+        throw new RegistrationCommandFailure("term-not-covering-today");
+      }
+
+      const [existingPlayer] = await tx
+        .select({ id: players.id })
+        .from(players)
+        .where(
+          and(
+            eq(players.academyId, academyId),
+            eq(
+              players.fullNameNormalized,
+              registration.playerFullNameNormalized,
+            ),
+            eq(players.phone, registration.contactPhone),
+          ),
+        )
+        .limit(1);
+
+      if (existingPlayer) {
+        const block = await guardNewEnrollment(tx, {
+          academyId,
+          playerId: existingPlayer.id,
+          batchId: registration.batchId,
+          validFrom,
+          validUntil,
+          today,
+        });
+        if (block) {
+          throw new RegistrationCommandFailure(block);
+        }
+      }
+
+      const playerId = await findOrCreatePlayer(tx, academyId, {
+        fullName: registration.playerFullName,
+        fullNameNormalized: registration.playerFullNameNormalized,
+        phone: registration.contactPhone,
+        dateOfBirth: registration.playerDateOfBirth,
+        guardianFullName: registration.guardianFullName,
+        guardianPhone: registration.guardianPhone,
+        email: registration.contactEmail,
+      });
+
+      if (playerId !== existingPlayer?.id) {
+        const block = await guardNewEnrollment(tx, {
+          academyId,
+          playerId,
+          batchId: registration.batchId,
+          validFrom,
+          validUntil,
+          today,
+        });
+        if (block) {
+          throw new RegistrationCommandFailure(block);
+        }
+      }
+
+      await insertEnrollment(tx, {
+        academyId,
+        playerId,
+        batchId: registration.batchId,
+        registrationId: registration.id,
+        daysPerWeek: registration.daysPerWeek,
+        termDays: registration.termDays,
+        feePaisePaid: registration.feePaise,
+        validFrom,
+        validUntil,
+      });
+
+      const accepted = await tx
+        .update(registrations)
+        .set({
+          status: "accepted",
+          playerId,
+          acceptedAt: new Date(),
+          acceptedByUserId,
+        })
+        .where(
+          and(
+            eq(registrations.id, registrationId),
+            eq(registrations.academyId, academyId),
+            eq(registrations.status, "pending"),
+          ),
+        )
+        .returning({ id: registrations.id });
+
+      if (accepted.length === 0) {
+        throw new RegistrationCommandFailure("not-pending");
+      }
+    });
+  } catch (error) {
+    if (error instanceof RegistrationCommandFailure) {
+      return { ok: false, error: error.code };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
+export async function rejectRegistration(
+  academyId: string,
+  registrationId: string,
+  rejectedByUserId: string,
+): Promise<{ ok: true } | { ok: false; error: RegistrationCommandError }> {
+  const db = getTransactionalDb();
+  const rejected = await db
+    .update(registrations)
+    .set({
+      status: "rejected",
+      rejectedAt: new Date(),
+      rejectedByUserId,
+    })
+    .where(
+      and(
+        eq(registrations.id, registrationId),
+        eq(registrations.academyId, academyId),
+        eq(registrations.status, "pending"),
+      ),
+    )
+    .returning({ id: registrations.id });
+
+  if (rejected.length > 0) {
+    return { ok: true };
+  }
+
+  const [row] = await db
+    .select({ id: registrations.id })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.id, registrationId),
+        eq(registrations.academyId, academyId),
+      ),
+    )
+    .limit(1);
+
+  return { ok: false, error: row ? "not-pending" : "not-found" };
+}
+

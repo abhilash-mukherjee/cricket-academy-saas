@@ -1,4 +1,4 @@
-import { APP_DESCRIPTION, APP_NAME, FEATURE_LIST_HEADING, PRODUCT_HOMEPAGE_COPY } from "@/lib/constants";
+import { APP_DESCRIPTION, PRODUCT_HOMEPAGE_COPY } from "@/lib/constants";
 import Link from "next/link";
 import { MarketingShell } from "./marketing-shell";
 import FeatureShell from "./feature-shell";
@@ -17,7 +17,7 @@ export default function Home() {
               {PRODUCT_HOMEPAGE_COPY}
             </p>
           </div>
-          <Link href="/login" className="btn btn-lg">
+          <Link href="/app" className="btn btn-lg">
             Start your Academy
           </Link>
         </section>

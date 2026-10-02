@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   RegistrableBatch,
   RegistrableFeeOption,
@@ -87,6 +88,7 @@ export function RegistrationForm({
   batches,
   upiQrUrl,
 }: RegistrationFormProps) {
+  const router = useRouter();
   const [values, setValues] = useState(() => emptyValues(batches));
   const [fields, setFields] = useState<RegistrationFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -173,7 +175,8 @@ export function RegistrationForm({
     });
 
     if (response.status === 404) {
-      window.location.assign(`/a/${academySlug}/join`);
+      router.push(`/a/${academySlug}/join`);
+      router.refresh();
       return;
     }
 
@@ -233,7 +236,7 @@ export function RegistrationForm({
                 <label
                   key={
                     option.id ||
-                    `${batch.id || batch.name}-${option.daysPerWeek}-${option.termMonths}`
+                    `${batch.id || batch.name}-${option.daysPerWeek}-${option.termDays}`
                   }
                   className="card bg-base-200 cursor-pointer"
                 >

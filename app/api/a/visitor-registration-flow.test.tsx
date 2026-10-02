@@ -152,7 +152,7 @@ async function openRegistrableBatch(
   slug: string,
   options: {
     daysPerWeek?: number;
-    termMonths?: number;
+    termDays?: number;
     feeInr?: number;
     label?: string | null;
   } = {},
@@ -172,7 +172,7 @@ async function openRegistrableBatch(
       },
       body: JSON.stringify({
         daysPerWeek: options.daysPerWeek ?? 3,
-        termMonths: options.termMonths ?? 3,
+        termDays: options.termDays ?? 45,
         feeInr: options.feeInr ?? 15000,
         label: options.label ?? "Weekday nets",
       }),
@@ -266,7 +266,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         snapshot: {
           batchName: "U-14 evening",
           daysPerWeek: 3,
-          termMonths: 3,
+          termDays: 45,
           feePaise: 1500000,
           contactPhone: "+919876543210",
           contactEmail: "arjun@example.com",
@@ -287,7 +287,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         batchId: opened.batch.id,
         batchFeeOptionId: opened.feeOptionId,
         daysPerWeek: 3,
-        termMonths: 3,
+        termDays: 45,
         feePaise: 1500000,
         playerFullName: "Arjun Rao",
         playerFullNameNormalized: "arjun rao",
@@ -413,7 +413,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 5,
-            termMonths: 6,
+            termDays: 6,
             feeInr: 22000,
             label: "Weekend",
           }),
@@ -522,7 +522,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           },
           body: JSON.stringify({
             daysPerWeek: 5,
-            termMonths: 6,
+            termDays: 6,
             feeInr: 22000,
           }),
         }),
@@ -691,7 +691,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
     });
 
-    it("shows Pending Registrations on the dashboard, including zero, with no inbox link", async () => {
+    it("shows Pending Registrations on the dashboard, including zero, linking to the inbox", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug, "U-14 evening");
       sessionCookie.value = cookie;
@@ -701,7 +701,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       const empty = renderToStaticMarkup(await DashboardPage());
       expect(empty).toContain("Pending Registrations: 0");
-      expect(empty).not.toContain("/app/registrations");
+      expect(empty).toContain('href="/app/registrations"');
 
       const opened = await openRegistrableBatch(cookie, slug);
       const submitted = await postRegistration(slug, {
@@ -712,7 +712,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       const counted = renderToStaticMarkup(await DashboardPage());
       expect(counted).toContain("Pending Registrations: 1");
-      expect(counted).not.toContain("/app/registrations");
+      expect(counted).toContain('href="/app/registrations"');
     });
 
     it("lists package ids as a radio picker on /join and hides UPI until the last step", async () => {
@@ -747,7 +747,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           snapshot={{
             batchName: "U-14 evening",
             daysPerWeek: 3,
-            termMonths: 3,
+            termDays: 1,
             feePaise: 1500000,
             contactPhone: "+919876543210",
             contactEmail: "arjun@example.com",
@@ -762,9 +762,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         "The Academy will contact you on +919876543210 and arjun@example.com.",
       );
       expect(html).toContain("U-14 evening");
-      expect(html).toContain("Weekday nets");
+      expect(html.indexOf("Weekday nets")).toBeLessThan(html.indexOf("1 day"));
       expect(html).toContain("3 days per week");
-      expect(html).toContain("3 months");
+      expect(html).toContain("1 day");
+      expect(html).not.toContain("1 days");
       expect(html).toContain("₹15,000");
       expect(html).toContain(`Pay ${formatInr(1500000)} with UPI`);
       expect(html).toContain(

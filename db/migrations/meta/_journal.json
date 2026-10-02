@@ -36,6 +36,48 @@
       "when": 1789878413707,
       "tag": "0004_registration_contact_email",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789900000000,
+      "tag": "0005_fee_option_term_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789900001000,
+      "tag": "0006_drop_term_months",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790167971213,
+      "tag": "0007_player_guardian_enrollment_pause_batch_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790702124935,
+      "tag": "0008_players_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790835626907,
+      "tag": "0009_attendance_is_present",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790839674369,
+      "tag": "0010_enrollments_academy_batch_idx",
+      "breakpoints": true
     }
   ]
 }

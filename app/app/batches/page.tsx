@@ -5,7 +5,7 @@ import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
-import { BatchesEditor } from "./batches-editor";
+import { BatchesDirectory } from "./batches-directory";
 import { DashboardBackLink } from "../dashboard-back-link";
 
 export default async function BatchesPage() {
@@ -48,7 +48,7 @@ export default async function BatchesPage() {
                 is on.
               </p>
             )}
-            <BatchesEditor
+            <BatchesDirectory
               batches={academyBatches}
               feeOptions={feeOptions}
             />

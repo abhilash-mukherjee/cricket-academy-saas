@@ -1,9 +1,18 @@
 import Link from "next/link";
 
-export function DashboardBackLink() {
+export function DashboardBackLink({
+  href = "/app/dashboard",
+  label = "Dashboard",
+  onClick,
+}: {
+  href?: string;
+  label?: string;
+  onClick?: (event: { preventDefault(): void }, href: string) => void;
+} = {}) {
   return (
     <Link
-      href="/app/dashboard"
+      href={href}
+      onClick={onClick ? (event) => onClick(event, href) : undefined}
       className="link link-hover inline-flex items-center gap-1 self-start text-sm"
     >
       <svg
@@ -21,7 +30,7 @@ export function DashboardBackLink() {
           d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
         />
       </svg>
-      Dashboard
+      {label}
     </Link>
   );
 }

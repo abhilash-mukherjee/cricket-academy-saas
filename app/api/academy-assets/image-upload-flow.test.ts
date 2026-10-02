@@ -41,11 +41,7 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@vercel/blob", () => ({
-  put: async (
-    pathname: string,
-    body: ArrayBuffer | Buffer | Blob,
-    _options: Record<string, unknown>,
-  ) => {
+  put: async (pathname: string, body: ArrayBuffer | Buffer | Blob) => {
     const bytes = new Uint8Array(
       body instanceof Blob
         ? await body.arrayBuffer()
@@ -403,7 +399,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         academyId: academy!.id,
         batchId: batch!.id,
         daysPerWeek: 2,
-        termMonths: 3,
+        termDays: 3,
         feePaise: 1500000,
         sortOrder: 0,
       });

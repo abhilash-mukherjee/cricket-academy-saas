@@ -1,0 +1,1 @@
+CREATE INDEX "enrollments_academy_id_batch_id_idx" ON "enrollments" USING btree ("academy_id","batch_id");

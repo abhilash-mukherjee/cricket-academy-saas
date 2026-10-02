@@ -101,7 +101,7 @@ export const batchFeeOptions = pgTable(
       .notNull()
       .references(() => batches.id, { onDelete: "restrict" }),
     daysPerWeek: integer("days_per_week").notNull(),
-    termMonths: integer("term_months").notNull(),
+    termDays: integer("term_days").notNull(),
     feePaise: integer("fee_paise").notNull(),
     label: text("label"),
     isOffered: boolean("is_offered").notNull().default(true),
@@ -115,10 +115,10 @@ export const batchFeeOptions = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    unique("batch_fee_options_batch_id_days_per_week_term_months_unique").on(
+    unique("batch_fee_options_batch_id_days_per_week_term_days_unique").on(
       table.batchId,
       table.daysPerWeek,
-      table.termMonths,
+      table.termDays,
     ),
     check(
       "batch_fee_options_days_per_week_range",
@@ -138,6 +138,9 @@ export const players = pgTable(
     fullNameNormalized: text("full_name_normalized").notNull(),
     phone: text("phone").notNull(),
     dateOfBirth: date("date_of_birth").notNull(),
+    guardianFullName: text("guardian_full_name"),
+    guardianPhone: text("guardian_phone"),
+    email: text("email"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -169,7 +172,7 @@ export const registrations = pgTable(
       .notNull()
       .references(() => batchFeeOptions.id, { onDelete: "restrict" }),
     daysPerWeek: integer("days_per_week").notNull(),
-    termMonths: integer("term_months").notNull(),
+    termDays: integer("term_days").notNull(),
     feePaise: integer("fee_paise").notNull(),
     playerFullName: text("player_full_name").notNull(),
     playerFullNameNormalized: text("player_full_name_normalized").notNull(),
@@ -233,11 +236,11 @@ export const enrollments = pgTable(
     batchId: uuid("batch_id")
       .notNull()
       .references(() => batches.id, { onDelete: "restrict" }),
-    registrationId: uuid("registration_id")
-      .notNull()
-      .references(() => registrations.id, { onDelete: "restrict" }),
+    registrationId: uuid("registration_id").references(() => registrations.id, {
+      onDelete: "restrict",
+    }),
     daysPerWeek: integer("days_per_week").notNull(),
-    termMonths: integer("term_months").notNull(),
+    termDays: integer("term_days").notNull(),
     feePaisePaid: integer("fee_paise_paid").notNull(),
     validFrom: date("valid_from").notNull(),
     validUntil: date("valid_until").notNull(),
@@ -257,6 +260,106 @@ export const enrollments = pgTable(
     check(
       "enrollments_days_per_week_range",
       sql`${table.daysPerWeek} between 1 and 7`,
+    ),
+    uniqueIndex("enrollments_registration_id_unique")
+      .on(table.registrationId)
+      .where(sql`${table.registrationId} is not null`),
+    index("enrollments_academy_id_batch_id_idx").on(
+      table.academyId,
+      table.batchId,
+    ),
+  ],
+);
+
+export const enrollmentPauses = pgTable(
+  "enrollment_pauses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    enrollmentId: uuid("enrollment_id")
+      .notNull()
+      .references(() => enrollments.id, { onDelete: "restrict" }),
+    pausedOn: date("paused_on").notNull(),
+    plannedLastPausedOn: date("planned_last_paused_on"),
+    resumedOn: date("resumed_on"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check(
+      "enrollment_pauses_planned_last_paused_on",
+      sql`${table.plannedLastPausedOn} is null or ${table.plannedLastPausedOn} >= ${table.pausedOn}`,
+    ),
+    check(
+      "enrollment_pauses_resumed_on",
+      sql`${table.resumedOn} is null or ${table.resumedOn} >= ${table.pausedOn}`,
+    ),
+    uniqueIndex("enrollment_pauses_one_open_per_enrollment")
+      .on(table.enrollmentId)
+      .where(sql`${table.resumedOn} is null`),
+  ],
+);
+
+export const batchSessions = pgTable(
+  "batch_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => batches.id, { onDelete: "restrict" }),
+    sessionDate: date("session_date").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("batch_sessions_academy_id_batch_id_session_date_unique").on(
+      table.academyId,
+      table.batchId,
+      table.sessionDate,
+    ),
+  ],
+);
+
+export const batchSessionAttendance = pgTable(
+  "batch_session_attendance",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    batchSessionId: uuid("batch_session_id")
+      .notNull()
+      .references(() => batchSessions.id, { onDelete: "restrict" }),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    enrollmentId: uuid("enrollment_id")
+      .notNull()
+      .references(() => enrollments.id, { onDelete: "restrict" }),
+    isPresent: boolean("is_present").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    unique("batch_session_attendance_batch_session_id_player_id_unique").on(
+      table.batchSessionId,
+      table.playerId,
     ),
   ],
 );

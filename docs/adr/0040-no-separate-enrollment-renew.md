@@ -1,0 +1,5 @@
+# No separate Enrollment renew action
+
+A later Enrollment for the same Player and Batch is created by accepting a Registration or by manual add (Add Enrollment). Those commands already enforce the term, the shared-day rule, and the open-pause rule. A dedicated Renew action would only set `renewed_from_enrollment_id`. Player detail already has a line for that column (“This term continues the previous one.”). No command sets it, so Enrollments the product creates never show that line. No reminder, term count, or roster rule follows the chain. The column stays on `enrollments`; accept and manual add leave it null. [#65](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/65) is closed.
+
+**Considered options:** A Renew control on a lapsed row that locks the Batch and sets the link (rejected — the create is the same as Add Enrollment, and accepting a later Registration for that Batch would still leave the link empty). Setting the link from Add Enrollment whenever that Batch has only lapsed Enrollments (rejected — no behavior follows the chain, and several lapsed rows would need an arbitrary pick).
