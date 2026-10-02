@@ -1,3 +1,4 @@
+import { LinkPendingMark } from "@/app/app/link-pending-mark";
 import Link from "next/link";
 import { MarketingShell } from "../marketing-shell";
 import { LoginForm } from "./login-form";
@@ -36,8 +37,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
           <LoginForm callbackUrl={callbackUrl} />
 
-          <Link href="/" className="link link-hover text-sm">
+          <Link
+            href="/"
+            className="link link-hover inline-flex items-center gap-1 text-sm"
+          >
             Back to homepage
+            <LinkPendingMark />
           </Link>
         </div>
       </section>

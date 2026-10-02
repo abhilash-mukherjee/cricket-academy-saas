@@ -1,3 +1,4 @@
+import { LinkPendingMark } from "@/app/app/link-pending-mark";
 import { APP_DESCRIPTION, PRODUCT_HOMEPAGE_COPY } from "@/lib/constants";
 import Link from "next/link";
 import { MarketingShell } from "./marketing-shell";
@@ -19,6 +20,7 @@ export default function Home() {
           </div>
           <Link href="/app" className="btn btn-lg">
             Start your Academy
+            <LinkPendingMark />
           </Link>
         </section>
       </MarketingShell>

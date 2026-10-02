@@ -31,5 +31,13 @@ vi.mock("next/navigation", async (importOriginal) => {
   return {
     ...actual,
     usePathname: () => "",
+    useRouter: () => ({
+      refresh: () => undefined,
+      push: () => undefined,
+      replace: () => undefined,
+      prefetch: () => undefined,
+      back: () => undefined,
+      forward: () => undefined,
+    }),
   };
 });
