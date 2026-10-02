@@ -1,3 +1,4 @@
+import { LinkPendingMark } from "@/app/app/link-pending-mark";
 import { APP_NAME } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
@@ -42,6 +43,7 @@ export function MarketingShell({ children, className }: MarketingShellProps) {
         <div className="flex-none">
           <Link href="/app" className="btn btn-ghost btn-sm text-base-100">
             Sign in
+            <LinkPendingMark />
           </Link>
         </div>
       </div>
