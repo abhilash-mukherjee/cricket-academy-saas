@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { ConversionEditorState } from "@/lib/conversion";
 
 type ConversionEditorProps = {
@@ -117,9 +118,12 @@ export function ConversionEditor({ conversion }: ConversionEditorProps) {
       </p>
 
       {upiQrUrl ? (
-        <img
+        <Image
           src={upiQrUrl}
           alt="UPI QR preview"
+          width={192}
+          height={192}
+          sizes="12rem"
           className="h-48 w-48 rounded-box object-contain"
         />
       ) : null}

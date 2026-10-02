@@ -1,8 +1,8 @@
 # Issue #61 vertical — academy operations
 
-Blueprint for the Owner roster: Registration accept and reject, manual add, the Player directory, Enrollment pause and renew, and Session attendance. Parent spec: [#61](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/61). Children: [#7](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/7), [#62](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/62), [#63](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/63), [#64](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/64), [#65](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/65), [#66](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/66).
+Blueprint for the Owner roster: Registration accept and reject, manual add, the Player directory, Enrollment pause, and Session attendance. A later term on the same Batch is another Enrollment from accept or manual add. There is no Renew command ([ADR-0040](../adr/0040-no-separate-enrollment-renew.md); [#65](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/65) is closed). Parent spec: [#61](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/61). Children: [#7](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/7), [#62](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/62), [#63](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/63), [#64](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/64), [#66](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/66), [#73](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/73).
 
-Amends [issue #1 vertical](./issue-1-vertical.md) where this file says so. Trade-offs: [ADR-0034](../adr/0034-guardian-copied-onto-player.md), [ADR-0035](../adr/0035-owner-chooses-enrollment-valid-from.md), [ADR-0036](../adr/0036-dated-pause-ends-on-its-last-day.md), [ADR-0037](../adr/0037-enrollment-pauses-are-rows.md), [ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md). Writes that read then decide use a transaction ([ADR-0024](../adr/0024-neon-http-not-session-locks.md)).
+Amends [issue #1 vertical](./issue-1-vertical.md) where this file says so. Trade-offs: [ADR-0034](../adr/0034-guardian-copied-onto-player.md), [ADR-0035](../adr/0035-owner-chooses-enrollment-valid-from.md), [ADR-0036](../adr/0036-dated-pause-ends-on-its-last-day.md), [ADR-0037](../adr/0037-enrollment-pauses-are-rows.md), [ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md), [ADR-0040](../adr/0040-no-separate-enrollment-renew.md). Writes that read then decide use a transaction ([ADR-0024](../adr/0024-neon-http-not-session-locks.md)).
 
 After implementation, `db/domain-schema.ts` and migrations are canonical; update this doc when the schema changes intentionally.
 
@@ -20,7 +20,7 @@ Same as the #1 blueprint: uuid keys, `academy_id` on every Academy-scoped row, `
 
 - `lib/registrations.ts` — submit (already), plus accept and reject
 - `lib/players.ts` — find or create by name + phone, directory, Batch roster
-- `lib/enrollments.ts` — create, pause, resume, renew, and pause settlement
+- `lib/enrollments.ts` — create, pause, resume, and pause settlement
 - `lib/batch-sessions.ts` — read the list for a date, save, discard
 - `getDb()` stays `drizzle-orm/neon-http` for reads
 - These commands use a second Drizzle client on `drizzle-orm/neon-serverless` (WebSocket pool) so one transaction can read, decide, and write
@@ -35,7 +35,7 @@ A dated pause whose planned last day is before today is finished. Its end day is
 
 **Paused days** are the first paused day inclusive through the end day exclusive. The end day is the first day not paused. Same-day resume stores the end day equal to the first paused day and adds none. An early resume sets the end day to today and keeps the planned last day on the row. The count uses the end day.
 
-**Currently paused** (directory, roster, renew, pause): an open pause with no end day yet, whose interval covers today. An open-ended pause covers every date from its first day forward. A dated pause that is still running covers its first day through its planned last day.
+**Currently paused** (directory, roster, pause): an open pause with no end day yet, whose interval covers today. An open-ended pause covers every date from its first day forward. A dated pause that is still running covers its first day through its planned last day.
 
 **Effective `valid_until`:** the stored date, plus days from any dated pause that is finished and not yet persisted.
 
@@ -63,7 +63,7 @@ No Guardian table ([ADR-0034](../adr/0034-guardian-copied-onto-player.md)). Iden
 
 ### `enrollments`
 
-`registration_id` becomes nullable. Manual add and renew leave it null. Accept sets it.
+`registration_id` becomes nullable. Manual add leaves it null. Accept sets it.
 
 | Constraint | |
 | --- | --- |
@@ -110,7 +110,7 @@ The row is inserted on the first save. Opening a date with no row writes nothing
 
 ### `batch_session_attendance`
 
-Postgres enum `batch_session_attendance_mark`: `present` | `absent`
+One row per Player on the saved list. Absent is `is_present = false`. A missing row means that Player was not on the list. Unmarked stays on the screen until save, then it is stored as absent. There is no third stored value (late, excused, left-early). Mark stays the verb.
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ Postgres enum `batch_session_attendance_mark`: `present` | `absent`
 | `batch_session_id` | `uuid NOT NULL` FK → `batch_sessions` | |
 | `player_id` | `uuid NOT NULL` FK → `players` | |
 | `enrollment_id` | `uuid NOT NULL` FK → `enrollments` | The Enrollment that put the Player on the list |
-| `mark` | `batch_session_attendance_mark NOT NULL` | |
+| `is_present` | `boolean NOT NULL` | No default. Present is `true`, absent is `false` |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Constraint:** `UNIQUE (batch_session_id, player_id)`
@@ -128,7 +128,7 @@ Deleting a Session deletes its attendance rows first, then the Session, in one t
 
 ## Create rules
 
-Shared by accept, manual add, and renew. One transaction. Any failure rolls back. No Player row is left without the Enrollment, and a failed accept leaves the Registration pending.
+Shared by accept and manual add. One transaction. Any failure rolls back. No Player row is left without the Enrollment, and a failed accept leaves the Registration pending.
 
 `valid_from` defaults to today in the form. The Owner may change it. It must be a real calendar date, today or earlier. `valid_until` from the term must be today or later. A future start and an already-finished term are rejected.
 
@@ -138,11 +138,11 @@ On the player key `(academy_id, full_name_normalized, phone)`: link the existing
 
 Accept copies the Registration’s snapshotted days per week, term days, and fee. It sets `registration_id` and leaves `renewed_from_enrollment_id` null. Guardian is copied from the Registration when both Guardian fields are present and the Player has none. Contact email is copied from the Registration when present and the Player has none. Accept does not recompute age.
 
-Manual add and renew copy days per week, term days, and fee from a fee option on that Batch, including one that is no longer offered. The Enrollment does not store the fee-option id. The Batch may be closed for Registration. A Batch with no fee option at all cannot be used. `registration_id` is null.
+Manual add copies days per week, term days, and fee from a fee option on that Batch, including one that is no longer offered. The Enrollment does not store the fee-option id. The Batch may be closed for Registration. A Batch with no fee option at all cannot be used. `registration_id` is null. `renewed_from_enrollment_id` stays null (ADR-0040).
 
 Manual add decides under-18 with `isPlayerUnder18` as of today. Under 18 requires Guardian name and phone. An adult intake leaves Guardian null. `valid_from` does not change the age check. The Player’s phone is the Guardian phone when under 18, otherwise the Player phone. Same contact rule as a Registration. Optional email may be set on create; on link, fill-if-empty only.
 
-Renew is offered on a lapsed Enrollment when no Enrollment for that Player and Batch is Active or paused. `renewed_from_enrollment_id` points at the Enrollment the Owner renewed. Accept and manual add do not set it.
+There is no Renew command. A later Enrollment for the same Player and Batch is created by accept or by manual add. Accept and manual add leave `renewed_from_enrollment_id` null.
 
 A second Registration for a name and phone that already has an Active or paused Enrollment on that Batch may still be submitted. Accept then fails the overlap or open-pause check and the Registration stays pending. The Owner rejects it. Public submit is unchanged.
 
@@ -160,11 +160,13 @@ Resume requires an open pause. It sets `resumed_on` to today, extends `valid_unt
 
 ## Session attendance
 
+Enrollments are indexed by `(academy_id, batch_id)` so eligibility for one date is one query for that Batch.
+
 The date is today or earlier. With no Session row, the list is Players with an Enrollment on that Batch that covers the date and is not paused on that date. A lapsed Enrollment can appear on a past date inside its old range. A backdated Enrollment appears on an unsaved past date. It does not appear on a Session already saved.
 
-The save body is the Player ids that were on screen, and the subset marked present. Present ids must be a subset of that list.
+The save body is every Player id on the list being marked — the eligible list when no Session exists yet, the stored attendance rows when one does — including Players a search is hiding. The present ids are the subset marked present, and must be a subset of that list. Search does not change the id set.
 
-- **No Session yet.** Settle, recompute eligibility, and reject when the id set differs ([ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md)). When it matches, insert the Session and one attendance row per Player. Present marks are `present`. Everyone else on the list is `absent`. An empty eligible list may be saved: a Session with no attendance rows.
+- **No Session yet.** Settle, recompute eligibility, and reject when the id set differs ([ADR-0038](../adr/0038-attendance-save-rejects-a-stale-list.md)). When it matches, insert the Session and one attendance row per Player. Players marked present are stored as `is_present = true`. Everyone else on the list is `is_present = false`. An empty eligible list may be saved: a Session with no attendance rows.
 - **Session exists.** The id set must equal the stored attendance rows. A match updates marks only. Players are not added or removed.
 
 Discard deletes that Session and its attendance. The next open shows the live list.
@@ -195,7 +197,6 @@ Owner menu gains **Registrations** (`/app/registrations`) and **Players** (`/app
 | `POST /api/players` | manual-add fields | `player.manual-add` |
 | `POST /api/enrollments/[enrollmentId]/pause` | `{ pausedOn, plannedLastPausedOn }` | `enrollment.pause` |
 | `POST /api/enrollments/[enrollmentId]/resume` | none | `enrollment.resume` |
-| `POST /api/enrollments/[enrollmentId]/renew` | `{ feeOptionId, validFrom }` | `enrollment.renew` |
 | `PUT /api/batches/[batchId]/sessions/[date]` | `{ playerIds, presentPlayerIds }` | `batch-session.save` |
 | `DELETE /api/batches/[batchId]/sessions/[date]` | none | `batch-session.discard` |
 

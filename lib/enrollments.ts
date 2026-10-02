@@ -187,7 +187,7 @@ export async function guardNewEnrollment(
   return overlaps ? "overlaps" : null;
 }
 
-async function settleFinishedPauses(
+export async function settleFinishedPauses(
   tx: OwnerTx,
   academyId: string,
   enrollment: { id: string; validFrom: string; validUntil: string },

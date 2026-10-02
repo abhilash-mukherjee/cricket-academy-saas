@@ -176,18 +176,18 @@ Accept flow: find by that key → link existing Player, else insert → create `
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `player_id` | `uuid NOT NULL` FK → `players` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
-| `registration_id` | `uuid` nullable FK → `registrations` | Provenance. Null for manual add and renew. Unique when set. See [issue #61 operations](./issue-61-operations.md) |
+| `registration_id` | `uuid` nullable FK → `registrations` | Provenance. Null for manual add. Unique when set. See [issue #61 operations](./issue-61-operations.md) |
 | `days_per_week` | `integer NOT NULL` | From accepted Registration |
 | `term_days` | `integer NOT NULL` | From accepted Registration. Whole calendar days, at least 1 |
 | `fee_paise_paid` | `integer NOT NULL` | From accepted Registration |
 | `valid_from` | `date NOT NULL` | Owner-chosen start. valid-until is derived from the term |
 | `valid_until` | `date NOT NULL` | Last covered day. `valid_from` counts as day one, so `valid_from` + `term_days` − 1 day. The cutover does not rewrite a date already stored |
-| `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | Renewal chain |
+| `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | On the table. Product writes leave it null ([ADR-0040](../adr/0040-no-separate-enrollment-renew.md)) |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Constraint:** `CHECK (days_per_week BETWEEN 1 AND 7)`
 
-No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 90-day stint and a later 180-day renewal are separate rows).
+No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 90-day stint and a later 180-day term are separate rows).
 
 ### `brochure_images`
 
@@ -273,7 +273,7 @@ user ─────────────────────┬──►
 | In #1 | Deferred |
 | --- | --- |
 | Visitor picks Batch + fee option; amount on conversion/thank-you | Expiry reminders / lapsed membership UI |
-| Registration inbox shows Batch · days/week · term · fee | Renewal form / overlap handling |
+| Registration inbox shows Batch · days/week · term · fee | Overlap handling (shipped with accept and manual add). No separate renew action (ADR-0040) |
 | Accept writes `enrollments` with dates | Roster “active until” dashboard |
 | Owner manages `batch_fee_options` in `/app/batches` | Brochure “from ₹X” pricing |
 

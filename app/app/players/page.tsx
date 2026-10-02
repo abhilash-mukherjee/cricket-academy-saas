@@ -6,10 +6,11 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { calendarDateInIst } from "@/lib/player-age";
-import { listPlayerDirectory, type TermStatus } from "@/lib/players";
+import { listPlayerDirectory } from "@/lib/players";
 import { DashboardBackLink } from "../dashboard-back-link";
 import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
+import EnrollmentStatus from "../enrollment-status";
 
 type PlayersPageProps = {
   searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
@@ -40,16 +41,6 @@ function pageHref(q: string, page: number): string {
   }
   const query = params.toString();
   return query ? `/app/players?${query}` : "/app/players";
-}
-
-function statusLabel(status: TermStatus): string {
-  if (status === "active") {
-    return "Active";
-  }
-  if (status === "paused") {
-    return "Paused";
-  }
-  return "Lapsed";
 }
 
 export default async function PlayersPage({ searchParams }: PlayersPageProps) {
@@ -103,7 +94,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                 defaultValue={q}
                 aria-label="Search Players"
               />
-              <button className="btn btn-primary" type="submit">
+              <button className="btn btn-neutral" type="submit">
                 Search
               </button>
             </form>
@@ -129,7 +120,8 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                       </a>
                       {player.lines.map((line) => (
                         <p key={`${line.batchId}-${line.validFrom}`}>
-                          {line.batchName} {statusLabel(line.status)}
+                          {line.batchName}
+                          <EnrollmentStatus status={line.status}/>
                         </p>
                       ))}
                     </div>

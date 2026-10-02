@@ -6,7 +6,8 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { formatCalendarDate } from "@/lib/format-date";
-import { calendarDateInIst } from "@/lib/player-age";
+import { calendarDateInIst, isValidCalendarDate } from "@/lib/player-age";
+import { listBatchSessionDates } from "@/lib/batch-sessions";
 import { getPlayer } from "@/lib/players";
 import { PlayerPageBackLink } from "../../player-page-back-link";
 import { ManualAddForm } from "../manual-add-form";
@@ -14,7 +15,10 @@ import { PlayerEnrollmentList } from "../player-enrollment-list";
 
 type PlayerPageProps = {
   params: Promise<{ playerId: string }>;
-  searchParams: Promise<{ fromBatch?: string | string[] }>;
+  searchParams: Promise<{
+    fromBatch?: string | string[];
+    sessionDate?: string | string[];
+  }>;
 };
 
 function firstParam(value: string | string[] | undefined): string {
@@ -24,10 +28,13 @@ function firstParam(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
-function backHref(fromBatch: string): string {
+function backHref(fromBatch: string, sessionDate: string): string {
   const parsed = z.uuid().safeParse(fromBatch);
   if (!parsed.success) {
     return "/app/players";
+  }
+  if (isValidCalendarDate(sessionDate)) {
+    return `/app/batches/${parsed.data}/sessions?date=${sessionDate}`;
   }
   return `/app/batches/${parsed.data}`;
 }
@@ -61,12 +68,22 @@ export default async function PlayerPage({
     notFound();
   }
 
+  const sessionDatesByBatch = await listBatchSessionDates(
+    academy.id,
+    [...new Set(player.enrollments.map((enrollment) => enrollment.batchId))],
+  );
+
   const canMutate = Boolean(impersonation || !session.user.isSuperAdmin);
 
   return (
     <main className="flex min-h-full flex-col p-6">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
-        <PlayerPageBackLink href={backHref(firstParam(query.fromBatch))} />
+        <PlayerPageBackLink
+          href={backHref(
+            firstParam(query.fromBatch),
+            firstParam(query.sessionDate),
+          )}
+        />
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
             <h1 className="card-title">{player.fullName}</h1>
@@ -96,6 +113,7 @@ export default async function PlayerPage({
               enrollments={player.enrollments}
               today={today}
               canMutate={canMutate}
+              sessionDatesByBatch={sessionDatesByBatch}
             />
           </div>
         </section>

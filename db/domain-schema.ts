@@ -23,11 +23,6 @@ export const registrationStatusEnum = pgEnum("registration_status", [
   "rejected",
 ]);
 
-export const batchSessionAttendanceMarkEnum = pgEnum(
-  "batch_session_attendance_mark",
-  ["present", "absent"],
-);
-
 export const academies = pgTable(
   "academies",
   {
@@ -269,6 +264,10 @@ export const enrollments = pgTable(
     uniqueIndex("enrollments_registration_id_unique")
       .on(table.registrationId)
       .where(sql`${table.registrationId} is not null`),
+    index("enrollments_academy_id_batch_id_idx").on(
+      table.academyId,
+      table.batchId,
+    ),
   ],
 );
 
@@ -348,7 +347,7 @@ export const batchSessionAttendance = pgTable(
     enrollmentId: uuid("enrollment_id")
       .notNull()
       .references(() => enrollments.id, { onDelete: "restrict" }),
-    mark: batchSessionAttendanceMarkEnum("mark").notNull(),
+    isPresent: boolean("is_present").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   addCalendarDays,
   calendarDaysBetween,
+  pauseCoversDate,
   pauseEndExclusive,
   pauseIntervalsOverlap,
 } from "@/lib/enrollment-term";
@@ -14,11 +15,13 @@ import { packageFactsCopy } from "@/lib/package-copy";
 import { isValidCalendarDate } from "@/lib/player-age";
 import type { PlayerEnrollmentView } from "@/lib/players";
 import { SuccessToast } from "@/app/success-toast";
+import EnrollmentStatus from "../enrollment-status";
 
 type PlayerEnrollmentListProps = {
   enrollments: PlayerEnrollmentView[];
   today: string;
   canMutate: boolean;
+  sessionDatesByBatch: Record<string, string[]>;
 };
 
 type PauseDraft = {
@@ -30,16 +33,6 @@ type PauseInterval = PlayerEnrollmentView["pauseIntervals"][number];
 
 function emptyPauseDraft(today: string): PauseDraft {
   return { pausedOn: today, plannedLastPausedOn: "" };
-}
-
-function statusLabel(status: PlayerEnrollmentView["status"]): string {
-  if (status === "active") {
-    return "Active";
-  }
-  if (status === "paused") {
-    return "Paused";
-  }
-  return "Lapsed";
 }
 
 function pauseCopy(
@@ -156,6 +149,33 @@ function pauseSuccessToast(
   return "Paused open-ended — excluded from Session attendance until resumed.";
 }
 
+function draftCoversSavedSession(
+  draft: PauseDraft,
+  sessionDates: string[],
+): boolean {
+  if (!isValidCalendarDate(draft.pausedOn) || sessionDates.length === 0) {
+    return false;
+  }
+  const last = draft.plannedLastPausedOn.trim();
+  if (last !== "" && !isValidCalendarDate(last)) {
+    return false;
+  }
+  const plannedLastPausedOn = last === "" ? null : last;
+  if (plannedLastPausedOn !== null && plannedLastPausedOn < draft.pausedOn) {
+    return false;
+  }
+  return sessionDates.some((date) =>
+    pauseCoversDate(
+      {
+        pausedOn: draft.pausedOn,
+        plannedLastPausedOn,
+        resumedOn: null,
+      },
+      date,
+    ),
+  );
+}
+
 function resumeConfirmCopy(
   pausedOn: string,
   today: string,
@@ -173,6 +193,7 @@ export function PlayerEnrollmentList({
   enrollments,
   today,
   canMutate,
+  sessionDatesByBatch,
 }: PlayerEnrollmentListProps) {
   const router = useRouter();
   const [openPauseId, setOpenPauseId] = useState<string | null>(null);
@@ -338,6 +359,12 @@ export function PlayerEnrollmentList({
           const pauseBlocked =
             preview === pauseErrorCopy("pause-overlaps") ||
             (preview !== null && preview.startsWith("Last paused day"));
+          const savedAttendanceStays =
+            pauseOpen &&
+            draftCoversSavedSession(
+              draft,
+              sessionDatesByBatch[enrollment.batchId] ?? [],
+            );
 
           return (
             <li key={enrollment.id} className="card bg-base-100">
@@ -348,7 +375,7 @@ export function PlayerEnrollmentList({
                 >
                   {enrollment.batchName}
                 </Link>
-                <p>{statusLabel(enrollment.status)}</p>
+                <EnrollmentStatus status={enrollment.status}/>
                 <p>
                   {packageFactsCopy({
                     daysPerWeek: enrollment.daysPerWeek,
@@ -441,6 +468,12 @@ export function PlayerEnrollmentList({
                             }
                           >
                             {preview}
+                          </p>
+                        ) : null}
+                        {savedAttendanceStays ? (
+                          <p className="text-sm">
+                            Attendance already saved on days in this pause stays
+                            as it was.
                           </p>
                         ) : null}
                         {inlineError && openPauseId === enrollment.id ? (

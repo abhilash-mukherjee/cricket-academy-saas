@@ -125,6 +125,44 @@ describe("operations schema for guardian, pause, and batch sessions", () => {
   });
 });
 
+describe("attendance stores present as a boolean", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0009_attendance_is_present.sql",
+  );
+
+  it("maps present and absent onto is_present and drops the mark enum", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    const addColumnAt = sql.indexOf(
+      'ALTER TABLE "batch_session_attendance" ADD COLUMN "is_present" boolean;',
+    );
+    const mapMarksAt = sql.indexOf(
+      `UPDATE "batch_session_attendance" SET "is_present" = CASE "mark" WHEN 'present' THEN true WHEN 'absent' THEN false END;`,
+    );
+    const setNotNullAt = sql.indexOf(
+      'ALTER TABLE "batch_session_attendance" ALTER COLUMN "is_present" SET NOT NULL;',
+    );
+    const dropMarkAt = sql.indexOf(
+      'ALTER TABLE "batch_session_attendance" DROP COLUMN "mark";',
+    );
+    const dropTypeAt = sql.indexOf(
+      'DROP TYPE "public"."batch_session_attendance_mark";',
+    );
+
+    expect(addColumnAt).toBeGreaterThanOrEqual(0);
+    expect(mapMarksAt).toBeGreaterThan(addColumnAt);
+    expect(setNotNullAt).toBeGreaterThan(mapMarksAt);
+    expect(dropMarkAt).toBeGreaterThan(setNotNullAt);
+    expect(dropTypeAt).toBeGreaterThan(dropMarkAt);
+    expect(sql).not.toMatch(/"is_present"[^;]*DEFAULT/i);
+    expect(sql).not.toMatch(
+      /DROP CONSTRAINT "batch_session_attendance_batch_session_id_player_id_unique"/,
+    );
+  });
+});
+
 describe("players email for manual add and accept fill-if-empty", () => {
   const migrationPath = join(
     import.meta.dirname,
@@ -139,5 +177,20 @@ describe("players email for manual add and accept fill-if-empty", () => {
     expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
     expect(sql).not.toMatch(/ALTER TABLE "registrations"/);
     expect(sql).not.toMatch(/full_name_normalized|guardian_/i);
+  });
+});
+
+describe("enrollment lookup by academy and batch", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0010_enrollments_academy_batch_idx.sql",
+  );
+
+  it("indexes enrollments by academy and batch for Session eligibility", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+    expect(sql).toContain(
+      'CREATE INDEX "enrollments_academy_id_batch_id_idx" ON "enrollments" USING btree ("academy_id","batch_id");',
+    );
   });
 });

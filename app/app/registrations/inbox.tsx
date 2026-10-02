@@ -201,7 +201,7 @@ export function RegistrationInbox({ registrations, today }: InboxProps) {
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-neutral"
                     disabled={busy}
                     onClick={() => void accept(row)}
                   >
