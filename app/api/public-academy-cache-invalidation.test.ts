@@ -62,11 +62,7 @@ vi.mock("next/cache", () => ({
 }));
 
 vi.mock("@vercel/blob", () => ({
-  put: async (
-    pathname: string,
-    body: ArrayBuffer | Buffer | Blob,
-    _options: Record<string, unknown>,
-  ) => {
+  put: async (pathname: string, body: ArrayBuffer | Buffer | Blob) => {
     const bytes = new Uint8Array(
       body instanceof Blob
         ? await body.arrayBuffer()

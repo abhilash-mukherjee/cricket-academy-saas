@@ -6,7 +6,7 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { calendarDateInIst } from "@/lib/player-age";
-import { listPlayerDirectory, type TermStatus } from "@/lib/players";
+import { listPlayerDirectory } from "@/lib/players";
 import { DashboardBackLink } from "../dashboard-back-link";
 import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
@@ -41,16 +41,6 @@ function pageHref(q: string, page: number): string {
   }
   const query = params.toString();
   return query ? `/app/players?${query}` : "/app/players";
-}
-
-function statusLabel(status: TermStatus): string {
-  if (status === "active") {
-    return "Active";
-  }
-  if (status === "paused") {
-    return "Paused";
-  }
-  return "Lapsed";
 }
 
 export default async function PlayersPage({ searchParams }: PlayersPageProps) {

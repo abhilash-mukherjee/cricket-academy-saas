@@ -35,16 +35,6 @@ function emptyPauseDraft(today: string): PauseDraft {
   return { pausedOn: today, plannedLastPausedOn: "" };
 }
 
-function statusLabel(status: PlayerEnrollmentView["status"]): string {
-  if (status === "active") {
-    return "Active";
-  }
-  if (status === "paused") {
-    return "Paused";
-  }
-  return "Lapsed";
-}
-
 function pauseCopy(
   pausedOn: string | null,
   plannedLastPausedOn: string | null,

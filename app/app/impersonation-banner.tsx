@@ -25,7 +25,7 @@ export function ImpersonationBanner({
       }
       const body = (await response.json()) as { redirectTo: string };
       // Full navigation; avoids useRouter (breaks SSR tests).
-      window.location.assign(body.redirectTo); // eslint-disable-line @next/next/no-location-assign-relative-destination
+      window.location.assign(body.redirectTo);
     } catch {
       setPending(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import type { BrochureEditorState } from "@/lib/brochure";
 import { BrochureView } from "@/app/a/[academySlug]/brochure-view";
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
@@ -277,11 +278,15 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
           {images.map((image) => (
             <div key={image.storageKey} className="flex flex-col gap-2">
               {image.url ? (
-                <img
-                  src={image.url}
-                  alt=""
-                  className="h-32 w-full rounded-box object-cover"
-                />
+                <div className="relative h-32 w-full overflow-hidden rounded-box">
+                  <Image
+                    src={image.url}
+                    alt=""
+                    fill
+                    sizes="32rem"
+                    className="object-cover"
+                  />
+                </div>
               ) : null}
               <button
                 type="button"
@@ -381,11 +386,15 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
                 }}
               />
               {coach.imageUrl ? (
-                <img
-                  src={coach.imageUrl}
-                  alt=""
-                  className="h-24 w-24 rounded-box object-cover"
-                />
+                <div className="relative h-24 w-24 overflow-hidden rounded-box">
+                  <Image
+                    src={coach.imageUrl}
+                    alt=""
+                    fill
+                    sizes="6rem"
+                    className="object-cover"
+                  />
+                </div>
               ) : null}
               <div className="flex flex-wrap gap-2">
                 <label className="btn btn-neutral btn-sm">

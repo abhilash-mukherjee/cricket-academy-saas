@@ -42,7 +42,7 @@ export function AcademyAdminRow({
         return;
       }
       if (options?.navigateTo) {
-        window.location.assign(options.navigateTo); // eslint-disable-line @next/next/no-location-assign-relative-destination
+        window.location.assign(options.navigateTo);
         return;
       }
       setPending(null);

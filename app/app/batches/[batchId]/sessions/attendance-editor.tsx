@@ -164,6 +164,12 @@ export function AttendanceEditor({
   const [success, setSuccess] = useState<string | null>(null);
   const [successId, setSuccessId] = useState(0);
   const [pendingDate, setPendingDate] = useState<string | null>(null);
+  const routeKey = `${activeDate ?? ""}:${invalidDate ? "invalid" : "valid"}`;
+  const [seenRouteKey, setSeenRouteKey] = useState(routeKey);
+  if (seenRouteKey !== routeKey) {
+    setSeenRouteKey(routeKey);
+    setPendingDate(null);
+  }
   const dismissSuccess = useCallback(() => setSuccess(null), []);
 
   useEffect(() => {
@@ -180,10 +186,6 @@ export function AttendanceEditor({
     setSessionRows(sessionsRef.current);
     setSessionCount(sessionTotalRef.current);
   }, [sessionsKey]);
-
-  useEffect(() => {
-    setPendingDate(null);
-  }, [activeDate, invalidDate]);
 
   const dirty = checksDiffer(checks, baseline, players);
   const listLoading = pendingDate !== null;
