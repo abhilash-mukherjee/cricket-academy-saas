@@ -6,14 +6,22 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { calendarDateInIst } from "@/lib/player-age";
-import { listPlayerDirectory } from "@/lib/players";
+import {
+  directoryCut,
+  listPlayerDirectory,
+  type DirectoryCut,
+} from "@/lib/players";
 import { DashboardBackLink } from "../dashboard-back-link";
 import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
 import EnrollmentStatus from "../enrollment-status";
 
 type PlayersPageProps = {
-  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string | string[];
+    page?: string | string[];
+    status?: string | string[];
+  }>;
 };
 
 function firstParam(value: string | string[] | undefined): string {
@@ -31,10 +39,13 @@ function requestedPage(value: string): number {
   return page >= 1 ? page : 1;
 }
 
-function pageHref(q: string, page: number): string {
+function directoryHref(q: string, cut: DirectoryCut, page = 1): string {
   const params = new URLSearchParams();
   if (q.trim()) {
     params.set("q", q.trim());
+  }
+  if (cut !== "all") {
+    params.set("status", cut);
   }
   if (page > 1) {
     params.set("page", String(page));
@@ -43,9 +54,23 @@ function pageHref(q: string, page: number): string {
   return query ? `/app/players?${query}` : "/app/players";
 }
 
+function emptyDirectoryCopy(q: string, cut: DirectoryCut): string {
+  if (q.trim()) {
+    return "No Players match that search.";
+  }
+  if (cut === "paused") {
+    return "No paused Players.";
+  }
+  if (cut === "lapsed") {
+    return "No lapsed Players.";
+  }
+  return "No Players yet.";
+}
+
 export default async function PlayersPage({ searchParams }: PlayersPageProps) {
   const params = await searchParams;
   const q = firstParam(params.q);
+  const cut = directoryCut(firstParam(params.status));
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 
@@ -65,6 +90,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
       q,
       page: requestedPage(firstParam(params.page)),
       today,
+      cut,
     }),
     listBatches(academy.id),
     listFeeOptions(academy.id),
@@ -87,7 +113,28 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                 today={today}
               />
             ) : null}
+            <nav className="join" aria-label="Directory">
+              {(
+                [
+                  ["all", "All"],
+                  ["paused", "Paused"],
+                  ["lapsed", "Lapsed"],
+                ] as const
+              ).map(([choice, label]) => (
+                <Link
+                  key={choice}
+                  className={`btn join-item btn-sm${choice === cut ? " btn-active" : ""}`}
+                  href={directoryHref(q, choice)}
+                  aria-current={choice === cut ? "page" : undefined}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
             <form action="/app/players" method="get" className="flex gap-2">
+              {cut === "all" ? null : (
+                <input type="hidden" name="status" value={cut} />
+              )}
               <input
                 className="input input-bordered w-full"
                 name="q"
@@ -99,11 +146,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
               </button>
             </form>
             {directory.players.length === 0 ? (
-              <p>
-                {q.trim()
-                  ? "No Players match that search."
-                  : "No Players yet."}
-              </p>
+              <p>{emptyDirectoryCopy(q, cut)}</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {directory.players.map((player) => (
@@ -132,7 +175,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
             <PlayerPager
               page={directory.page}
               total={directory.total}
-              hrefFor={(page) => pageHref(q, page)}
+              hrefFor={(page) => directoryHref(q, cut, page)}
             />
           </div>
         </section>
