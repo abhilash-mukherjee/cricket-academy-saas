@@ -43,7 +43,11 @@ describe("product homepage", () => {
       expect(afterCtaText).toContain(card.body);
     }
 
-    expect(afterCta).not.toMatch(/<a\b/);
+    const articles = afterCta.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
+    expect(articles).toHaveLength(FEATURE_CARDS.length);
+    for (const article of articles) {
+      expect(article).not.toMatch(/<a\b/);
+    }
     expect(afterCtaText).toContain(
       "Everything Your Academy Needs, In One Place",
     );
