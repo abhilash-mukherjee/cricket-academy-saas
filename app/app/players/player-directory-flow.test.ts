@@ -26,6 +26,7 @@ import { formatCalendarDate } from "@/lib/format-date";
 import { calendarDateInIst } from "@/lib/player-age";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
+import EnrollmentStatus from "../enrollment-status";
 
 const sessionCookie = vi.hoisted(() => ({ value: "" }));
 
@@ -363,11 +364,12 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       const morningAt = html.indexOf("Morning nets");
       const eveningAt = html.indexOf("U-14 evening");
+      const pausedMarkup = renderToStaticMarkup(EnrollmentStatus({status: "paused"}));
+      const activeMarkup = renderToStaticMarkup(EnrollmentStatus({status: "active"}));
       expect(morningAt).toBeGreaterThan(-1);
       expect(eveningAt).toBeGreaterThan(morningAt);
-      expect(html).toContain("Morning nets Paused");
-      expect(html).toContain("U-14 evening Active");
-      expect(html).not.toContain("Lapsed");
+      expect(html).toMatch(new RegExp(`Morning nets[\\s\\S]*?${pausedMarkup}`));
+      expect(html).toMatch(new RegExp(`U-14 evening[\\s\\S]*?${activeMarkup}`));
       expect(older.id).toBeTruthy();
       expect(lapsed.id).toBeTruthy();
     });
