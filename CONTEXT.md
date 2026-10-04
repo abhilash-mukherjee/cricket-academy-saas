@@ -41,7 +41,7 @@ A person on an Academy roster after the Owner accepts a Registration or adds the
 _Avoid_: Student, kid, member, registration
 
 **Player directory**:
-The Academy-wide list of every Player, including a Player whose Enrollments are all lapsed.
+The Academy-wide list of every Player, including a Player whose Enrollments are all lapsed. The Owner may narrow it to Players with a paused Enrollment, or to Players with no Active Enrollment and no paused Enrollment.
 _Avoid_: roster (that word is the Batch roster: Active and paused Players on one Batch), student list
 
 **Batch**:
