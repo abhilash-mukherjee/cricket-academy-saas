@@ -1,0 +1,7 @@
+# API server logs, not a second audit table
+
+Diagnosing a failed manual add or Registration means seeing the request, the branch the command took, and the response in the host logs. Those lines go to stdout as JSON, for `app/api` only. They are not inserted into Postgres. `impersonation_audit_events` stays the record of meaningful writes while a Super-admin is impersonating an Owner (ADR-0018); this does not extend that table or replace it.
+
+Each API invocation generates its own request id, keeps it in `AsyncLocalStorage` so the command can log after commit without a new parameter, and echoes it on the response as `x-request-id`. Lines are written before the response is returned. Bodies are capped and credentials are omitted; domain fields such as Phone are included, because the mutation line has to show what was written. The same redaction applies in local dev. A logging failure does not change the HTTP response. The mail fallback that runs when Resend is unset must not print message HTML, because that HTML contains the magic link.
+
+**Considered options:** A durable audit table for every mutation (rejected — these logs are for the host log stream, and impersonated writes already have a table). Logging every page and asset response (rejected — those bodies are large and are not the JSON commands). Deferring lines until after the response via `after()` (rejected — a freeze after commit could drop the mutation line).
