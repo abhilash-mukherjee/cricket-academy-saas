@@ -13,6 +13,10 @@ import {
   calendarDateInIst,
   isValidCalendarDate,
 } from "@/lib/player-age";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 type OwnerTx = Parameters<
   Parameters<ReturnType<typeof getTransactionalDb>["transaction"]>[0]
@@ -283,20 +287,32 @@ export async function pauseEnrollment(
     (parsed.data.plannedLastPausedOn !== null &&
       !isValidCalendarDate(parsed.data.plannedLastPausedOn))
   ) {
+    logWarning(
+      `Enrollment was not paused with ID: ${enrollmentId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
   const { pausedOn, plannedLastPausedOn } = parsed.data;
   if (pausedOn > today) {
+    logWarning(
+      `Enrollment was not paused with ID: ${enrollmentId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
   if (plannedLastPausedOn !== null && plannedLastPausedOn < pausedOn) {
+    logWarning(
+      `Enrollment was not paused with ID: ${enrollmentId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
   const db = getTransactionalDb();
   try {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [enrollment] = await tx
         .select({
           id: enrollments.id,
@@ -431,8 +447,18 @@ export async function pauseEnrollment(
         plannedLastPausedOn,
       };
     });
+    logInfo(
+      result.outcome === "settled"
+        ? `Enrollment settled with ID: ${enrollmentId}.`
+        : `Enrollment paused with ID: ${enrollmentId}.`,
+    );
+    return result;
   } catch (error) {
     if (error instanceof PauseFailure) {
+      logWarning(
+        `Enrollment was not paused with ID: ${enrollmentId}.`,
+        error.code,
+      );
       return { ok: false, error: error.code };
     }
     throw error;
@@ -446,7 +472,7 @@ export async function resumeEnrollment(
 ): Promise<ResumeResult> {
   const db = getTransactionalDb();
   try {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [enrollment] = await tx
         .select({
           id: enrollments.id,
@@ -525,8 +551,16 @@ export async function resumeEnrollment(
 
       return { ok: true as const, daysAdded, validUntil };
     });
+    logInfo(
+      `Enrollment resumed successfully with ID: ${enrollmentId}.`,
+    );
+    return result;
   } catch (error) {
     if (error instanceof ResumeFailure) {
+      logWarning(
+        `Enrollment was not resumed with ID: ${enrollmentId}.`,
+        error.code,
+      );
       return { ok: false, error: error.code };
     }
     throw error;

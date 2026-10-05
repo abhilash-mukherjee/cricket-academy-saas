@@ -20,6 +20,11 @@ import {
   PLAYER_NAME_COPY,
 } from "@/lib/registration-input";
 import { normalizeRequiredPhone, PHONE_INVALID_COPY } from "@/lib/phone";
+import {
+  logWarning,
+  logInfo,
+  type TraceAttributes,
+} from "@/lib/request-trace";
 
 export type ManualAddError =
   | "invalid-input"
@@ -210,6 +215,27 @@ function parseBody(
   };
 }
 
+function playerFields(
+  parsed: NonNullable<ReturnType<typeof parseBody>>,
+): TraceAttributes | undefined {
+  if (parsed.mode !== "create") {
+    return undefined;
+  }
+  return {
+    name: parsed.value.playerFullName,
+    phone: parsed.value.contactPhone,
+    email: parsed.value.contactEmail,
+    dateOfBirth: parsed.value.playerDateOfBirth,
+  };
+}
+
+function playerNotAdded(parsed: ReturnType<typeof parseBody>): string {
+  if (parsed?.mode === "existing") {
+    return `Player was not added with ID: ${parsed.value.playerId}.`;
+  }
+  return "Player was not added.";
+}
+
 export async function manualAddPlayer(
   academyId: string,
   input: unknown,
@@ -217,9 +243,11 @@ export async function manualAddPlayer(
 ): Promise<ManualAddResult> {
   const parsed = parseBody(input);
   if (!parsed) {
+    logWarning("Player was not added.", "invalid-input");
     return { ok: false, error: "invalid-input" };
   }
   if (parsed.value.validFrom > today) {
+    logWarning(playerNotAdded(parsed), "invalid-input", playerFields(parsed));
     return { ok: false, error: "invalid-input" };
   }
 
@@ -365,9 +393,11 @@ export async function manualAddPlayer(
       return resolvedPlayerId;
     });
 
+    logInfo(`Player added successfully with ID: ${playerId}.`, playerFields(parsed));
     return { ok: true, playerId };
   } catch (error) {
     if (error instanceof ManualAddFailure) {
+      logWarning(playerNotAdded(parsed), error.code, playerFields(parsed));
       return { ok: false, error: error.code };
     }
     throw error;

@@ -7,6 +7,10 @@ import {
   isLegacyHttpStorageKey,
   resolvePublicAssetUrl,
 } from "@/lib/academy-assets";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type ConversionEditorState = {
   upiQrStorageKey: string | null;
@@ -61,23 +65,33 @@ export async function updateConversion(
   academyId: string,
   input: ConversionEditInput,
 ): Promise<ConversionEditResult> {
+  const conversionNotUpdated = (
+    error: ConversionEditError,
+  ): ConversionEditResult => {
+    logWarning(
+      `Conversion page was not updated with ID: ${academyId}.`,
+      error,
+    );
+    return { ok: false, error };
+  };
+
   const hasQr = "upiQrStorageKey" in input;
   const hasOnlineRegistrationAllowed = "isOnlineRegistrationAllowed" in input;
 
   if (!hasQr && !hasOnlineRegistrationAllowed) {
-    return { ok: false, error: "invalid-input" };
+    return conversionNotUpdated("invalid-input");
   }
 
   if (
     hasOnlineRegistrationAllowed &&
     typeof input.isOnlineRegistrationAllowed !== "boolean"
   ) {
-    return { ok: false, error: "invalid-input" };
+    return conversionNotUpdated("invalid-input");
   }
 
   const nextKey = hasQr ? (input.upiQrStorageKey ?? null) : undefined;
   if (nextKey && !isAcademyScopedStorageKey(nextKey, academyId)) {
-    return { ok: false, error: "invalid-storage-key" };
+    return conversionNotUpdated("invalid-storage-key");
   }
 
   const db = getDb();
@@ -88,7 +102,7 @@ export async function updateConversion(
     .limit(1);
 
   if (!current) {
-    return { ok: false, error: "not-found" };
+    return conversionNotUpdated("not-found");
   }
 
   const updated = await db
@@ -103,7 +117,7 @@ export async function updateConversion(
     .returning({ id: academies.id });
 
   if (updated.length === 0) {
-    return { ok: false, error: "not-found" };
+    return conversionNotUpdated("not-found");
   }
 
   if (
@@ -114,5 +128,8 @@ export async function updateConversion(
     await deleteAcademyAsset(current.upiQrStorageKey);
   }
 
+  logInfo(
+    `Conversion page updated successfully with ID: ${academyId}.`,
+  );
   return { ok: true };
 }

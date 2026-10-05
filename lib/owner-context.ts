@@ -6,6 +6,7 @@ import {
   logImpersonationAction,
   type ImpersonationState,
 } from "@/lib/impersonation";
+import { logActor, logException } from "@/lib/request-trace";
 import type { academies } from "@/db/domain-schema";
 
 type Academy = typeof academies.$inferSelect;
@@ -26,6 +27,7 @@ export type OwnerContext =
  */
 export async function resolveOwnerContext(
   requestHeaders?: Headers,
+  options?: { recordActor?: boolean },
 ): Promise<OwnerContext> {
   const session = await auth.api.getSession({
     headers: requestHeaders ?? (await headers()),
@@ -33,6 +35,10 @@ export async function resolveOwnerContext(
 
   if (!session) {
     return { ok: false, error: "unauthorized" };
+  }
+
+  if (options?.recordActor !== false) {
+    logActor(session.user.id);
   }
 
   const impersonation = await getImpersonationState(session);
@@ -77,11 +83,15 @@ export async function recordOwnerWriteIfImpersonating(
     return;
   }
 
-  await logImpersonationAction({
-    actorUserId: context.actorUserId,
-    subjectUserId: context.subjectUserId,
-    academyId: context.academy.id,
-    action,
-    metadata,
-  });
+  try {
+    await logImpersonationAction({
+      actorUserId: context.actorUserId,
+      subjectUserId: context.subjectUserId,
+      academyId: context.academy.id,
+      action,
+      metadata,
+    });
+  } catch (error) {
+    logException(error);
+  }
 }

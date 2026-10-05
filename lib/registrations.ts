@@ -14,6 +14,10 @@ import { calendarDateInIst, isValidCalendarDate } from "@/lib/player-age";
 import { findOrCreatePlayer } from "@/lib/players";
 import { postgresConstraint } from "@/lib/postgres-constraint";
 import { parseRegistrationInput } from "@/lib/registration-input";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type RegistrationSnapshot = {
   batchName: string;
@@ -277,9 +281,17 @@ export async function acceptRegistration(
 ): Promise<{ ok: true } | { ok: false; error: RegistrationCommandError }> {
   const parsed = acceptBodySchema.safeParse(input);
   if (!parsed.success || !isValidCalendarDate(parsed.data.validFrom)) {
+    logWarning(
+      `Registration was not accepted with ID: ${registrationId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
   if (parsed.data.validFrom > today) {
+    logWarning(
+      `Registration was not accepted with ID: ${registrationId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
@@ -399,11 +411,18 @@ export async function acceptRegistration(
     });
   } catch (error) {
     if (error instanceof RegistrationCommandFailure) {
+      logWarning(
+        `Registration was not accepted with ID: ${registrationId}.`,
+        error.code,
+      );
       return { ok: false, error: error.code };
     }
     throw error;
   }
 
+  logInfo(
+    `Registration accepted successfully with ID: ${registrationId}.`,
+  );
   return { ok: true };
 }
 
@@ -430,6 +449,9 @@ export async function rejectRegistration(
     .returning({ id: registrations.id });
 
   if (rejected.length > 0) {
+    logInfo(
+      `Registration rejected successfully with ID: ${registrationId}.`,
+    );
     return { ok: true };
   }
 
@@ -444,6 +466,11 @@ export async function rejectRegistration(
     )
     .limit(1);
 
-  return { ok: false, error: row ? "not-pending" : "not-found" };
+  const error = row ? "not-pending" : "not-found";
+  logWarning(
+    `Registration was not rejected with ID: ${registrationId}.`,
+    error,
+  );
+  return { ok: false, error };
 }
 
