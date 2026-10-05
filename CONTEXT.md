@@ -61,8 +61,12 @@ The logged-in user who runs an Academy: brochure, conversion page, Registration 
 _Avoid_: Admin, manager
 
 **Super-admin**:
-A platform operator with cross-Academy access at `/app/admin/…`. Provisioned out of band (seeded email, magic-link sign-in) — not self-registration. Does not belong to any Academy as Owner or Coach. Can list Academies, open public links, create an Academy and assign an Owner email to claim, deactivate and reactivate an Academy, and impersonate an Owner with full access (persistent banner, exit control, actions logged).
+A platform operator with cross-Academy access at `/app/admin/…`. Provisioned out of band (seeded email, magic-link sign-in) — not self-registration. Does not belong to any Academy as Owner or Coach. Can list Academies, open public links, create an Academy and assign an Owner email to claim, deactivate and reactivate an Academy, and impersonate an Owner with full access (persistent banner, exit control, impersonation audit).
 _Avoid_: Admin (in Owner-facing language), root user
+
+**Impersonation audit**:
+A record that a Super-admin, while impersonating an Owner, successfully changed something in that Academy. A failed attempt is not an impersonation audit.
+_Avoid_: log, request trace
 
 **Coach**:
 A logged-in user who will mark Session attendance for an Academy when Coach login ships. Until then, the Owner marks Player attendance (including while a Super-admin is impersonating that Owner). The same user can also be the Owner. An Owner may add display-only Coach profiles on the brochure (name, image, optional blurb); these may or may not match a logged-in Coach. Parents and Guardians do not have accounts in this phase.
