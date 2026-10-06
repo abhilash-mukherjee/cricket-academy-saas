@@ -18,10 +18,12 @@ export function inboxErrorCopy(error: string): string {
       return "This term overlaps an Enrollment on this Batch. Reject this Registration.";
     case "paused":
       return "An Enrollment on this Batch is paused. Reject this Registration.";
+    case "starts-later":
+      return "This Player already starts later on this Batch. Reject this Registration.";
     case "term-not-covering-today":
       return "That term would not cover today.";
     case "invalid-input":
-      return "Choose today or an earlier date.";
+      return "Choose a valid date.";
     case "not-found":
       return "That Registration was not found.";
     default:
@@ -175,11 +177,10 @@ export function RegistrationInbox({ registrations, today }: InboxProps) {
                   </p>
                 ) : null}
                 <label className="mt-3 flex flex-col gap-1 text-sm">
-                  Valid from
+                  Starts
                   <input
                     type="date"
                     className="input input-bordered"
-                    max={today}
                     value={validFrom}
                     onChange={(event) =>
                       setValidFromById((current) => ({

@@ -28,6 +28,7 @@ export type DirectoryLine = {
   batchName: string;
   status: TermStatus;
   validFrom: string;
+  startsLater: boolean;
 };
 
 export type DirectoryPlayer = {
@@ -50,6 +51,9 @@ export type RosterPlayer = {
   status: "active" | "paused";
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
+  startsLater: boolean;
+  validFrom: string;
+  effectiveValidUntil: string;
 };
 
 export type BatchRoster = {
@@ -68,9 +72,11 @@ export type PlayerEnrollmentView = {
   termDays: number;
   feePaisePaid: number;
   validFrom: string;
+  validUntil: string;
   effectiveValidUntil: string;
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
+  startsLater: boolean;
   continuesPreviousTerm: boolean;
   /** All pause intervals on this Enrollment (for overlap preview; not a history UI). */
   pauseIntervals: {
@@ -266,6 +272,7 @@ type DirectoryEnrollmentRow = {
   validUntil: string;
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
+  isDeferred: boolean | null;
 };
 
 function directoryLineInputs(
@@ -279,6 +286,7 @@ function directoryLineInputs(
         ? {
             pausedOn: row.pausedOn,
             plannedLastPausedOn: row.plannedLastPausedOn,
+            isDeferred: row.isDeferred === true,
           }
         : null,
       today,
@@ -288,20 +296,21 @@ function directoryLineInputs(
       batchName: row.batchName,
       validFrom: row.validFrom,
       status: term.status,
+      startsLater: term.startsLater,
     };
   });
 }
 
 function inDirectoryCut(
-  statuses: TermStatus[],
+  lines: { status: TermStatus; startsLater: boolean }[],
   cut: Exclude<DirectoryCut, "all">,
 ): boolean {
   if (cut === "paused") {
-    return statuses.some((status) => status === "paused");
+    return lines.some((line) => line.status === "paused" && !line.startsLater);
   }
   return (
-    !statuses.some((status) => status === "paused") &&
-    !statuses.some((status) => status === "active")
+    !lines.some((line) => line.status === "paused") &&
+    !lines.some((line) => line.status === "active")
   );
 }
 
@@ -342,6 +351,7 @@ async function directoryEnrollmentRows(
       validUntil: enrollments.validUntil,
       pausedOn: enrollmentPauses.pausedOn,
       plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+      isDeferred: enrollmentPauses.isDeferred,
     })
     .from(enrollments)
     .innerJoin(
@@ -378,6 +388,7 @@ function directoryLines(rows: DirectoryLine[]): DirectoryLine[] {
     batchName: row.batchName,
     status: row.status,
     validFrom: row.validFrom,
+    startsLater: row.startsLater,
   }));
 }
 
@@ -412,10 +423,7 @@ export async function listPlayerDirectory(
     );
     linesByPlayer = classified;
     chosen = matched.filter((player) =>
-      inDirectoryCut(
-        (classified.get(player.id) ?? []).map((line) => line.status),
-        cut,
-      ),
+      inDirectoryCut(classified.get(player.id) ?? [], cut),
     );
   }
 
@@ -475,6 +483,7 @@ export async function listBatchRoster(
       validUntil: enrollments.validUntil,
       pausedOn: enrollmentPauses.pausedOn,
       plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+      isDeferred: enrollmentPauses.isDeferred,
     })
     .from(enrollments)
     .innerJoin(
@@ -505,6 +514,7 @@ export async function listBatchRoster(
         ? {
             pausedOn: row.pausedOn,
             plannedLastPausedOn: row.plannedLastPausedOn,
+            isDeferred: row.isDeferred === true,
           }
         : null,
       input.today,
@@ -519,6 +529,9 @@ export async function listBatchRoster(
       status: term.status,
       pausedOn: term.pausedOn,
       plannedLastPausedOn: term.plannedLastPausedOn,
+      startsLater: term.startsLater,
+      validFrom: row.validFrom,
+      effectiveValidUntil: term.effectiveValidUntil,
     });
   }
 
@@ -576,6 +589,7 @@ export async function getPlayer(
       renewedFromEnrollmentId: enrollments.renewedFromEnrollmentId,
       pausedOn: enrollmentPauses.pausedOn,
       plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+      isDeferred: enrollmentPauses.isDeferred,
     })
     .from(enrollments)
     .innerJoin(
@@ -644,6 +658,7 @@ export async function getPlayer(
           ? {
               pausedOn: row.pausedOn,
               plannedLastPausedOn: row.plannedLastPausedOn,
+              isDeferred: row.isDeferred === true,
             }
           : null,
         today,
@@ -657,9 +672,11 @@ export async function getPlayer(
         termDays: row.termDays,
         feePaisePaid: row.feePaisePaid,
         validFrom: row.validFrom,
+        validUntil: row.validUntil,
         effectiveValidUntil: term.effectiveValidUntil,
         pausedOn: term.pausedOn,
         plannedLastPausedOn: term.plannedLastPausedOn,
+        startsLater: term.startsLater,
         continuesPreviousTerm: row.renewedFromEnrollmentId !== null,
         pauseIntervals: pausesByEnrollment.get(row.id) ?? [],
       };

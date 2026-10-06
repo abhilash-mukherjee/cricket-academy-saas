@@ -164,7 +164,10 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                       {player.lines.map((line) => (
                         <p key={`${line.batchId}-${line.validFrom}`}>
                           {line.batchName}
-                          <EnrollmentStatus status={line.status}/>
+                          <EnrollmentStatus
+                            status={line.status}
+                            startsLater={line.startsLater}
+                          />
                         </p>
                       ))}
                     </div>

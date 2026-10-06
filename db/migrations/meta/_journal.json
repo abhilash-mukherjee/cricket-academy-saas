@@ -78,6 +78,13 @@
       "when": 1790839674369,
       "tag": "0010_enrollments_academy_batch_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791270863325,
+      "tag": "0011_enrollment_pause_is_deferred",
+      "breakpoints": true
     }
   ]
 }

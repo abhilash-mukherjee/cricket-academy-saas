@@ -4,6 +4,7 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { formatCalendarDate } from "@/lib/format-date";
+import { addCalendarDays } from "@/lib/enrollment-term";
 import { calendarDateInIst } from "@/lib/player-age";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
@@ -122,8 +123,25 @@ export default async function BatchRosterPage({
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}
                       </a>
-                      <EnrollmentStatus status={player.status}/>
-                      {player.status === "paused" ? (
+                      <EnrollmentStatus
+                        status={player.status}
+                        startsLater={player.startsLater}
+                      />
+                      {player.startsLater && player.plannedLastPausedOn ? (
+                        <>
+                          <p>
+                            First day{" "}
+                            {formatCalendarDate(
+                              addCalendarDays(player.plannedLastPausedOn, 1),
+                            )}
+                          </p>
+                          <p>Valid from {formatCalendarDate(player.validFrom)}</p>
+                          <p>
+                            Valid until{" "}
+                            {formatCalendarDate(player.effectiveValidUntil)}
+                          </p>
+                        </>
+                      ) : player.status === "paused" ? (
                         <p>
                           {pauseCopy(
                             player.pausedOn,

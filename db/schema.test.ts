@@ -194,3 +194,18 @@ describe("enrollment lookup by academy and batch", () => {
     );
   });
 });
+
+describe("deferred start mark on a pause", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0011_enrollment_pause_is_deferred.sql",
+  );
+
+  it("adds is_deferred without rewriting existing pauses", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+    expect(sql).toContain(
+      'ALTER TABLE "enrollment_pauses" ADD COLUMN "is_deferred" boolean DEFAULT false NOT NULL;',
+    );
+  });
+});

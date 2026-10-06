@@ -27,8 +27,9 @@ import {
 } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+import { manualAddErrorCopy } from "@/app/app/players/manual-add-form";
 import { calendarDateInIst } from "@/lib/player-age";
-import { lastCoveredDay } from "@/lib/enrollment-term";
+import { addCalendarDays, lastCoveredDay } from "@/lib/enrollment-term";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 
@@ -600,6 +601,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
       expect(paused.status).toBe(409);
       await expect(paused.json()).resolves.toEqual({ error: "paused" });
+      expect(manualAddErrorCopy("paused")).toBe(
+        "An Enrollment for this Player on this Batch is paused.",
+      );
 
       expect(
         await db
@@ -617,6 +621,117 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
       expect(other.status).toBe(200);
     }, 30_000);
+
+    it("records a later start as a deferred pause and leaves today as valid-from", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id, { termDays: 30 });
+      const today = calendarDateInIst();
+      const startsOn = addCalendarDays(today, 10);
+
+      const response = await addPlayer(cookie, {
+        ...adult,
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: startsOn,
+      });
+      expect(response.status).toBe(200);
+
+      const db = getDb();
+      const [enrollment] = await db
+        .select()
+        .from(enrollments)
+        .where(eq(enrollments.academyId, academy.id));
+      expect(enrollment).toMatchObject({
+        validFrom: today,
+        validUntil: lastCoveredDay(today, 30),
+      });
+      const [pause] = await db
+        .select()
+        .from(enrollmentPauses)
+        .where(eq(enrollmentPauses.academyId, academy.id));
+      expect(pause).toMatchObject({
+        enrollmentId: enrollment.id,
+        pausedOn: today,
+        plannedLastPausedOn: addCalendarDays(startsOn, -1),
+        resumedOn: null,
+        isDeferred: true,
+      });
+
+      const far = await addPlayer(cookie, {
+        playerFullName: "Far Rao",
+        playerDateOfBirth: "1990-06-15",
+        playerPhone: "9876543211",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: addCalendarDays(today, 400),
+      });
+      expect(far.status).toBe(200);
+    }, 20_000);
+
+    it("still decides under-18 as of today when the start is after the 18th birthday", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id);
+      const today = calendarDateInIst();
+      const eighteenth = addCalendarDays(today, 5);
+      const [year, month, day] = eighteenth.split("-");
+      const dateOfBirth = `${Number(year) - 18}-${month}-${day}`;
+
+      const response = await addPlayer(cookie, {
+        playerFullName: "Almost Adult",
+        playerDateOfBirth: dateOfBirth,
+        guardianFullName: "Asha Rao",
+        guardianPhone: "9876543210",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: addCalendarDays(today, 30),
+      });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { playerId: string };
+      const db = getDb();
+      const [player] = await db
+        .select()
+        .from(players)
+        .where(eq(players.id, body.playerId));
+      expect(player).toMatchObject({
+        guardianFullName: "Asha Rao",
+        guardianPhone: "+919876543210",
+      });
+    }, 20_000);
+
+    it("says the Player already starts later when a deferred start blocks another Enrollment", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id);
+      const today = calendarDateInIst();
+
+      const first = await addPlayer(cookie, {
+        ...adult,
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: addCalendarDays(today, 14),
+      });
+      expect(first.status).toBe(200);
+
+      const blocked = await addPlayer(cookie, {
+        ...adult,
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: today,
+      });
+      expect(blocked.status).toBe(409);
+      await expect(blocked.json()).resolves.toEqual({ error: "starts-later" });
+      expect(manualAddErrorCopy("starts-later")).toBe(
+        "This Player already starts later on this Batch.",
+      );
+    }, 20_000);
 
     it("isolates the write path across Academies", async () => {
       const cookie = await signInOwner(ownerEmail);

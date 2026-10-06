@@ -176,16 +176,17 @@ function draftCoversSavedSession(
   );
 }
 
-function resumeConfirmCopy(
+export function resumeConfirmCopy(
   pausedOn: string,
   today: string,
-  validUntil: string,
+  storedValidUntil: string,
+  shownValidUntil: string,
 ): string {
   const daysAdded = calendarDaysBetween(pausedOn, today);
-  if (daysAdded === 0) {
-    return "Adds 0 days; valid-until unchanged";
+  const nextUntil = addCalendarDays(storedValidUntil, daysAdded);
+  if (nextUntil === shownValidUntil) {
+    return `Adds ${daysAdded} days; valid-until unchanged`;
   }
-  const nextUntil = addCalendarDays(validUntil, daysAdded);
   return `Adds ${daysAdded} days → valid-until ${formatCalendarDate(nextUntil)}`;
 }
 
@@ -375,7 +376,10 @@ export function PlayerEnrollmentList({
                 >
                   {enrollment.batchName}
                 </Link>
-                <EnrollmentStatus status={enrollment.status}/>
+                <EnrollmentStatus
+                  status={enrollment.status}
+                  startsLater={enrollment.startsLater}
+                />
                 <p>
                   {packageFactsCopy({
                     daysPerWeek: enrollment.daysPerWeek,
@@ -388,7 +392,14 @@ export function PlayerEnrollmentList({
                   Valid until{" "}
                   {formatCalendarDate(enrollment.effectiveValidUntil)}
                 </p>
-                {enrollment.status === "paused" ? (
+                {enrollment.startsLater && enrollment.plannedLastPausedOn ? (
+                  <p>
+                    First day{" "}
+                    {formatCalendarDate(
+                      addCalendarDays(enrollment.plannedLastPausedOn, 1),
+                    )}
+                  </p>
+                ) : enrollment.status === "paused" ? (
                   <p>
                     {pauseCopy(
                       enrollment.pausedOn,
@@ -505,6 +516,7 @@ export function PlayerEnrollmentList({
                           {resumeConfirmCopy(
                             enrollment.pausedOn,
                             today,
+                            enrollment.validUntil,
                             enrollment.effectiveValidUntil,
                           )}
                         </p>

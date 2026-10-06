@@ -75,6 +75,8 @@ export function manualAddErrorCopy(error: string): string {
       return "This term overlaps an Enrollment for this Player on this Batch.";
     case "paused":
       return "An Enrollment for this Player on this Batch is paused.";
+    case "starts-later":
+      return "This Player already starts later on this Batch.";
     case "term-not-covering-today":
       return "That term would not cover today.";
     case "invalid-input":
@@ -503,11 +505,10 @@ export function ManualAddForm(props: ManualAddFormProps) {
             </label>
 
             <label className="flex flex-col gap-1 text-sm">
-              Valid from
+              Starts
               <input
                 type="date"
                 className="input input-bordered"
-                max={today}
                 value={draft.validFrom}
                 onChange={(event) =>
                   setDraft((current) => ({
