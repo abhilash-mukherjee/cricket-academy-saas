@@ -4,6 +4,10 @@ import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
 import { isAcademySlug } from "@/lib/academy-slug";
 import { normalizeOptionalPhone } from "@/lib/phone";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type OwnerOnboardingInput = {
   displayName: string;
@@ -51,20 +55,34 @@ export async function completeOwnerOnboarding(
   const batchName = input.batchName.trim();
 
   if (!displayName || !academyName || !slug || !batchName) {
+    logWarning("Academy was not created.", "invalid-input", {
+      name: academyName || undefined,
+    });
     return { ok: false, error: "invalid-input" };
   }
 
   if (!isAcademySlug(slug)) {
+    logWarning("Academy was not created.", "invalid-slug", {
+      name: academyName,
+    });
     return { ok: false, error: "invalid-slug" };
   }
 
   const phoneResult = normalizeOptionalPhone(input.phone);
   if (!phoneResult.ok) {
+    logWarning("Academy was not created.", "invalid-phone", {
+      name: academyName,
+      phone: input.phone,
+    });
     return { ok: false, error: "invalid-phone" };
   }
 
   const existing = await getOwnedAcademy(ownerUserId);
   if (existing) {
+    logWarning("Academy was not created.", "already-owns-academy", {
+      name: academyName,
+      phone: phoneResult.phone,
+    });
     return { ok: false, error: "already-owns-academy" };
   }
 
@@ -93,13 +111,25 @@ export async function completeOwnerOnboarding(
       }),
     ]);
 
+    logInfo(`Academy created successfully with ID: ${academyId}.`, {
+      name: academyName,
+      phone: phoneResult.phone,
+    });
     return { ok: true, slug };
   } catch (error) {
     const constraint = postgresConstraint(error);
     if (constraint === "academies_slug_unique") {
+      logWarning("Academy was not created.", "slug-taken", {
+        name: academyName,
+        phone: phoneResult.phone,
+      });
       return { ok: false, error: "slug-taken" };
     }
     if (constraint === "academies_owner_user_id_unique") {
+      logWarning("Academy was not created.", "already-owns-academy", {
+        name: academyName,
+        phone: phoneResult.phone,
+      });
       return { ok: false, error: "already-owns-academy" };
     }
     throw error;

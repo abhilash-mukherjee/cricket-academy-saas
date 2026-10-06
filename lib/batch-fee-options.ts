@@ -1,6 +1,10 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { batchFeeOptions, batches, registrations } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type FeeOptionRecord = {
   id: string;
@@ -83,6 +87,7 @@ export async function createFeeOption(
     termDays < 1 ||
     feePaise === null
   ) {
+    logWarning("Fee option was not created.", "invalid-input");
     return { ok: false, error: "invalid-input" };
   }
 
@@ -94,6 +99,7 @@ export async function createFeeOption(
     .limit(1);
 
   if (!batch) {
+    logWarning("Fee option was not created.", "not-found");
     return { ok: false, error: "not-found" };
   }
 
@@ -124,12 +130,16 @@ export async function createFeeOption(
       })
       .returning({ id: batchFeeOptions.id });
 
+    logInfo(
+      `Fee option created successfully with ID: ${created.id}.`,
+    );
     return { ok: true, id: created.id };
   } catch (error) {
     if (
       postgresConstraint(error) ===
       "batch_fee_options_batch_id_days_per_week_term_days_unique"
     ) {
+      logWarning("Fee option was not created.", "identity-taken");
       return { ok: false, error: "identity-taken" };
     }
     throw error;
@@ -152,6 +162,10 @@ export async function updateFeeOption(
   if (input.feeInr !== undefined) {
     const feePaise = inrToPaise(input.feeInr);
     if (feePaise === null) {
+      logWarning(
+        `Fee option was not updated with ID: ${feeOptionId}.`,
+        "invalid-input",
+      );
       return { ok: false, error: "invalid-input" };
     }
     patch.feePaise = feePaise;
@@ -163,6 +177,10 @@ export async function updateFeeOption(
 
   if (input.sortOrder !== undefined) {
     if (!Number.isInteger(input.sortOrder)) {
+      logWarning(
+        `Fee option was not updated with ID: ${feeOptionId}.`,
+        "invalid-input",
+      );
       return { ok: false, error: "invalid-input" };
     }
     patch.sortOrder = input.sortOrder;
@@ -170,6 +188,10 @@ export async function updateFeeOption(
 
   if (input.isOffered !== undefined) {
     if (typeof input.isOffered !== "boolean") {
+      logWarning(
+        `Fee option was not updated with ID: ${feeOptionId}.`,
+        "invalid-input",
+      );
       return { ok: false, error: "invalid-input" };
     }
     patch.isOffered = input.isOffered;
@@ -188,13 +210,27 @@ export async function updateFeeOption(
       .from(batchFeeOptions)
       .where(where)
       .limit(1);
-    return existing ? { ok: true } : { ok: false, error: "not-found" };
+    if (existing) {
+      logInfo(
+        `Fee option updated successfully with ID: ${feeOptionId}.`,
+      );
+      return { ok: true };
+    }
+    logWarning(
+      `Fee option was not updated with ID: ${feeOptionId}.`,
+      "not-found",
+    );
+    return { ok: false, error: "not-found" };
   }
 
   if (patch.isOffered === false) {
     if (
       await wouldRemoveLastOfferedOnOpenBatch(academyId, batchId, feeOptionId)
     ) {
+      logWarning(
+        `Fee option was not updated with ID: ${feeOptionId}.`,
+        "close-first",
+      );
       return { ok: false, error: "close-first" };
     }
   }
@@ -206,9 +242,14 @@ export async function updateFeeOption(
     .returning({ id: batchFeeOptions.id });
 
   if (updated.length === 0) {
+    logWarning(
+      `Fee option was not updated with ID: ${feeOptionId}.`,
+      "not-found",
+    );
     return { ok: false, error: "not-found" };
   }
 
+  logInfo(`Fee option updated successfully with ID: ${feeOptionId}.`);
   return { ok: true };
 }
 
@@ -231,10 +272,18 @@ export async function deleteFeeOption(
     .limit(1);
 
   if (!existing) {
+    logWarning(
+      `Fee option was not deleted with ID: ${feeOptionId}.`,
+      "not-found",
+    );
     return { ok: false, error: "not-found" };
   }
 
   if (await wouldRemoveLastOfferedOnOpenBatch(academyId, batchId, feeOptionId)) {
+    logWarning(
+      `Fee option was not deleted with ID: ${feeOptionId}.`,
+      "close-first",
+    );
     return { ok: false, error: "close-first" };
   }
 
@@ -250,17 +299,28 @@ export async function deleteFeeOption(
     .limit(1);
 
   if (referenced) {
+    logWarning(
+      `Fee option was not deleted with ID: ${feeOptionId}.`,
+      "in-use",
+    );
     return { ok: false, error: "in-use" };
   }
 
   try {
     await db.delete(batchFeeOptions).where(where);
+    logInfo(
+      `Fee option deleted successfully with ID: ${feeOptionId}.`,
+    );
     return { ok: true };
   } catch (error) {
     if (
       postgresConstraint(error) ===
       "registrations_batch_fee_option_id_batch_fee_options_id_fk"
     ) {
+      logWarning(
+        `Fee option was not deleted with ID: ${feeOptionId}.`,
+        "in-use",
+      );
       return { ok: false, error: "in-use" };
     }
     throw error;

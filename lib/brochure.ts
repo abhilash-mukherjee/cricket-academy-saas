@@ -17,6 +17,10 @@ import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
 import { normalizeOptionalPhone } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type BrochureCoachInput = {
   fullName: string;
@@ -96,7 +100,7 @@ function normalizeStoredKey(
 function validateStorageKeys(
   academyId: string,
   keys: string[],
-): BrochureEditResult | null {
+): { ok: false; error: "invalid-storage-key" } | null {
   for (const key of keys) {
     if (!isAcademyScopedStorageKey(key, academyId)) {
       return { ok: false, error: "invalid-storage-key" };
@@ -212,13 +216,32 @@ export async function updateBrochure(
 ): Promise<BrochureEditResult> {
   const name = input.name.trim();
   if (!name) {
+    logWarning(
+      `Brochure was not updated with ID: ${academyId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
   const phoneResult = normalizeOptionalPhone(input.phone);
   if (!phoneResult.ok) {
+    logWarning(
+      `Brochure was not updated with ID: ${academyId}.`,
+      "invalid-phone",
+      { name, phone: input.phone },
+    );
     return { ok: false, error: "invalid-phone" };
   }
+
+  const brochureFields = { name, phone: phoneResult.phone };
+  const brochureNotUpdated = (error: BrochureEditError): BrochureEditResult => {
+    logWarning(
+      `Brochure was not updated with ID: ${academyId}.`,
+      error,
+      brochureFields,
+    );
+    return { ok: false, error };
+  };
 
   let imageKeys: string[] | undefined;
   if (input.imageStorageKeys) {
@@ -232,12 +255,12 @@ export async function updateBrochure(
     }
 
     if (imageKeys.length > MAX_BROCHURE_GALLERY_IMAGES) {
-      return { ok: false, error: "gallery-limit" };
+      return brochureNotUpdated("gallery-limit");
     }
 
     const keyError = validateStorageKeys(academyId, imageKeys);
     if (keyError) {
-      return keyError;
+      return brochureNotUpdated(keyError.error);
     }
   }
 
@@ -251,7 +274,7 @@ export async function updateBrochure(
       }
       const videoId = parseYoutubeVideoId(value);
       if (!videoId) {
-        return { ok: false, error: "invalid-youtube-url" };
+        return brochureNotUpdated("invalid-youtube-url");
       }
       videoIds.push(videoId);
     }
@@ -280,7 +303,7 @@ export async function updateBrochure(
         .filter((key): key is string => Boolean(key)),
     );
     if (coachKeyError) {
-      return coachKeyError;
+      return brochureNotUpdated(coachKeyError.error);
     }
   }
 
@@ -308,7 +331,7 @@ export async function updateBrochure(
     .returning({ id: academies.id });
 
   if (updated.length === 0) {
-    return { ok: false, error: "not-found" };
+    return brochureNotUpdated("not-found");
   }
 
   if (input.batchBlurbs) {
@@ -321,7 +344,7 @@ export async function updateBrochure(
           and(eq(batches.academyId, academyId), inArray(batches.id, batchIds)),
         );
       if (owned.length !== new Set(batchIds).size) {
-        return { ok: false, error: "invalid-input" };
+        return brochureNotUpdated("invalid-input");
       }
     }
 
@@ -396,5 +419,6 @@ export async function updateBrochure(
     await deleteAcademyAssets(removedCoachKeys);
   }
 
+  logInfo(`Brochure updated successfully with ID: ${academyId}.`, brochureFields);
   return { ok: true };
 }

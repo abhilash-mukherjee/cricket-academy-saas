@@ -1,6 +1,10 @@
 import { eq, and, asc } from "drizzle-orm";
 import { batchFeeOptions, batches } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type BatchRecord = {
   id: string;
@@ -45,6 +49,7 @@ export async function createBatch(
 ): Promise<CreateBatchResult> {
   const trimmed = name.trim();
   if (!trimmed) {
+    logWarning("Batch was not created.", "invalid-input");
     return { ok: false, error: "invalid-input" };
   }
 
@@ -59,9 +64,15 @@ export async function createBatch(
       })
       .returning({ id: batches.id });
 
+    logInfo(`Batch created successfully with ID: ${created.id}.`, {
+      name: trimmed,
+    });
     return { ok: true, id: created.id };
   } catch (error) {
     if (postgresConstraint(error) === "batches_academy_id_name_unique") {
+      logWarning("Batch was not created.", "name-taken", {
+        name: trimmed,
+      });
       return { ok: false, error: "name-taken" };
     }
     throw error;
@@ -75,6 +86,10 @@ export async function renameBatch(
 ): Promise<RenameBatchResult> {
   const trimmed = name.trim();
   if (!trimmed) {
+    logWarning(
+      `Batch was not renamed with ID: ${batchId}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
@@ -87,12 +102,25 @@ export async function renameBatch(
       .returning({ id: batches.id });
 
     if (updated.length === 0) {
+      logWarning(
+        `Batch was not renamed with ID: ${batchId}.`,
+        "not-found",
+        { name: trimmed },
+      );
       return { ok: false, error: "not-found" };
     }
 
+    logInfo(`Batch renamed successfully with ID: ${batchId}.`, {
+      name: trimmed,
+    });
     return { ok: true };
   } catch (error) {
     if (postgresConstraint(error) === "batches_academy_id_name_unique") {
+      logWarning(
+        `Batch was not renamed with ID: ${batchId}.`,
+        "name-taken",
+        { name: trimmed },
+      );
       return { ok: false, error: "name-taken" };
     }
     throw error;
@@ -111,7 +139,15 @@ export async function setBatchOpenForRegistration(
     .where(and(eq(batches.id, batchId), eq(batches.academyId, academyId)))
     .limit(1);
 
+  const openSentence = isOpenForRegistration
+    ? `Batch opened for Registration with ID: ${batchId}.`
+    : `Batch closed for Registration with ID: ${batchId}.`;
+  const failedSentence = isOpenForRegistration
+    ? `Batch was not opened for Registration with ID: ${batchId}.`
+    : `Batch was not closed for Registration with ID: ${batchId}.`;
+
   if (!batch) {
+    logWarning(failedSentence, "not-found");
     return { ok: false, error: "not-found" };
   }
 
@@ -129,6 +165,7 @@ export async function setBatchOpenForRegistration(
       .limit(1);
 
     if (!offered) {
+      logWarning(failedSentence, "no-offered-package");
       return { ok: false, error: "no-offered-package" };
     }
   }
@@ -138,6 +175,7 @@ export async function setBatchOpenForRegistration(
     .set({ isOpenForRegistration })
     .where(and(eq(batches.id, batchId), eq(batches.academyId, academyId)));
 
+  logInfo(openSentence);
   return { ok: true };
 }
 
