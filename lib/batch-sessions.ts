@@ -46,6 +46,7 @@ export type AttendancePlayer = {
 export type AttendanceSnapshot = {
   saved: boolean;
   pausedPlayersOmitted: boolean;
+  deferredStartsOmitted: boolean;
   players: AttendancePlayer[];
 };
 
@@ -80,6 +81,7 @@ type PauseRow = {
   pausedOn: string;
   plannedLastPausedOn: string | null;
   resumedOn: string | null;
+  isDeferred: boolean;
 };
 
 type Bundle = {
@@ -174,20 +176,28 @@ function eligiblePlayers(
   bundles: Bundle[],
   sessionDate: string,
   today: string,
-): { players: EligiblePlayer[]; pausedPlayersOmitted: boolean } {
+): {
+  players: EligiblePlayer[];
+  pausedPlayersOmitted: boolean;
+  deferredStartsOmitted: boolean;
+} {
   const chosen = new Map<string, EligiblePlayer>();
   const pausedPlayerIds = new Set<string>();
+  const deferredPlayerIds = new Set<string>();
 
   for (const bundle of bundles) {
     const settled = settleInMemory(bundle, today);
-    const paused = settled.pauses.some((pause) =>
+    const covering = settled.pauses.filter((pause) =>
       pauseCoversDate(pause, sessionDate),
     );
-    if (paused) {
+    if (covering.some((pause) => pause.isDeferred)) {
+      deferredPlayerIds.add(bundle.playerId);
+    }
+    if (covering.some((pause) => !pause.isDeferred)) {
       pausedPlayerIds.add(bundle.playerId);
     }
     if (
-      paused ||
+      covering.length > 0 ||
       !coversDate(bundle.validFrom, settled.validUntil, sessionDate)
     ) {
       continue;
@@ -203,6 +213,9 @@ function eligiblePlayers(
   return {
     players: [...chosen.values()].sort(byNameThenId),
     pausedPlayersOmitted: [...pausedPlayerIds].some((id) => !chosen.has(id)),
+    deferredStartsOmitted: [...deferredPlayerIds].some(
+      (id) => !chosen.has(id),
+    ),
   };
 }
 
@@ -217,6 +230,7 @@ function bundlesFrom(
     pausedOn: string | null;
     plannedLastPausedOn: string | null;
     resumedOn: string | null;
+    isDeferred: boolean | null;
   }[],
 ): Bundle[] {
   const map = new Map<string, Bundle>();
@@ -239,6 +253,7 @@ function bundlesFrom(
         pausedOn: row.pausedOn,
         plannedLastPausedOn: row.plannedLastPausedOn,
         resumedOn: row.resumedOn,
+        isDeferred: row.isDeferred === true,
       });
     }
   }
@@ -270,6 +285,7 @@ async function loadBundles(
       pausedOn: enrollmentPauses.pausedOn,
       plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
       resumedOn: enrollmentPauses.resumedOn,
+      isDeferred: enrollmentPauses.isDeferred,
     })
     .from(enrollments)
     .innerJoin(
@@ -407,6 +423,7 @@ export async function getSessionAttendance(
       batchName: batch.name,
       saved: true,
       pausedPlayersOmitted: false,
+      deferredStartsOmitted: false,
       players: await loadStored(db, academyId, session.id),
     };
   }
@@ -420,6 +437,7 @@ export async function getSessionAttendance(
     batchName: batch.name,
     saved: false,
     pausedPlayersOmitted: eligible.pausedPlayersOmitted,
+    deferredStartsOmitted: eligible.deferredStartsOmitted,
     players: unmarked(eligible.players),
   };
 }
@@ -607,6 +625,7 @@ export async function saveSessionAttendance(
           ok: true as const,
           saved: true,
           pausedPlayersOmitted: false,
+          deferredStartsOmitted: false,
           players: stored
             .map((row) => ({
               playerId: row.playerId,
@@ -649,6 +668,7 @@ export async function saveSessionAttendance(
         ok: true as const,
         saved: true,
         pausedPlayersOmitted: false,
+        deferredStartsOmitted: false,
         players: eligible.players.map((player) => ({
           playerId: player.playerId,
           fullName: player.fullName,
@@ -739,6 +759,7 @@ export async function discardSession(
         ok: true as const,
         saved: false,
         pausedPlayersOmitted: eligible.pausedPlayersOmitted,
+        deferredStartsOmitted: eligible.deferredStartsOmitted,
         players: unmarked(eligible.players),
       };
     });

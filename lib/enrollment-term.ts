@@ -13,6 +13,44 @@ export function lastCoveredDay(validFrom: string, termDays: number): string {
   return shiftCalendarDate(validFrom, termDays - 1);
 }
 
+export type RecordedStart =
+  | {
+      ok: true;
+      validFrom: string;
+      validUntil: string;
+      deferred: { pausedOn: string; plannedLastPausedOn: string } | null;
+    }
+  | { ok: false; error: "term-not-covering-today" };
+
+/**
+ * Today or earlier is valid-from and creates no pause.
+ * A later start stores valid-from as today and a dated pause through the day before that start.
+ * A term that is already over is rejected. There is no cap on how far ahead.
+ */
+export function recordedStart(
+  startsOn: string,
+  termDays: number,
+  today: string,
+): RecordedStart {
+  if (startsOn > today) {
+    return {
+      ok: true,
+      validFrom: today,
+      validUntil: lastCoveredDay(today, termDays),
+      deferred: {
+        pausedOn: today,
+        plannedLastPausedOn: addCalendarDays(startsOn, -1),
+      },
+    };
+  }
+
+  const validUntil = lastCoveredDay(startsOn, termDays);
+  if (validUntil < today) {
+    return { ok: false, error: "term-not-covering-today" };
+  }
+  return { ok: true, validFrom: startsOn, validUntil, deferred: null };
+}
+
 export function addCalendarDays(isoDate: string, days: number): string {
   return shiftCalendarDate(isoDate, days);
 }

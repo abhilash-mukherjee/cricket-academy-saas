@@ -30,7 +30,7 @@ import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
 import { calendarDateInIst } from "@/lib/player-age";
 import { formatCalendarDate } from "@/lib/format-date";
-import { lastCoveredDay } from "@/lib/enrollment-term";
+import { addCalendarDays, lastCoveredDay } from "@/lib/enrollment-term";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import { inboxErrorCopy } from "@/app/app/registrations/inbox";
@@ -559,6 +559,53 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Email: arjun@example.com");
       expect(html).toContain("Note: Evening preferred.");
       expect(html).not.toContain("Accept this Registration?");
+    }, 20_000);
+
+    it("records a later start on accept and still copies Guardian", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id, { termDays: 30 });
+      const today = calendarDateInIst();
+      const startsOn = addCalendarDays(today, 12);
+
+      await submit(slug, feeOptionId, child);
+      const registrationId = await pendingId(academy.id, "Mini Rao");
+      const accepted = await accept(cookie, registrationId, startsOn);
+      expect(accepted.status).toBe(200);
+
+      const db = getDb();
+      const [player] = await db
+        .select()
+        .from(players)
+        .where(eq(players.academyId, academy.id));
+      expect(player).toMatchObject({
+        dateOfBirth: "2015-06-15",
+        guardianFullName: "Asha Rao",
+        guardianPhone: "+919876543210",
+      });
+      const [enrollment] = await db
+        .select()
+        .from(enrollments)
+        .where(eq(enrollments.academyId, academy.id));
+      expect(enrollment).toMatchObject({
+        validFrom: today,
+        validUntil: lastCoveredDay(today, 30),
+        registrationId,
+      });
+      const [pause] = await db
+        .select()
+        .from(enrollmentPauses)
+        .where(eq(enrollmentPauses.enrollmentId, enrollment.id));
+      expect(pause).toMatchObject({
+        pausedOn: today,
+        plannedLastPausedOn: addCalendarDays(startsOn, -1),
+        isDeferred: true,
+        resumedOn: null,
+      });
+      expect(inboxErrorCopy("starts-later")).toContain("starts later");
+      expect(inboxErrorCopy("starts-later")).toContain("Reject");
     }, 20_000);
   },
 );

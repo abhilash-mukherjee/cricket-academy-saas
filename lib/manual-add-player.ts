@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { batchFeeOptions, batches, players } from "@/db/domain-schema";
 import { getTransactionalDb } from "@/db/client";
-import { lastCoveredDay } from "@/lib/enrollment-term";
+import { recordedStart } from "@/lib/enrollment-term";
 import { guardNewEnrollment, insertEnrollment } from "@/lib/enrollments";
 import {
   calendarDateInIst,
@@ -31,7 +31,8 @@ export type ManualAddError =
   | "not-found"
   | "term-not-covering-today"
   | "overlaps"
-  | "paused";
+  | "paused"
+  | "starts-later";
 
 export type ManualAddResult =
   | { ok: true; playerId: string }
@@ -246,12 +247,7 @@ export async function manualAddPlayer(
     logWarning("Player was not added.", "invalid-input");
     return { ok: false, error: "invalid-input" };
   }
-  if (parsed.value.validFrom > today) {
-    logWarning(playerNotAdded(parsed), "invalid-input", playerFields(parsed));
-    return { ok: false, error: "invalid-input" };
-  }
-
-  const validFrom = parsed.value.validFrom;
+  const startsOn = parsed.value.validFrom;
   const batchId = parsed.value.batchId;
   const batchFeeOptionId = parsed.value.batchFeeOptionId;
   const db = getTransactionalDb();
@@ -288,10 +284,11 @@ export async function manualAddPlayer(
         throw new ManualAddFailure("not-found");
       }
 
-      const validUntil = lastCoveredDay(validFrom, feeOption.termDays);
-      if (validUntil < today) {
-        throw new ManualAddFailure("term-not-covering-today");
+      const start = recordedStart(startsOn, feeOption.termDays, today);
+      if (!start.ok) {
+        throw new ManualAddFailure(start.error);
       }
+      const { validFrom, validUntil, deferred } = start;
 
       let resolvedPlayerId: string;
       if (parsed.mode === "existing") {
@@ -388,6 +385,7 @@ export async function manualAddPlayer(
         feePaisePaid: feeOption.feePaise,
         validFrom,
         validUntil,
+        deferred,
       });
 
       return resolvedPlayerId;

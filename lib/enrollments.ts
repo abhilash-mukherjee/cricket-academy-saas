@@ -22,13 +22,14 @@ type OwnerTx = Parameters<
   Parameters<ReturnType<typeof getTransactionalDb>["transaction"]>[0]
 >[0];
 
-export type EnrollmentBlock = "overlaps" | "paused";
+export type EnrollmentBlock = "overlaps" | "paused" | "starts-later";
 
 export type TermStatus = "active" | "paused" | "lapsed";
 
 export type OpenPause = {
   pausedOn: string;
   plannedLastPausedOn: string | null;
+  isDeferred?: boolean;
 };
 
 export type EnrollmentTerm = {
@@ -36,6 +37,7 @@ export type EnrollmentTerm = {
   effectiveValidUntil: string;
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
+  startsLater: boolean;
 };
 
 export type PauseError =
@@ -95,6 +97,7 @@ export function enrollmentTerm(
       effectiveValidUntil: enrollment.validUntil,
       pausedOn: null,
       plannedLastPausedOn: null,
+      startsLater: false,
     };
   }
 
@@ -113,6 +116,7 @@ export function enrollmentTerm(
       effectiveValidUntil,
       pausedOn: null,
       plannedLastPausedOn: null,
+      startsLater: false,
     };
   }
 
@@ -121,11 +125,23 @@ export function enrollmentTerm(
     (openPause.plannedLastPausedOn === null ||
       today <= openPause.plannedLastPausedOn);
   if (coversToday) {
+    const startsLater = openPause.isDeferred === true;
+    const effectiveValidUntil =
+      startsLater && openPause.plannedLastPausedOn !== null
+        ? addCalendarDays(
+            enrollment.validUntil,
+            calendarDaysBetween(
+              openPause.pausedOn,
+              addCalendarDays(openPause.plannedLastPausedOn, 1),
+            ),
+          )
+        : enrollment.validUntil;
     return {
       status: "paused",
-      effectiveValidUntil: enrollment.validUntil,
+      effectiveValidUntil,
       pausedOn: openPause.pausedOn,
       plannedLastPausedOn: openPause.plannedLastPausedOn,
+      startsLater,
     };
   }
 
@@ -134,6 +150,7 @@ export function enrollmentTerm(
     effectiveValidUntil: enrollment.validUntil,
     pausedOn: null,
     plannedLastPausedOn: null,
+    startsLater: false,
   };
 }
 
@@ -163,8 +180,12 @@ export async function guardNewEnrollment(
       ),
     );
 
-  const ranges: { validFrom: string; validUntil: string; open: boolean }[] =
-    [];
+  const ranges: {
+    validFrom: string;
+    validUntil: string;
+    open: boolean;
+    startsLater: boolean;
+  }[] = [];
 
   for (const enrollment of existing) {
     const settled = await settleFinishedPauses(
@@ -176,6 +197,9 @@ export async function guardNewEnrollment(
     ranges.push(settled);
   }
 
+  if (ranges.some((range) => range.open && range.startsLater)) {
+    return "starts-later";
+  }
   if (ranges.some((range) => range.open)) {
     return "paused";
   }
@@ -196,12 +220,18 @@ export async function settleFinishedPauses(
   academyId: string,
   enrollment: { id: string; validFrom: string; validUntil: string },
   today: string,
-): Promise<{ validFrom: string; validUntil: string; open: boolean }> {
+): Promise<{
+  validFrom: string;
+  validUntil: string;
+  open: boolean;
+  startsLater: boolean;
+}> {
   const openPauses = await tx
     .select({
       id: enrollmentPauses.id,
       pausedOn: enrollmentPauses.pausedOn,
       plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+      isDeferred: enrollmentPauses.isDeferred,
     })
     .from(enrollmentPauses)
     .where(
@@ -214,12 +244,14 @@ export async function settleFinishedPauses(
 
   let validUntil = enrollment.validUntil;
   let open = false;
+  let startsLater = false;
 
   for (const pause of openPauses) {
     const finished =
       pause.plannedLastPausedOn !== null && pause.plannedLastPausedOn < today;
     if (!finished) {
       open = true;
+      startsLater = pause.isDeferred;
       continue;
     }
 
@@ -243,7 +275,7 @@ export async function settleFinishedPauses(
       );
   }
 
-  return { validFrom: enrollment.validFrom, validUntil, open };
+  return { validFrom: enrollment.validFrom, validUntil, open, startsLater };
 }
 
 export async function insertEnrollment(
@@ -258,19 +290,35 @@ export async function insertEnrollment(
     feePaisePaid: number;
     validFrom: string;
     validUntil: string;
+    deferred: { pausedOn: string; plannedLastPausedOn: string } | null;
   },
 ): Promise<void> {
-  await tx.insert(enrollments).values({
+  const [created] = await tx
+    .insert(enrollments)
+    .values({
+      academyId: input.academyId,
+      playerId: input.playerId,
+      batchId: input.batchId,
+      registrationId: input.registrationId,
+      daysPerWeek: input.daysPerWeek,
+      termDays: input.termDays,
+      feePaisePaid: input.feePaisePaid,
+      validFrom: input.validFrom,
+      validUntil: input.validUntil,
+      renewedFromEnrollmentId: null,
+    })
+    .returning({ id: enrollments.id });
+
+  if (!input.deferred) {
+    return;
+  }
+
+  await tx.insert(enrollmentPauses).values({
     academyId: input.academyId,
-    playerId: input.playerId,
-    batchId: input.batchId,
-    registrationId: input.registrationId,
-    daysPerWeek: input.daysPerWeek,
-    termDays: input.termDays,
-    feePaisePaid: input.feePaisePaid,
-    validFrom: input.validFrom,
-    validUntil: input.validUntil,
-    renewedFromEnrollmentId: null,
+    enrollmentId: created.id,
+    pausedOn: input.deferred.pausedOn,
+    plannedLastPausedOn: input.deferred.plannedLastPausedOn,
+    isDeferred: true,
   });
 }
 
@@ -346,6 +394,7 @@ export async function pauseEnrollment(
         .select({
           pausedOn: enrollmentPauses.pausedOn,
           plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+          isDeferred: enrollmentPauses.isDeferred,
         })
         .from(enrollmentPauses)
         .where(
@@ -415,6 +464,7 @@ export async function pauseEnrollment(
           pausedOn,
           plannedLastPausedOn,
           resumedOn,
+          isDeferred: false,
         });
         await tx
           .update(enrollments)
@@ -439,6 +489,7 @@ export async function pauseEnrollment(
         pausedOn,
         plannedLastPausedOn,
         resumedOn: null,
+        isDeferred: false,
       });
       return {
         ok: true as const,
@@ -504,6 +555,7 @@ export async function resumeEnrollment(
           id: enrollmentPauses.id,
           pausedOn: enrollmentPauses.pausedOn,
           plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
+          isDeferred: enrollmentPauses.isDeferred,
         })
         .from(enrollmentPauses)
         .where(

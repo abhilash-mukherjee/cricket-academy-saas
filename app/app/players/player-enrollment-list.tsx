@@ -375,7 +375,10 @@ export function PlayerEnrollmentList({
                 >
                   {enrollment.batchName}
                 </Link>
-                <EnrollmentStatus status={enrollment.status}/>
+                <EnrollmentStatus
+                  status={enrollment.status}
+                  startsLater={enrollment.startsLater}
+                />
                 <p>
                   {packageFactsCopy({
                     daysPerWeek: enrollment.daysPerWeek,
@@ -388,7 +391,14 @@ export function PlayerEnrollmentList({
                   Valid until{" "}
                   {formatCalendarDate(enrollment.effectiveValidUntil)}
                 </p>
-                {enrollment.status === "paused" ? (
+                {enrollment.startsLater && enrollment.plannedLastPausedOn ? (
+                  <p>
+                    First day{" "}
+                    {formatCalendarDate(
+                      addCalendarDays(enrollment.plannedLastPausedOn, 1),
+                    )}
+                  </p>
+                ) : enrollment.status === "paused" ? (
                   <p>
                     {pauseCopy(
                       enrollment.pausedOn,

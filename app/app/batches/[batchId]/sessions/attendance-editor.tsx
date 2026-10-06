@@ -18,6 +18,7 @@ type AttendancePlayer = {
 type AttendanceSnapshot = {
   saved: boolean;
   pausedPlayersOmitted: boolean;
+  deferredStartsOmitted: boolean;
   players: AttendancePlayer[];
 };
 
@@ -52,6 +53,7 @@ type AttendanceEditorProps = {
 const EMPTY_ATTENDANCE: AttendanceSnapshot = {
   saved: false,
   pausedPlayersOmitted: false,
+  deferredStartsOmitted: false,
   players: [],
 };
 
@@ -125,7 +127,7 @@ export function AttendanceEditor({
   const router = useRouter();
   const [isNavigating, startNavigate] = useTransition();
   const snapshot = attendance ?? EMPTY_ATTENDANCE;
-  const serverKey = `${snapshot.saved}:${snapshot.pausedPlayersOmitted}:${snapshot.players
+  const serverKey = `${snapshot.saved}:${snapshot.pausedPlayersOmitted}:${snapshot.deferredStartsOmitted}:${snapshot.players
     .map((player) => `${player.playerId}:${player.isPresent ? 1 : 0}`)
     .join("|")}`;
   const sessionsKey = `${sessionPage}:${sessionTotal}:${sessions
@@ -146,6 +148,9 @@ export function AttendanceEditor({
   const [saved, setSaved] = useState(snapshot.saved);
   const [pausedPlayersOmitted, setPausedPlayersOmitted] = useState(
     snapshot.pausedPlayersOmitted,
+  );
+  const [deferredStartsOmitted, setDeferredStartsOmitted] = useState(
+    snapshot.deferredStartsOmitted,
   );
   const [checks, setChecks] = useState(() =>
     loadedChecks(snapshot.players, snapshot.saved),
@@ -178,6 +183,7 @@ export function AttendanceEditor({
     setPlayers(current.players);
     setSaved(current.saved);
     setPausedPlayersOmitted(current.pausedPlayersOmitted);
+    setDeferredStartsOmitted(current.deferredStartsOmitted);
     setChecks(nextChecks);
     setBaseline(nextChecks);
   }, [serverKey]);
@@ -205,6 +211,7 @@ export function AttendanceEditor({
     setPlayers(next.players);
     setSaved(next.saved);
     setPausedPlayersOmitted(next.pausedPlayersOmitted);
+    setDeferredStartsOmitted(next.deferredStartsOmitted);
     setChecks(nextChecks);
     setBaseline(nextChecks);
   }
@@ -496,6 +503,9 @@ export function AttendanceEditor({
           ) : null}
           {!listLoading && !invalidDate && !saved && pausedPlayersOmitted ? (
             <p>Paused Players are not listed.</p>
+          ) : null}
+          {!listLoading && !invalidDate && !saved && deferredStartsOmitted ? (
+            <p>Players who start later are not listed.</p>
           ) : null}
           {showListTools ? (
             <input

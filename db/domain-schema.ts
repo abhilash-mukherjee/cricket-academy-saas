@@ -284,6 +284,7 @@ export const enrollmentPauses = pgTable(
     pausedOn: date("paused_on").notNull(),
     plannedLastPausedOn: date("planned_last_paused_on"),
     resumedOn: date("resumed_on"),
+    isDeferred: boolean("is_deferred").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
