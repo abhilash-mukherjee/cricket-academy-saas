@@ -176,16 +176,17 @@ function draftCoversSavedSession(
   );
 }
 
-function resumeConfirmCopy(
+export function resumeConfirmCopy(
   pausedOn: string,
   today: string,
-  validUntil: string,
+  storedValidUntil: string,
+  shownValidUntil: string,
 ): string {
   const daysAdded = calendarDaysBetween(pausedOn, today);
-  if (daysAdded === 0) {
-    return "Adds 0 days; valid-until unchanged";
+  const nextUntil = addCalendarDays(storedValidUntil, daysAdded);
+  if (nextUntil === shownValidUntil) {
+    return `Adds ${daysAdded} days; valid-until unchanged`;
   }
-  const nextUntil = addCalendarDays(validUntil, daysAdded);
   return `Adds ${daysAdded} days → valid-until ${formatCalendarDate(nextUntil)}`;
 }
 
@@ -515,6 +516,7 @@ export function PlayerEnrollmentList({
                           {resumeConfirmCopy(
                             enrollment.pausedOn,
                             today,
+                            enrollment.validUntil,
                             enrollment.effectiveValidUntil,
                           )}
                         </p>

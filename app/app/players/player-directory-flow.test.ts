@@ -27,6 +27,7 @@ import { calendarDateInIst } from "@/lib/player-age";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
 import EnrollmentStatus from "../enrollment-status";
+import { resumeConfirmCopy } from "./player-enrollment-list";
 
 const sessionCookie = vi.hoisted(() => ({ value: "" }));
 
@@ -1546,3 +1547,23 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
     });
   },
 );
+
+describe("resume confirmation for a deferred start", () => {
+  it("counts only the days actually paused, not the projected term", () => {
+    const today = "2026-10-06";
+    const storedUntil = "2026-11-04";
+    const shownUntil = "2026-11-14";
+    expect(resumeConfirmCopy(today, today, storedUntil, shownUntil)).toBe(
+      `Adds 0 days → valid-until ${formatCalendarDate(storedUntil)}`,
+    );
+    expect(
+      resumeConfirmCopy("2026-10-02", today, "2026-10-31", shownUntil),
+    ).toBe(`Adds 4 days → valid-until ${formatCalendarDate("2026-11-04")}`);
+  });
+
+  it("leaves a normal pause unchanged when resume adds no days", () => {
+    expect(
+      resumeConfirmCopy("2026-10-06", "2026-10-06", "2026-11-04", "2026-11-04"),
+    ).toBe("Adds 0 days; valid-until unchanged");
+  });
+});

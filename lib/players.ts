@@ -72,6 +72,7 @@ export type PlayerEnrollmentView = {
   termDays: number;
   feePaisePaid: number;
   validFrom: string;
+  validUntil: string;
   effectiveValidUntil: string;
   pausedOn: string | null;
   plannedLastPausedOn: string | null;
@@ -671,6 +672,7 @@ export async function getPlayer(
         termDays: row.termDays,
         feePaisePaid: row.feePaisePaid,
         validFrom: row.validFrom,
+        validUntil: row.validUntil,
         effectiveValidUntil: term.effectiveValidUntil,
         pausedOn: term.pausedOn,
         plannedLastPausedOn: term.plannedLastPausedOn,
