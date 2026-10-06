@@ -11,6 +11,10 @@ import {
 import { getDb, getTransactionalDb } from "@/db/client";
 import { settleFinishedPauses } from "@/lib/enrollments";
 import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
+import {
   addCalendarDays,
   calendarDaysBetween,
   pauseCoversDate,
@@ -528,18 +532,27 @@ export async function saveSessionAttendance(
     !uniqueIds(parsed.data.playerIds) ||
     !uniqueIds(parsed.data.presentPlayerIds)
   ) {
+    logWarning(
+      `Session attendance was not saved with ID: ${batchId} on ${sessionDate}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
   const { playerIds, presentPlayerIds } = parsed.data;
   const listed = new Set(playerIds);
   if (!presentPlayerIds.every((id) => listed.has(id))) {
+    logWarning(
+      `Session attendance was not saved with ID: ${batchId} on ${sessionDate}.`,
+      "invalid-input",
+    );
     return { ok: false, error: "invalid-input" };
   }
 
   const db = getTransactionalDb();
+  let sessionId: string | null = null;
   try {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const batch = await findBatch(tx, academyId, batchId);
       if (!batch) {
         throw new SessionFailure("not-found");
@@ -577,6 +590,7 @@ export async function saveSessionAttendance(
           throw new SessionFailure("stale-list");
         }
 
+        sessionId = session.id;
         for (const row of stored) {
           await tx
             .update(batchSessionAttendance)
@@ -618,6 +632,7 @@ export async function saveSessionAttendance(
         .values({ academyId, batchId, sessionDate })
         .returning({ id: batchSessions.id });
 
+      sessionId = created.id;
       if (eligible.players.length > 0) {
         await tx.insert(batchSessionAttendance).values(
           eligible.players.map((player) => ({
@@ -642,12 +657,24 @@ export async function saveSessionAttendance(
         })),
       };
     });
+    logInfo(
+      `Session attendance saved successfully with ID: ${sessionId}.`,
+    );
+    return result;
   } catch (error) {
     if (error instanceof SessionFailure) {
+      logWarning(
+        `Session attendance was not saved with ID: ${batchId} on ${sessionDate}.`,
+        error.code,
+      );
       return { ok: false, error: error.code };
     }
     if (postgresConstraint(error) === SESSION_UNIQUE) {
       if (retried) {
+        logWarning(
+          `Session attendance was not saved with ID: ${batchId} on ${sessionDate}.`,
+          "stale-list",
+        );
         return { ok: false, error: "stale-list" };
       }
       return saveSessionAttendance(
@@ -670,8 +697,9 @@ export async function discardSession(
   today: string = calendarDateInIst(),
 ): Promise<SessionCommandResult> {
   const db = getTransactionalDb();
+  let sessionId: string | null = null;
   try {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const batch = await findBatch(tx, academyId, batchId);
       if (!batch) {
         throw new SessionFailure("not-found");
@@ -683,6 +711,7 @@ export async function discardSession(
         throw new SessionFailure("not-found");
       }
 
+      sessionId = session.id;
       await settleBatch(tx, academyId, batchId, today);
       await tx
         .delete(batchSessionAttendance)
@@ -713,8 +742,16 @@ export async function discardSession(
         players: unmarked(eligible.players),
       };
     });
+    logInfo(
+      `Session discarded successfully with ID: ${sessionId}.`,
+    );
+    return result;
   } catch (error) {
     if (error instanceof SessionFailure) {
+      logWarning(
+        `Session was not discarded with ID: ${batchId} on ${sessionDate}.`,
+        error.code,
+      );
       return { ok: false, error: error.code };
     }
     throw error;

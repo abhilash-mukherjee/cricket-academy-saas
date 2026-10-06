@@ -3,6 +3,10 @@ import { academies } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
 import { isAcademySlug } from "@/lib/academy-slug";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type AdminAcademyListItem = {
   id: string;
@@ -80,10 +84,18 @@ export async function createAdminAcademy(
   const pendingOwnerEmail = normalizeEmail(input.pendingOwnerEmail);
 
   if (!name || !slug || !pendingOwnerEmail) {
+    logWarning("Academy was not created.", "invalid-input", {
+      name: name || undefined,
+      email: input.pendingOwnerEmail || undefined,
+    });
     return { ok: false, error: "invalid-input" };
   }
 
   if (!isAcademySlug(slug)) {
+    logWarning("Academy was not created.", "invalid-slug", {
+      name,
+      email: pendingOwnerEmail,
+    });
     return { ok: false, error: "invalid-slug" };
   }
 
@@ -100,6 +112,10 @@ export async function createAdminAcademy(
     )
     .limit(1);
   if (superAdminUser) {
+    logWarning("Academy was not created.", "super-admin-email", {
+      name,
+      email: pendingOwnerEmail,
+    });
     return { ok: false, error: "super-admin-email" };
   }
 
@@ -110,6 +126,11 @@ export async function createAdminAcademy(
     .where(sql`lower(${user.email}) = ${pendingOwnerEmail}`)
     .limit(1);
   if (existingOwned) {
+    logWarning(
+      "Academy was not created.",
+      "email-already-owns-academy",
+      { name, email: pendingOwnerEmail },
+    );
     return { ok: false, error: "email-already-owns-academy" };
   }
 
@@ -124,10 +145,18 @@ export async function createAdminAcademy(
       ownerUserId: null,
       isActive: true,
     });
+    logInfo(`Academy created successfully with ID: ${id}.`, {
+      name,
+      email: pendingOwnerEmail,
+    });
     return { ok: true, id, slug };
   } catch (error) {
     const constraint = postgresConstraint(error);
     if (constraint === "academies_slug_unique") {
+      logWarning("Academy was not created.", "slug-taken", {
+        name,
+        email: pendingOwnerEmail,
+      });
       return { ok: false, error: "slug-taken" };
     }
     throw error;
@@ -145,10 +174,16 @@ export async function setAcademyActive(
     .where(eq(academies.id, academyId))
     .returning({ id: academies.id, slug: academies.slug, isActive: academies.isActive });
 
+  const verb = isActive ? "reactivated" : "deactivated";
   if (!updated) {
+    logWarning(
+      `Academy was not ${verb} with ID: ${academyId}.`,
+      "not-found",
+    );
     return { ok: false, error: "not-found" };
   }
 
+  logInfo(`Academy ${verb} with ID: ${academyId}.`);
   return { ok: true, slug: updated.slug, isActive: updated.isActive };
 }
 

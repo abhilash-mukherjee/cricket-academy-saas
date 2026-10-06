@@ -3,6 +3,10 @@ import { eq } from "drizzle-orm";
 import { academies, impersonationAuditEvents } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export const IMPERSONATION_COOKIE = "staff_impersonation";
 
@@ -84,6 +88,10 @@ export async function startImpersonation(
   | { ok: false; error: "forbidden" | "not-found" | "no-owner" | "inactive" }
 > {
   if (!session.user.isSuperAdmin) {
+    logWarning(
+      `Impersonation was not started with ID: ${academyId}.`,
+      "forbidden",
+    );
     return { ok: false, error: "forbidden" };
   }
 
@@ -99,23 +107,39 @@ export async function startImpersonation(
     .limit(1);
 
   if (!row) {
+    logWarning(
+      `Impersonation was not started with ID: ${academyId}.`,
+      "not-found",
+    );
     return { ok: false, error: "not-found" };
   }
   if (!row.ownerUserId) {
+    logWarning(
+      `Impersonation was not started with ID: ${academyId}.`,
+      "no-owner",
+    );
     return { ok: false, error: "no-owner" };
   }
   if (!row.isActive) {
+    logWarning(
+      `Impersonation was not started with ID: ${academyId}.`,
+      "inactive",
+    );
     return { ok: false, error: "inactive" };
   }
 
   const jar = await cookies();
   jar.set(IMPERSONATION_COOKIE, JSON.stringify({ academyId: row.id }));
+  logInfo(
+    `Impersonation started successfully with ID: ${row.id}.`,
+  );
   return { ok: true };
 }
 
 export async function endImpersonation(): Promise<void> {
   const jar = await cookies();
   jar.delete(IMPERSONATION_COOKIE);
+  logInfo("Impersonation ended.");
 }
 
 export async function logImpersonationAction(input: {

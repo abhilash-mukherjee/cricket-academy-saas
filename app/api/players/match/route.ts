@@ -3,7 +3,9 @@ import { resolveOwnerContext } from "@/lib/owner-context";
 import { findPlayerMatch } from "@/lib/players";
 
 export async function GET(request: Request) {
-  const ownerContext = await resolveOwnerContext(request.headers);
+  const ownerContext = await resolveOwnerContext(request.headers, {
+    recordActor: false,
+  });
   if (!ownerContext.ok) {
     if (ownerContext.error === "unauthorized") {
       return NextResponse.redirect(new URL("/login", request.url));
