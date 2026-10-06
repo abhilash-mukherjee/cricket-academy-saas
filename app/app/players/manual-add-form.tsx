@@ -76,7 +76,7 @@ export function manualAddErrorCopy(error: string): string {
     case "paused":
       return "An Enrollment for this Player on this Batch is paused.";
     case "starts-later":
-      return "This Player starts later on this Batch.";
+      return "This Player already starts later on this Batch.";
     case "term-not-covering-today":
       return "That term would not cover today.";
     case "invalid-input":

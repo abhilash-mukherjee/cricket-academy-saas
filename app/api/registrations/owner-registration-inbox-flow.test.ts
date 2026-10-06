@@ -408,7 +408,46 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         .where(eq(players.academyId, academy.id));
       expect(roster).toHaveLength(1);
       expect(inboxErrorCopy("overlaps")).toContain("Reject");
-      expect(inboxErrorCopy("paused")).toContain("Reject");
+      expect(inboxErrorCopy("paused")).toBe(
+        "An Enrollment on this Batch is paused. Reject this Registration.",
+      );
+    }, 20_000);
+
+    it("tells the Owner the Player already starts later when a deferred start blocks accept", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id);
+      const today = calendarDateInIst();
+
+      await submit(slug, feeOptionId, adult);
+      const firstId = await pendingId(academy.id, "Arjun Rao");
+      expect(
+        (await accept(cookie, firstId, addCalendarDays(today, 7))).status,
+      ).toBe(200);
+
+      await submit(slug, feeOptionId, adult);
+      const secondId = await pendingId(academy.id, "Arjun Rao");
+      const blocked = await accept(cookie, secondId, today);
+      expect(blocked.status).toBe(409);
+      await expect(blocked.json()).resolves.toEqual({ error: "starts-later" });
+      expect(inboxErrorCopy("starts-later")).toBe(
+        "This Player already starts later on this Batch. Reject this Registration.",
+      );
+
+      const db = getDb();
+      const [stillPending] = await db
+        .select({ status: registrations.status })
+        .from(registrations)
+        .where(eq(registrations.id, secondId));
+      expect(stillPending.status).toBe("pending");
+      expect(
+        await db
+          .select({ id: enrollments.id })
+          .from(enrollments)
+          .where(eq(enrollments.academyId, academy.id)),
+      ).toHaveLength(1);
     }, 20_000);
 
     it("writes no Player when the term would not cover today", async () => {
@@ -604,8 +643,6 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         isDeferred: true,
         resumedOn: null,
       });
-      expect(inboxErrorCopy("starts-later")).toContain("starts later");
-      expect(inboxErrorCopy("starts-later")).toContain("Reject");
     }, 20_000);
   },
 );

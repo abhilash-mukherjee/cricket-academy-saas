@@ -27,6 +27,7 @@ import {
 } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+import { manualAddErrorCopy } from "@/app/app/players/manual-add-form";
 import { calendarDateInIst } from "@/lib/player-age";
 import { addCalendarDays, lastCoveredDay } from "@/lib/enrollment-term";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
@@ -600,6 +601,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
       expect(paused.status).toBe(409);
       await expect(paused.json()).resolves.toEqual({ error: "paused" });
+      expect(manualAddErrorCopy("paused")).toBe(
+        "An Enrollment for this Player on this Batch is paused.",
+      );
 
       expect(
         await db
@@ -700,7 +704,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
     }, 20_000);
 
-    it("says the Player starts later when a deferred start blocks another Enrollment", async () => {
+    it("says the Player already starts later when a deferred start blocks another Enrollment", async () => {
       const cookie = await signInOwner(ownerEmail);
       await onboardOwner(cookie, slug);
       const academy = await academyFor(cookie);
@@ -724,6 +728,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
       expect(blocked.status).toBe(409);
       await expect(blocked.json()).resolves.toEqual({ error: "starts-later" });
+      expect(manualAddErrorCopy("starts-later")).toBe(
+        "This Player already starts later on this Batch.",
+      );
     }, 20_000);
 
     it("isolates the write path across Academies", async () => {

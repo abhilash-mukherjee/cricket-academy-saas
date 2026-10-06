@@ -19,7 +19,7 @@ export function inboxErrorCopy(error: string): string {
     case "paused":
       return "An Enrollment on this Batch is paused. Reject this Registration.";
     case "starts-later":
-      return "This Player starts later on this Batch. Reject this Registration.";
+      return "This Player already starts later on this Batch. Reject this Registration.";
     case "term-not-covering-today":
       return "That term would not cover today.";
     case "invalid-input":
