@@ -14,10 +14,10 @@ import { postgresConstraint } from "@/lib/postgres-constraint";
 
 export const PLAYERS_PER_PAGE = 20;
 
-export type DirectoryCut = "all" | "paused" | "lapsed";
+export type DirectoryCut = "all" | "paused" | "lapsed" | "starts-later";
 
 export function directoryCut(status: string): DirectoryCut {
-  if (status === "paused" || status === "lapsed") {
+  if (status === "paused" || status === "lapsed" || status === "starts-later") {
     return status;
   }
   return "all";
@@ -307,6 +307,9 @@ function inDirectoryCut(
 ): boolean {
   if (cut === "paused") {
     return lines.some((line) => line.status === "paused" && !line.startsLater);
+  }
+  if (cut === "starts-later") {
+    return lines.some((line) => line.startsLater);
   }
   return (
     !lines.some((line) => line.status === "paused") &&

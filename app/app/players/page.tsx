@@ -66,6 +66,9 @@ function emptyDirectoryCopy(q: string, cut: DirectoryCut): string {
   if (cut === "lapsed") {
     return "No lapsed Players.";
   }
+  if (cut === "starts-later") {
+    return "No Players start later.";
+  }
   return "No Players yet.";
 }
 
@@ -126,6 +129,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                   ["all", "All"],
                   ["paused", "Paused"],
                   ["lapsed", "Lapsed"],
+                  ["starts-later", "Starts later"],
                 ] as const
               ).map(([choice, label]) => (
                 <Link
