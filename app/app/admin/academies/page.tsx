@@ -5,8 +5,14 @@ import { listAdminAcademies } from "@/lib/admin-academies";
 import { brochureUrl } from "@/lib/public-origin";
 import { CreateAcademyForm } from "./create-academy-form";
 import { AcademyAdminRow } from "./academy-admin-row";
+import { deactivatedOwnerPage } from "../../deactivated-owner-page";
 
 export default async function AdminAcademiesPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

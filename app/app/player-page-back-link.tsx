@@ -29,7 +29,7 @@ export function PlayerPageBackLink({
         />
       </svg>
       {label}
-      {href.includes("/sessions") ? <LinkPendingMark /> : null}
+      <LinkPendingMark />
     </Link>
   );
 }

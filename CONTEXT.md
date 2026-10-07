@@ -25,7 +25,7 @@ A Player's placement on a Batch for a defined term, created when the Owner accep
 _Avoid_: Subscription, membership (domain language prefers Enrollment; UI may say membership), Renew (a separate action that links a new Enrollment to a prior one)
 
 **Deferred start**:
-A Pause created with an Enrollment when the Owner chooses a start after today, on accept or manual add. valid-from is today. The last paused day is the day before that start, so the Player is off Session lists until then, and those days are added back onto valid-until. While it is open, the Owner sees Starts later, the first day the Player attends, and a valid-until equal to counting the term from that start. Resume can end it early and then the end includes only the days actually paused. The mark stays on that Pause so it can be told from a Pause the Owner applies later. The Pause action cannot create one. A deferred start does not put the Player in the directory's paused cut, and it does not make them Lapsed. Where that open pause blocks another Enrollment, or leaves the Player off a Session list, the product says they start later. A normal Pause still shows the valid-until stored so far, which grows when that pause ends.
+A Pause created with an Enrollment when the Owner chooses a start after today, on accept or manual add. valid-from is today. The last paused day is the day before that start, so the Player is off Session lists until then, and those days are added back onto valid-until. While it is open, the Owner sees Starts later, the first day the Player attends, and a valid-until equal to counting the term from that start. Resume can end it early and then the end includes only the days actually paused. The mark stays on that Pause so it can be told from a Pause the Owner applies later. The Pause action cannot create one. A deferred start does not put the Player in the directory's paused cut, and it does not make them Lapsed. An open deferred start puts the Player in the directory's Starts later cut, including when that Player also has an Active Enrollment or a real pause. Where that open pause blocks another Enrollment, or leaves the Player off a Session list, the product says they start later. A normal Pause still shows the valid-until stored so far, which grows when that pause ends.
 _Avoid_: future valid-from, scheduled pause, grace period
 
 **Active**:
@@ -45,7 +45,7 @@ A person on an Academy roster after the Owner accepts a Registration or adds the
 _Avoid_: Student, kid, member, registration
 
 **Player directory**:
-The Academy-wide list of every Player, including a Player whose Enrollments are all lapsed. The Owner may narrow it to Players with a paused Enrollment other than a deferred start, or to Players with no Active Enrollment and no paused Enrollment. A Player whose only current Enrollment is a deferred start stays on the full list and in neither of those cuts.
+The Academy-wide list of every Player, including a Player whose Enrollments are all lapsed. The Owner may narrow it to Players with a paused Enrollment other than a deferred start, to Players with no Active Enrollment and no paused Enrollment, or to Starts later. Starts later is every Player with an open deferred start, including one who also has an Active Enrollment or a real pause. A real pause still puts that Player in the paused cut. A resumed deferred start, or one whose start day has arrived, does not.
 _Avoid_: roster (that word is the Batch roster: Active and paused Players on one Batch), student list
 
 **Batch**:

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { LinkPendingMark } from "./link-pending-mark";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "./sign-out-button";
 
@@ -80,6 +81,7 @@ export function StaffAppMenu({
                       onClick={closeMenu}
                     >
                       {link.label}
+                      <LinkPendingMark />
                     </Link>
                   </li>
                 );

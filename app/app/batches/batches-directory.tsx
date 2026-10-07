@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { LinkPendingMark } from "../link-pending-mark";
 import type { BatchRecord } from "@/lib/batches";
 import type { FeeOptionRecord } from "@/lib/batch-fee-options";
 import { packageFactsCopy } from "@/lib/package-copy";
@@ -71,6 +72,7 @@ export function BatchesDirectory({
                     href={`/app/batches/${batch.id}`}
                   >
                     {batch.name}
+                    <LinkPendingMark />
                   </Link>
                   <p className="text-sm">
                     {batch.isOpenForRegistration

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GET as verifyAuth, POST as authPost } from "@/app/api/auth/[...all]/route";
 import { POST as completeOnboarding } from "@/app/api/onboarding/route";
@@ -178,14 +179,16 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       sessionCookie.value = cookie;
 
       const { default: PlayersPage } = await import("./page");
-      const { default: AppLayout } = await import("../layout");
+      const { AppChrome } = await import("../layout");
       const html = renderToStaticMarkup(
-        await AppLayout({
-          children: await PlayersPage({
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          await PlayersPage({
             searchParams: Promise.resolve({}),
           }),
-          params: Promise.resolve({}),
-        }),
+        ),
       );
 
       expect(html).toContain("Players");
@@ -194,7 +197,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Add Player");
     });
 
-    it("offers All, Paused, and Lapsed, and names an empty cut", async () => {
+    it("offers All, Paused, Lapsed, and Starts later, and names an empty cut", async () => {
       const cookie = await signInOwner(ownerEmail);
       await onboardOwner(cookie, slug);
       sessionCookie.value = cookie;
@@ -211,7 +214,15 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(all).toMatch(/href="\/app\/players"[^>]*>All</);
       expect(all).toContain('href="/app/players?status=paused"');
       expect(all).toContain('href="/app/players?status=lapsed"');
+      expect(all).toContain('href="/app/players?status=starts-later"');
       expect(all).not.toContain("status=all");
+      const pausedAt = all.indexOf('href="/app/players?status=paused"');
+      const lapsedAt = all.indexOf('href="/app/players?status=lapsed"');
+      const startsLaterAt = all.indexOf(
+        'href="/app/players?status=starts-later"',
+      );
+      expect(lapsedAt).toBeGreaterThan(pausedAt);
+      expect(startsLaterAt).toBeGreaterThan(lapsedAt);
 
       const paused = renderToStaticMarkup(
         await PlayersPage({
@@ -237,6 +248,32 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(lapsed).toMatch(/aria-current="page"[^>]*>Lapsed</);
       expect(lapsed).toMatch(/btn-active[^>]*>Lapsed</);
 
+      const startsLater = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "starts-later" }),
+        }),
+      );
+      expect(startsLater).toContain("No Players start later.");
+      expect(startsLater).toContain("Add Player");
+      expect(startsLater).toMatch(/aria-current="page"[^>]*>Starts later</);
+      expect(startsLater).toMatch(/btn-active[^>]*>Starts later</);
+      expect(startsLater).toContain('name="status"');
+      expect(startsLater).toContain('value="starts-later"');
+
+      const missedStartsLater = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({
+            status: "starts-later",
+            q: "rahul",
+          }),
+        }),
+      );
+      expect(missedStartsLater).toContain("No Players match that search.");
+      expect(missedStartsLater).not.toContain("No Players start later.");
+      expect(missedStartsLater).toMatch(
+        /aria-current="page"[^>]*>Starts later</,
+      );
+
       const other = renderToStaticMarkup(
         await PlayersPage({
           searchParams: Promise.resolve({ status: "active", q: "rahul" }),
@@ -251,6 +288,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(other).toContain(
         'href="/app/players?q=rahul&amp;status=lapsed"',
+      );
+      expect(other).toContain(
+        'href="/app/players?q=rahul&amp;status=starts-later"',
       );
       expect(other).not.toContain('name="status"');
     });
@@ -1544,6 +1584,324 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain(
         `Valid until ${formatCalendarDate(lastCoveredDay(today, 30))}`,
       );
+    });
+
+    it("lists every Player with an open deferred start, including one who is also Active or paused", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const [evening] = await listBatches(academy.id);
+      const today = calendarDateInIst();
+      const startsOn = addCalendarDays(today, 10);
+      const db = getDb();
+      const [morning, finished] = await db
+        .insert(batches)
+        .values([
+          { academyId: academy.id, name: "Morning nets" },
+          { academyId: academy.id, name: "Finished nets" },
+        ])
+        .returning({ id: batches.id });
+      const [later, activeAlso, pausedAlso, resumed, arrived, pausedOnly] =
+        await db
+          .insert(players)
+          .values([
+            {
+              academyId: academy.id,
+              fullName: "Later Rao",
+              fullNameNormalized: "later rao",
+              phone: "+919876543210",
+              dateOfBirth: "2012-04-01",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Active Also",
+              fullNameNormalized: "active also",
+              phone: "+919876543211",
+              dateOfBirth: "2012-04-02",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Paused Also",
+              fullNameNormalized: "paused also",
+              phone: "+919876543212",
+              dateOfBirth: "2012-04-03",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Resumed Rao",
+              fullNameNormalized: "resumed rao",
+              phone: "+919876543213",
+              dateOfBirth: "2012-04-04",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Arrived Rao",
+              fullNameNormalized: "arrived rao",
+              phone: "+919876543214",
+              dateOfBirth: "2012-04-05",
+            },
+            {
+              academyId: academy.id,
+              fullName: "Paused Rao",
+              fullNameNormalized: "paused rao",
+              phone: "+919876543215",
+              dateOfBirth: "2012-04-06",
+            },
+          ])
+          .returning({ id: players.id });
+      const term = (playerId: string, batchId: string, validFrom: string) => ({
+        academyId: academy.id,
+        playerId,
+        batchId,
+        daysPerWeek: 3,
+        termDays: 30,
+        feePaisePaid: 150000,
+        validFrom,
+        validUntil: lastCoveredDay(validFrom, 30),
+      });
+      const inserted = await db
+        .insert(enrollments)
+        .values([
+          term(later.id, evening.id, today),
+          term(later.id, finished.id, addCalendarDays(today, -40)),
+          term(activeAlso.id, evening.id, today),
+          term(activeAlso.id, morning.id, addCalendarDays(today, -5)),
+          term(pausedAlso.id, evening.id, today),
+          term(pausedAlso.id, morning.id, addCalendarDays(today, -5)),
+          term(resumed.id, evening.id, addCalendarDays(today, -5)),
+          term(arrived.id, evening.id, addCalendarDays(today, -10)),
+          term(pausedOnly.id, evening.id, today),
+        ])
+        .returning({
+          id: enrollments.id,
+          playerId: enrollments.playerId,
+          batchId: enrollments.batchId,
+        });
+      const enrollmentId = (playerId: string, batchId: string) =>
+        inserted.find(
+          (row) => row.playerId === playerId && row.batchId === batchId,
+        )!.id;
+      const openDeferredStart = (playerId: string) => ({
+        academyId: academy.id,
+        enrollmentId: enrollmentId(playerId, evening.id),
+        pausedOn: today,
+        plannedLastPausedOn: addCalendarDays(startsOn, -1),
+        isDeferred: true,
+      });
+      await db.insert(enrollmentPauses).values([
+        openDeferredStart(later.id),
+        openDeferredStart(activeAlso.id),
+        openDeferredStart(pausedAlso.id),
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(pausedAlso.id, morning.id),
+          pausedOn: addCalendarDays(today, -2),
+          isDeferred: false,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(resumed.id, evening.id),
+          pausedOn: addCalendarDays(today, -5),
+          plannedLastPausedOn: addCalendarDays(today, 4),
+          resumedOn: today,
+          isDeferred: true,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(arrived.id, evening.id),
+          pausedOn: addCalendarDays(today, -10),
+          plannedLastPausedOn: addCalendarDays(today, -1),
+          isDeferred: true,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(pausedOnly.id, evening.id),
+          pausedOn: today,
+          isDeferred: false,
+        },
+      ]);
+      sessionCookie.value = cookie;
+
+      const { default: PlayersPage } = await import("./page");
+      const startsLaterBadge = renderToStaticMarkup(
+        EnrollmentStatus({ status: "paused", startsLater: true }),
+      );
+      const activeMarkup = renderToStaticMarkup(
+        EnrollmentStatus({ status: "active" }),
+      );
+      const pausedMarkup = renderToStaticMarkup(
+        EnrollmentStatus({ status: "paused" }),
+      );
+
+      const startsLater = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "starts-later" }),
+        }),
+      );
+      expect(startsLater).toContain("Later Rao");
+      expect(startsLater).toContain("Active Also");
+      expect(startsLater).toContain("Paused Also");
+      expect(startsLater).not.toContain("Resumed Rao");
+      expect(startsLater).not.toContain("Arrived Rao");
+      expect(startsLater).not.toContain("Paused Rao");
+      const laterCard = startsLater.slice(
+        startsLater.indexOf("Later Rao"),
+        startsLater.indexOf("Paused Also"),
+      );
+      expect(laterCard).toContain("U-14 evening");
+      expect(laterCard).toContain(startsLaterBadge);
+      expect(laterCard).not.toContain("Finished nets");
+      const activeCard = startsLater.slice(
+        startsLater.indexOf("Active Also"),
+        startsLater.indexOf("Later Rao"),
+      );
+      expect(activeCard.indexOf("U-14 evening")).toBeGreaterThan(-1);
+      expect(activeCard.indexOf("Morning nets")).toBeGreaterThan(
+        activeCard.indexOf("U-14 evening"),
+      );
+      expect(activeCard).toContain(startsLaterBadge);
+      expect(activeCard).toContain(activeMarkup);
+      const pausedCard = startsLater.slice(startsLater.indexOf("Paused Also"));
+      expect(pausedCard).toContain("U-14 evening");
+      expect(pausedCard).toContain("Morning nets");
+      expect(pausedCard).toContain(startsLaterBadge);
+      expect(pausedCard).toContain(pausedMarkup);
+
+      const pausedCut = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "paused" }),
+        }),
+      );
+      expect(pausedCut).toContain("Paused Also");
+      expect(pausedCut).toContain("Paused Rao");
+      expect(pausedCut).not.toContain("Later Rao");
+      expect(pausedCut).not.toContain("Active Also");
+      expect(pausedCut).not.toContain("Resumed Rao");
+      expect(pausedCut).not.toContain("Arrived Rao");
+
+      const lapsedCut = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "lapsed" }),
+        }),
+      );
+      expect(lapsedCut).not.toContain("Later Rao");
+      expect(lapsedCut).not.toContain("Active Also");
+      expect(lapsedCut).not.toContain("Paused Also");
+
+      const searched = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({
+            status: "starts-later",
+            q: "Active",
+          }),
+        }),
+      );
+      expect(searched).toContain("Active Also");
+      expect(searched).not.toContain("Later Rao");
+      expect(searched).toContain('value="starts-later"');
+
+      const missed = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({
+            status: "starts-later",
+            q: "zzzz",
+          }),
+        }),
+      );
+      expect(missed).toContain("No Players match that search.");
+    });
+
+    it("pages the Starts later cut and keeps the search and the choice", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const [batch] = await listBatches(academy.id);
+      const today = calendarDateInIst();
+      const db = getDb();
+      const laterPlayers = Array.from({ length: 21 }, (_, index) => {
+        const name = `Player ${String(index + 1).padStart(2, "0")}`;
+        return {
+          academyId: academy.id,
+          fullName: name,
+          fullNameNormalized: name.toLowerCase(),
+          phone: `+919800000${String(index).padStart(3, "0")}`,
+          dateOfBirth: "2012-04-01",
+        };
+      });
+      const inserted = await db
+        .insert(players)
+        .values([
+          ...laterPlayers,
+          {
+            academyId: academy.id,
+            fullName: "Aaa Active",
+            fullNameNormalized: "aaa active",
+            phone: "+919811111111",
+            dateOfBirth: "2012-04-02",
+          },
+        ])
+        .returning({ id: players.id, fullName: players.fullName });
+      const enrollmentRows = await db
+        .insert(enrollments)
+        .values(
+          inserted.map((player) => ({
+            academyId: academy.id,
+            playerId: player.id,
+            batchId: batch.id,
+            daysPerWeek: 3,
+            termDays: 45,
+            feePaisePaid: 150000,
+            validFrom: today,
+            validUntil: addCalendarDays(today, 44),
+          })),
+        )
+        .returning({ id: enrollments.id, playerId: enrollments.playerId });
+      const active = inserted.find((player) => player.fullName === "Aaa Active")!;
+      await db.insert(enrollmentPauses).values(
+        enrollmentRows
+          .filter((row) => row.playerId !== active.id)
+          .map((row) => ({
+            academyId: academy.id,
+            enrollmentId: row.id,
+            pausedOn: today,
+            plannedLastPausedOn: addCalendarDays(today, 9),
+            isDeferred: true,
+          })),
+      );
+      sessionCookie.value = cookie;
+      const { default: PlayersPage } = await import("./page");
+
+      const first = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({ status: "starts-later" }),
+        }),
+      );
+      expect(first).toContain("Player 01");
+      expect(first).toContain("Player 20");
+      expect(first).not.toContain("Player 21");
+      expect(first).not.toContain("Aaa Active");
+      expect(first).toContain("1–20 of 21");
+      expect(first).toContain(
+        'href="/app/players?status=starts-later&amp;page=2"',
+      );
+
+      const second = renderToStaticMarkup(
+        await PlayersPage({
+          searchParams: Promise.resolve({
+            status: "starts-later",
+            q: "player",
+            page: "2",
+          }),
+        }),
+      );
+      expect(second).toContain("Player 21");
+      expect(second).not.toContain("Player 01");
+      expect(second).not.toContain("Aaa Active");
+      expect(second).toContain("21–21 of 21");
+      expect(second).toContain(
+        'href="/app/players?q=player&amp;status=starts-later"',
+      );
+      expect(second).not.toContain("page=");
     });
   },
 );

@@ -7,8 +7,15 @@ import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { BatchesDirectory } from "./batches-directory";
 import { DashboardBackLink } from "../dashboard-back-link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
+import { LinkPendingMark } from "../link-pending-mark";
 
 export default async function BatchesPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 
@@ -44,6 +51,7 @@ export default async function BatchesPage() {
                 Visitors will not get a form on the conversion page until{" "}
                 <Link className="link" href="/app/conversion">
                   online Registration
+                  <LinkPendingMark />
                 </Link>{" "}
                 is on.
               </p>

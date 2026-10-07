@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { claimPendingAcademy } from "@/lib/academy-claim";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import type { academies } from "@/db/domain-schema";
@@ -16,27 +17,42 @@ type StaffUser = {
   isSuperAdmin: boolean;
 };
 
+const loadStaffAccess = cache(
+  async (
+    id: string,
+    email: string,
+    isSuperAdmin: boolean,
+  ): Promise<StaffAccess> => {
+    if (isSuperAdmin) {
+      return { kind: "super-admin" };
+    }
+
+    await claimPendingAcademy(id, email);
+
+    const academy = await getOwnedAcademy(id);
+    if (!academy) {
+      return { kind: "needs-onboarding" };
+    }
+
+    if (!academy.isActive) {
+      return { kind: "owner-deactivated", academy };
+    }
+
+    return { kind: "owner", academy };
+  },
+);
+
 /**
  * Resolve staff access after claiming any pending Academy assignment.
  * Super-admin (not impersonating) is platform console access.
+ * Cached per request so the staff chrome and the page share one lookup.
  */
-export async function resolveStaffAccess(
+export function resolveStaffAccess(
   staffUser: StaffUser,
 ): Promise<StaffAccess> {
-  if (staffUser.isSuperAdmin) {
-    return { kind: "super-admin" };
-  }
-
-  await claimPendingAcademy(staffUser.id, staffUser.email);
-
-  const academy = await getOwnedAcademy(staffUser.id);
-  if (!academy) {
-    return { kind: "needs-onboarding" };
-  }
-
-  if (!academy.isActive) {
-    return { kind: "owner-deactivated", academy };
-  }
-
-  return { kind: "owner", academy };
+  return loadStaffAccess(
+    staffUser.id,
+    staffUser.email,
+    staffUser.isSuperAdmin,
+  );
 }

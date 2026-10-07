@@ -9,8 +9,15 @@ import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
 import Link from "next/link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
+import { LinkPendingMark } from "../link-pending-mark";
 
 export default async function DashboardPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 
@@ -53,6 +60,7 @@ export default async function DashboardPage() {
             <p>
               <Link className="link" href="/app/registrations">
                 Pending Registrations: {pendingCount}
+                <LinkPendingMark />
               </Link>
             </p>
           </div>
@@ -67,10 +75,12 @@ export default async function DashboardPage() {
                   <Link className="link" href="/app/batches">
                     Batches — open one to rename it, edit fee options, or open
                     it for Registration
+                    <LinkPendingMark />
                   </Link>
                 ) : (
                   <Link className="link" href="/app/batches">
                     Add your first Batch
+                    <LinkPendingMark />
                   </Link>
                 )}
               </li>
@@ -78,6 +88,7 @@ export default async function DashboardPage() {
                 <li>
                   <Link className="link" href="/app/batches">
                     Open a Batch and add a fee option
+                    <LinkPendingMark />
                   </Link>
                 </li>
               ) : null}
@@ -85,18 +96,21 @@ export default async function DashboardPage() {
                 <li>
                   <Link className="link" href="/app/batches">
                     Open a Batch for Registration.
+                    <LinkPendingMark />
                   </Link>
                 </li>
               ) : null}
               <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure
+                  <LinkPendingMark />
                 </Link>{" "}
                 photos, YouTube, Batch blurbs, and Coach profiles.
               </li>
               <li>
                 <Link className="link" href="/app/conversion">
                   Conversion page
+                  <LinkPendingMark />
                 </Link>{" "}
                 UPI QR (optional) and online Registration.
               </li>

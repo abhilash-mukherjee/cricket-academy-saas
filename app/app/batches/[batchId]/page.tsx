@@ -14,6 +14,7 @@ import { LinkPendingMark } from "../../link-pending-mark";
 import { PlayerPager } from "../../players/player-pager";
 import { BatchEditor } from "../batch-editor";
 import EnrollmentStatus from "../../enrollment-status";
+import { deactivatedOwnerPage } from "../../deactivated-owner-page";
 
 type BatchRosterPageProps = {
   params: Promise<{ batchId: string }>;
@@ -52,6 +53,11 @@ export default async function BatchRosterPage({
   params,
   searchParams,
 }: BatchRosterPageProps) {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const { batchId } = await params;
   const query = await searchParams;
   const session = await requireStaffSession();
@@ -119,6 +125,7 @@ export default async function BatchRosterPage({
                         href={`/app/players/${player.id}?fromBatch=${batchId}`}
                       >
                         {player.fullName}
+                        <LinkPendingMark />
                       </Link>
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}

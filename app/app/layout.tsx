@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Geist_Mono } from "next/font/google";
@@ -6,7 +7,6 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { resolveStaffAccess } from "@/lib/staff-access";
 import { getImpersonationState } from "@/lib/impersonation";
 import { APP_NAME } from "@/lib/constants";
-import { AcademyDeactivatedMessage } from "./academy-deactivated-message";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { StaffAppMenu } from "./staff-app-menu";
 
@@ -18,9 +18,11 @@ const geistMono = Geist_Mono({
 export const dynamic = "force-dynamic";
 export const preferredRegion = "sin1";
 
-export default async function AppLayout({
-  children,
-}: LayoutProps<"/app">) {
+function AppChromeFallback() {
+  return <header className="navbar border-base-300 border-b px-4" />;
+}
+
+export async function AppChrome() {
   await connection();
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
@@ -38,9 +40,7 @@ export default async function AppLayout({
       : "/app";
 
   return (
-    <div
-      className={`${geistMono.variable} bg-base-100 flex min-h-full flex-col`}
-    >
+    <>
       {impersonation ? (
         <ImpersonationBanner
           academyName={impersonation.academy.name}
@@ -68,11 +68,19 @@ export default async function AppLayout({
           />
         </div>
       </header>
-      {access.kind === "owner-deactivated" ? (
-        <AcademyDeactivatedMessage />
-      ) : (
-        children
-      )}
+    </>
+  );
+}
+
+export default function AppLayout({ children }: LayoutProps<"/app">) {
+  return (
+    <div
+      className={`${geistMono.variable} bg-base-100 flex min-h-full flex-col`}
+    >
+      <Suspense fallback={<AppChromeFallback />}>
+        <AppChrome />
+      </Suspense>
+      {children}
     </div>
   );
 }

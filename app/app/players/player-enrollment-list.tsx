@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { LinkPendingMark } from "../link-pending-mark";
 import { useRouter } from "next/navigation";
 import {
   addCalendarDays,
@@ -375,6 +376,7 @@ export function PlayerEnrollmentList({
                   href={`/app/batches/${enrollment.batchId}`}
                 >
                   {enrollment.batchName}
+                  <LinkPendingMark />
                 </Link>
                 <EnrollmentStatus
                   status={enrollment.status}
