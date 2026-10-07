@@ -125,12 +125,14 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const setCookie = await signInStaff(testEmail);
       sessionCookie.value = setCookie;
 
-      const { default: AppLayout } = await import("@/app/app/layout");
+      const { AppChrome } = await import("@/app/app/layout");
       const html = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("p", null, "signed in"),
-          params: Promise.resolve({}),
-        }),
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          createElement("p", null, "signed in"),
+        ),
       );
       expect(html).toContain(testEmail);
       expect(html).toContain("Sign out");

@@ -149,13 +149,15 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await onboardOwner(cookie, slug);
       sessionCookie.value = cookie;
 
-      const { default: AppLayout } = await import("./layout");
+      const { AppChrome } = await import("./layout");
       const { default: DashboardPage } = await import("./dashboard/page");
       const html = renderToStaticMarkup(
-        await AppLayout({
-          children: await DashboardPage(),
-          params: Promise.resolve({}),
-        }),
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          await DashboardPage(),
+        ),
       );
 
       const bar = headerBar(html);
@@ -182,13 +184,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await onboardOwner(cookie, slug);
       sessionCookie.value = cookie;
 
-      const { default: AppLayout } = await import("./layout");
+      const { AppChrome } = await import("./layout");
       const { default: Loading } = await import("./loading");
       const html = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement(Loading),
-          params: Promise.resolve({}),
-        }),
+        createElement("div", null, await AppChrome(), createElement(Loading)),
       );
 
       const headerEnd = html.indexOf("</header>");
@@ -207,13 +206,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         .where(eq(user.email, superAdminEmail));
       sessionCookie.value = cookie;
 
-      const { default: AppLayout } = await import("./layout");
-      const html = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("p", null, "academies"),
-          params: Promise.resolve({}),
-        }),
-      );
+      const { AppChrome } = await import("./layout");
+      const html = renderToStaticMarkup(await AppChrome());
 
       const menu = accountMenu(html);
       expect(menu).toContain("Super Admin");

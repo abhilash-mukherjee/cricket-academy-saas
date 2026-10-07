@@ -7,8 +7,14 @@ import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
 import { BatchesDirectory } from "./batches-directory";
 import { DashboardBackLink } from "../dashboard-back-link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 export default async function BatchesPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

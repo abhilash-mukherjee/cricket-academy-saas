@@ -9,8 +9,14 @@ import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
 import Link from "next/link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 export default async function DashboardPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

@@ -2,8 +2,14 @@ import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { resolveStaffAccess } from "@/lib/staff-access";
 import { getImpersonationState } from "@/lib/impersonation";
+import { deactivatedOwnerPage } from "./deactivated-owner-page";
 
 export default async function AppHomePage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { academies, impersonationAuditEvents } from "@/db/domain-schema";
@@ -37,7 +38,7 @@ function parseCookieValue(raw: string | undefined): string | null {
   }
 }
 
-export async function getImpersonationState(
+export const getImpersonationState = cache(async function getImpersonationState(
   session: StaffSession,
 ): Promise<ImpersonationState | null> {
   if (!session.user.isSuperAdmin) {
@@ -78,7 +79,7 @@ export async function getImpersonationState(
     subjectEmail: row.subjectEmail,
     academy: row.academy,
   };
-}
+});
 
 export async function startImpersonation(
   session: StaffSession,

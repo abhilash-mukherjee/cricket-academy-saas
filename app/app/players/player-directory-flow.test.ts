@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GET as verifyAuth, POST as authPost } from "@/app/api/auth/[...all]/route";
 import { POST as completeOnboarding } from "@/app/api/onboarding/route";
@@ -178,14 +179,16 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       sessionCookie.value = cookie;
 
       const { default: PlayersPage } = await import("./page");
-      const { default: AppLayout } = await import("../layout");
+      const { AppChrome } = await import("../layout");
       const html = renderToStaticMarkup(
-        await AppLayout({
-          children: await PlayersPage({
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          await PlayersPage({
             searchParams: Promise.resolve({}),
           }),
-          params: Promise.resolve({}),
-        }),
+        ),
       );
 
       expect(html).toContain("Players");

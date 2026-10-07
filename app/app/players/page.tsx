@@ -15,6 +15,7 @@ import { DashboardBackLink } from "../dashboard-back-link";
 import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
 import EnrollmentStatus from "../enrollment-status";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 type PlayersPageProps = {
   searchParams: Promise<{
@@ -68,6 +69,11 @@ function emptyDirectoryCopy(q: string, cut: DirectoryCut): string {
 }
 
 export default async function PlayersPage({ searchParams }: PlayersPageProps) {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const params = await searchParams;
   const q = firstParam(params.q);
   const cut = directoryCut(firstParam(params.status));
