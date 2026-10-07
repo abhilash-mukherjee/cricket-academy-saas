@@ -125,6 +125,7 @@ export default async function BatchRosterPage({
                         href={`/app/players/${player.id}?fromBatch=${batchId}`}
                       >
                         {player.fullName}
+                        <LinkPendingMark />
                       </Link>
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}

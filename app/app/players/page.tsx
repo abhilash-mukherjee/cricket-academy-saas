@@ -16,6 +16,7 @@ import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
 import EnrollmentStatus from "../enrollment-status";
 import { deactivatedOwnerPage } from "../deactivated-owner-page";
+import { LinkPendingMark } from "../link-pending-mark";
 
 type PlayersPageProps = {
   searchParams: Promise<{
@@ -134,6 +135,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                   aria-current={choice === cut ? "page" : undefined}
                 >
                   {label}
+                  <LinkPendingMark />
                 </Link>
               ))}
             </nav>
@@ -163,6 +165,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                         href={`/app/players/${player.id}`}
                       >
                         {player.fullName}
+                        <LinkPendingMark />
                       </Link>
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LinkPendingMark } from "./link-pending-mark";
 
 export function DashboardBackLink({
   href = "/app/dashboard",
@@ -31,6 +32,7 @@ export function DashboardBackLink({
         />
       </svg>
       {label}
+      <LinkPendingMark />
     </Link>
   );
 }
