@@ -785,7 +785,7 @@ export function AttendanceEditor({
           </div>
           <button
             type="button"
-            className="fixed inset-0 z-10 cursor-default bg-transparent"
+            className="fixed inset-0 z-10 cursor-default bg-black/40"
             aria-label="Cancel"
             onClick={() => setPendingHref(null)}
           />
