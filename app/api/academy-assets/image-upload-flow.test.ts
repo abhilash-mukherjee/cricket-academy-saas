@@ -8,6 +8,7 @@ import { POST as saveBrochure } from "../brochure/route";
 import { POST as saveConversion } from "../conversion/route";
 import AcademyBrochurePage from "@/app/a/[academySlug]/page";
 import ConversionPage from "@/app/a/[academySlug]/join/page";
+import { getPublicConversion } from "@/lib/public-conversion";
 import {
   clearCapturedMail,
   disableMailCapture,
@@ -40,11 +41,7 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@vercel/blob", () => ({
-  put: async (
-    pathname: string,
-    body: ArrayBuffer | Buffer | Blob,
-    _options: Record<string, unknown>,
-  ) => {
+  put: async (pathname: string, body: ArrayBuffer | Buffer | Blob) => {
     const bytes = new Uint8Array(
       body instanceof Blob
         ? await body.arrayBuffer()
@@ -73,6 +70,10 @@ vi.mock("@vercel/blob", () => ({
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const hasAuthSecret = Boolean(process.env.BETTER_AUTH_SECRET);
 const origin = "http://localhost:3000";
+
+function expectOptimizedAsset(html: string, storageKey: string) {
+  expect(html).toContain(encodeURIComponent(storageKey));
+}
 
 function pngFile(name = "photo.png"): File {
   const bytes = Buffer.from(
@@ -265,10 +266,95 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain(gallery.url);
-      expect(html).toContain(coachPhoto.url);
+      expectOptimizedAsset(html, gallery.storageKey);
+      expectOptimizedAsset(html, coachPhoto.storageKey);
       expect(html).toContain("Ravi Kumar");
       expect(html).toContain("Head Coach");
+      expect(html).toContain("aspect-[4/3]");
+      expect(html).not.toContain("carousel");
+      expect(html).not.toContain("Previous");
+    });
+
+    it("allows another gallery upload after three images are already saved", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const keys: string[] = [];
+      for (let index = 0; index < 3; index += 1) {
+        const uploaded = await uploadImage(
+          cookie,
+          "brochure-gallery",
+          pngFile(`gallery-${index}.png`),
+          index,
+        );
+        keys.push(uploaded.storageKey);
+      }
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            imageStorageKeys: keys,
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      const fourth = await uploadImage(
+        cookie,
+        "brochure-gallery",
+        pngFile("gallery-3.png"),
+        3,
+      );
+      expect(fourth.storageKey).toBeTruthy();
+    });
+
+    it("shows DaisyUI carousel chrome when the gallery has two photos", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const first = await uploadImage(cookie, "brochure-gallery", pngFile("one.png"), 0);
+      const second = await uploadImage(
+        cookie,
+        "brochure-gallery",
+        pngFile("two.png"),
+        1,
+      );
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            imageStorageKeys: [first.storageKey, second.storageKey],
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expectOptimizedAsset(html, first.storageKey);
+      expectOptimizedAsset(html, second.storageKey);
+      expect(html).toContain("carousel");
+      expect(html).toContain("Previous");
+      expect(html).toContain("Next");
     });
 
     it("shows uploaded UPI QR on GET /a/{slug}/join when intake is available", async () => {
@@ -312,7 +398,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       await db.insert(batchFeeOptions).values({
         academyId: academy!.id,
         batchId: batch!.id,
-        termMonths: 3,
+        daysPerWeek: 2,
+        termDays: 3,
         feePaise: 1500000,
         sortOrder: 0,
       });
@@ -324,8 +411,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain(upiQr.url);
-      expect(html).toContain("Pay with UPI");
+      const conversion = await getPublicConversion(slug);
+      expect(conversion?.upiQrUrl).toContain(upiQr.storageKey);
+      expect(html).toContain("Register for a Batch.");
+      expect(html).not.toContain("Pay with UPI");
     });
   },
 );

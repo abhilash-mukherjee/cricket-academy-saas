@@ -1,0 +1,870 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { renderToStaticMarkup } from "react-dom/server";
+import { GET as verifyAuth, POST as authPost } from "./auth/[...all]/route";
+import { POST as completeOnboarding } from "./onboarding/route";
+import { POST as saveBrochure } from "./brochure/route";
+import { POST as saveConversion } from "./conversion/route";
+import { POST as uploadAsset } from "./academy-assets/upload/route";
+import { POST as createBatch } from "./batches/route";
+import { PATCH as renameBatch } from "./batches/[batchId]/route";
+import { POST as createFeeOption } from "./batches/[batchId]/fee-options/route";
+import {
+  PATCH as updateFeeOption,
+  DELETE as deleteFeeOption,
+} from "./batches/[batchId]/fee-options/[feeOptionId]/route";
+import { PATCH as patchBatch } from "./batches/[batchId]/route";
+import AcademyBrochurePage from "@/app/a/[academySlug]/page";
+import ConversionPage from "@/app/a/[academySlug]/join/page";
+import { getPublicConversion } from "@/lib/public-conversion";
+import {
+  clearCapturedMail,
+  disableMailCapture,
+  enableMailCapture,
+  extractFirstUrl,
+  getCapturedMail,
+} from "@/lib/mailer";
+import {
+  academies,
+  batches,
+  batchFeeOptions,
+  brochureImages,
+  coachProfiles,
+  youtubeEmbeds,
+} from "@/db/domain-schema";
+import { user } from "@/db/auth-schema";
+import { getDb } from "@/db/client";
+import { listBatches } from "@/lib/batches";
+import { getOwnedAcademy } from "@/lib/owner-onboarding";
+
+const sessionCookie = vi.hoisted(() => ({ value: "" }));
+const blobStore = vi.hoisted(() => new Map<string, Buffer>());
+const revalidatePath = vi.hoisted(() => vi.fn());
+const revalidateTag = vi.hoisted(() => vi.fn());
+
+vi.mock("next/headers", () => ({
+  headers: async () => {
+    const headers = new Headers();
+    if (sessionCookie.value) {
+      headers.set("cookie", sessionCookie.value);
+    }
+    return headers;
+  },
+}));
+
+vi.mock("next/cache", () => ({
+  unstable_cache:
+    (fn: () => Promise<unknown>) =>
+    () =>
+      fn(),
+  revalidatePath,
+  revalidateTag,
+}));
+
+vi.mock("@vercel/blob", () => ({
+  put: async (pathname: string, body: ArrayBuffer | Buffer | Blob) => {
+    const bytes = new Uint8Array(
+      body instanceof Blob
+        ? await body.arrayBuffer()
+        : body instanceof Buffer
+          ? body
+          : body,
+    );
+    blobStore.set(pathname, Buffer.from(bytes));
+    return {
+      pathname,
+      url: `https://blob.test/${pathname}`,
+    };
+  },
+  del: async () => {},
+}));
+
+const hasDatabase = Boolean(process.env.DATABASE_URL);
+const hasAuthSecret = Boolean(process.env.BETTER_AUTH_SECRET);
+const origin = "http://localhost:3000";
+
+function pngFile(name = "photo.png"): File {
+  const bytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  return new File([bytes], name, { type: "image/png" });
+}
+
+async function signInOwner(email: string): Promise<string> {
+  const signInResponse = await authPost(
+    new Request(`${origin}/api/auth/sign-in/magic-link`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin,
+      },
+      body: JSON.stringify({
+        email,
+        name: "New Owner",
+        callbackURL: "/app",
+      }),
+    }),
+  );
+  expect(signInResponse.status).toBe(200);
+
+  const verifyUrl = extractFirstUrl(getCapturedMail().at(-1)?.html ?? "");
+  expect(verifyUrl).toBeTruthy();
+
+  const verifyResponse = await verifyAuth(
+    new Request(verifyUrl!, {
+      method: "GET",
+      headers: { origin },
+      redirect: "manual",
+    }),
+  );
+  const setCookie = verifyResponse.headers.get("set-cookie");
+  expect(setCookie).toBeTruthy();
+  return setCookie!;
+}
+
+async function onboardOwner(cookie: string, slug: string) {
+  const response = await completeOnboarding(
+    new Request(`${origin}/api/onboarding`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin,
+        cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Asha Rao",
+        academyName: "Blitz Cricket Academy",
+        slug,
+        batchName: "U-14 evening",
+        tagline: "Original tagline",
+        location: "Koramangala",
+        phone: "+919876543210",
+      }),
+    }),
+  );
+  expect(response.status).toBe(200);
+}
+
+async function uploadImage(cookie: string, purpose: "upi-qr", file: File) {
+  const form = new FormData();
+  form.set("purpose", purpose);
+  form.set("file", file);
+
+  const response = await uploadAsset(
+    new Request(`${origin}/api/academy-assets/upload`, {
+      method: "POST",
+      headers: { origin, cookie },
+      body: form,
+    }),
+  );
+  expect(response.status).toBe(200);
+  return (await response.json()) as { storageKey: string; url: string };
+}
+
+async function enableIntake(slug: string) {
+  const db = getDb();
+  const [academy] = await db
+    .select({ id: academies.id })
+    .from(academies)
+    .where(eq(academies.slug, slug))
+    .limit(1);
+  expect(academy).toBeTruthy();
+
+  const [batch] = await db
+    .select({ id: batches.id })
+    .from(batches)
+    .where(eq(batches.academyId, academy!.id))
+    .limit(1);
+  expect(batch).toBeTruthy();
+
+  await db
+    .update(batches)
+    .set({ isOpenForRegistration: true })
+    .where(eq(batches.id, batch!.id));
+  await db.insert(batchFeeOptions).values({
+    academyId: academy!.id,
+    batchId: batch!.id,
+    daysPerWeek: 2,
+    termDays: 3,
+    feePaise: 1500000,
+    sortOrder: 0,
+  });
+}
+
+async function deleteOwnerByEmail(email: string) {
+  const db = getDb();
+  const [owner] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, email))
+    .limit(1);
+  if (owner) {
+    const owned = await db
+      .select({ id: academies.id })
+      .from(academies)
+      .where(eq(academies.ownerUserId, owner.id));
+    for (const academy of owned) {
+      await db
+        .delete(brochureImages)
+        .where(eq(brochureImages.academyId, academy.id));
+      await db
+        .delete(youtubeEmbeds)
+        .where(eq(youtubeEmbeds.academyId, academy.id));
+      await db
+        .delete(coachProfiles)
+        .where(eq(coachProfiles.academyId, academy.id));
+      await db
+        .delete(batchFeeOptions)
+        .where(eq(batchFeeOptions.academyId, academy.id));
+      await db.delete(batches).where(eq(batches.academyId, academy.id));
+      await db.delete(academies).where(eq(academies.id, academy.id));
+    }
+  }
+  await db.delete(user).where(eq(user.email, email));
+}
+
+describe.skipIf(!hasDatabase || !hasAuthSecret)(
+  "public Academy cache invalidation at the App Router seam",
+  () => {
+    const testEmail = `cache-owner-${Date.now()}@example.com`;
+    const slug = `cache-${Date.now()}`;
+
+    beforeEach(() => {
+      enableMailCapture();
+      sessionCookie.value = "";
+      blobStore.clear();
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+    });
+
+    afterEach(async () => {
+      disableMailCapture();
+      clearCapturedMail();
+      sessionCookie.value = "";
+      blobStore.clear();
+      await deleteOwnerByEmail(testEmail);
+    });
+
+    it("purges public pages when the Owner saves the brochure", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const saveResponse = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            tagline: "Updated after save",
+          }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("Updated after save");
+      expect(html).not.toContain("Original tagline");
+    });
+
+    it("purges public pages when the Owner saves conversion UPI QR", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+      await enableIntake(slug);
+
+      const upiQr = await uploadImage(cookie, "upi-qr", pngFile("upi.png"));
+
+      const saveResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ upiQrStorageKey: upiQr.storageKey }),
+        }),
+      );
+      expect(saveResponse.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const html = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      const conversion = await getPublicConversion(slug);
+      expect(conversion?.upiQrUrl).toContain(upiQr.storageKey);
+      expect(html).toContain("Register for a Batch.");
+      expect(html).not.toContain("Pay with UPI");
+    });
+
+    it("purges public pages when the Owner adds a Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const createResponse = await createBatch(
+        new Request(`${origin}/api/batches`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ name: "Weekend nets" }),
+        }),
+      );
+      expect(createResponse.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("Weekend nets");
+      expect(html).toContain("U-14 evening");
+    });
+
+    it("purges public pages when the Owner renames a Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+      expect(batch).toBeTruthy();
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const renameResponse = await renameBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ name: "U-14 Morning" }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(renameResponse.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const html = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+
+      expect(html).toContain("U-14 Morning");
+      expect(html).not.toContain("U-14 evening");
+    });
+
+    it("purges public pages when the Owner adds, updates, or deletes a fee option", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+      expect(batch).toBeTruthy();
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const createResponse = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 3,
+            termDays: 3,
+            feeInr: 15000,
+            label: "Weekday nets",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(createResponse.status).toBe(200);
+      const created = (await createResponse.json()) as { id: string };
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterCreate = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterCreate = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterCreate).toContain("U-14 evening");
+      expect(joinAfterCreate).toContain("Blitz Cricket Academy");
+      expect(joinAfterCreate).toContain("Intake is closed.");
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const updateResponse = await updateFeeOption(
+        new Request(
+          `${origin}/api/batches/${batch!.id}/fee-options/${created.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              origin,
+              cookie,
+            },
+            body: JSON.stringify({ sortOrder: 2, feeInr: 16000 }),
+          },
+        ),
+        {
+          params: Promise.resolve({
+            batchId: batch!.id,
+            feeOptionId: created.id,
+          }),
+        },
+      );
+      expect(updateResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const deleteResponse = await deleteFeeOption(
+        new Request(
+          `${origin}/api/batches/${batch!.id}/fee-options/${created.id}`,
+          {
+            method: "DELETE",
+            headers: { origin, cookie },
+          },
+        ),
+        {
+          params: Promise.resolve({
+            batchId: batch!.id,
+            feeOptionId: created.id,
+          }),
+        },
+      );
+      expect(deleteResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const joinAfterDelete = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(joinAfterDelete).toContain("Blitz Cricket Academy");
+      expect(joinAfterDelete).toContain("Intake is closed.");
+    });
+
+    it("purges public pages when the Owner opens or closes a Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+      expect(batch).toBeTruthy();
+
+      const created = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 3,
+            termDays: 3,
+            feeInr: 15000,
+            label: "Weekday nets",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(created.status).toBe(200);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const openResponse = await patchBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOpenForRegistration: true }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(openResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterOpen = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterOpen = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterOpen).toContain("Register");
+      expect(brochureAfterOpen).toContain(`/a/${slug}/join`);
+      expect(joinAfterOpen).toContain("U-14 evening");
+      expect(joinAfterOpen).toContain("Weekday nets");
+      expect(joinAfterOpen).toContain("₹15,000");
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const closeResponse = await patchBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOpenForRegistration: false }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(closeResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterClose = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterClose = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterClose).toContain("Call to Register");
+      expect(brochureAfterClose).not.toContain(`href="/a/${slug}/join"`);
+      expect(joinAfterClose).toContain("Intake is closed.");
+    });
+
+    it("shows price, label, and sort-order edits on /join after purge for a registrable Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+
+      const first = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 3,
+            termDays: 3,
+            feeInr: 15000,
+            label: "Weekday nets",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      const created = (await first.json()) as { id: string };
+
+      const second = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 5,
+            termDays: 6,
+            feeInr: 28000,
+            label: "Full week",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(second.status).toBe(200);
+
+      const openResponse = await patchBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOpenForRegistration: true }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(openResponse.status).toBe(200);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const updateResponse = await updateFeeOption(
+        new Request(
+          `${origin}/api/batches/${batch!.id}/fee-options/${created.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "content-type": "application/json",
+              origin,
+              cookie,
+            },
+            body: JSON.stringify({
+              feeInr: 16500,
+              label: "Evening package",
+              sortOrder: 4,
+            }),
+          },
+        ),
+        {
+          params: Promise.resolve({
+            batchId: batch!.id,
+            feeOptionId: created.id,
+          }),
+        },
+      );
+      expect(updateResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const joinHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(joinHtml).toContain("Evening package");
+      expect(joinHtml).toContain("₹16,500");
+      expect(joinHtml).not.toContain("Weekday nets");
+      expect(joinHtml.indexOf("Full week")).toBeGreaterThan(-1);
+      expect(joinHtml.indexOf("Evening package")).toBeGreaterThan(
+        joinHtml.indexOf("Full week"),
+      );
+    });
+
+    it("purges public pages when the Owner toggles online Registration", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const sessionResponse = await verifyAuth(
+        new Request(`${origin}/api/auth/get-session`, {
+          headers: { cookie, origin },
+        }),
+      );
+      const sessionBody = (await sessionResponse.json()) as {
+        user: { id: string };
+      };
+      const academy = await getOwnedAcademy(sessionBody.user.id);
+      const [batch] = await listBatches(academy!.id);
+
+      const created = await createFeeOption(
+        new Request(`${origin}/api/batches/${batch!.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 3,
+            termDays: 3,
+            feeInr: 15000,
+            label: "Weekday nets",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(created.status).toBe(200);
+
+      const openResponse = await patchBatch(
+        new Request(`${origin}/api/batches/${batch!.id}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOpenForRegistration: true }),
+        }),
+        { params: Promise.resolve({ batchId: batch!.id }) },
+      );
+      expect(openResponse.status).toBe(200);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const offResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOnlineRegistrationAllowed: false }),
+        }),
+      );
+      expect(offResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterOff = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterOff = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterOff).toContain("Call to Register");
+      expect(brochureAfterOff).not.toContain(`href="/a/${slug}/join"`);
+      expect(joinAfterOff).toMatch(/online Registration is off/i);
+      expect(joinAfterOff).not.toContain("Weekday nets");
+      expect(joinAfterOff).not.toContain("Pay with UPI");
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const onResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOnlineRegistrationAllowed: true }),
+        }),
+      );
+      expect(onResponse.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureAfterOn = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const joinAfterOn = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureAfterOn).toContain("Register");
+      expect(brochureAfterOn).toContain(`/a/${slug}/join`);
+      expect(joinAfterOn).toContain("U-14 evening");
+      expect(joinAfterOn).toContain("Weekday nets");
+    });
+  },
+);

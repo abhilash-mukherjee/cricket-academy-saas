@@ -1,0 +1,1 @@
+ALTER TABLE "registrations" ADD COLUMN "contact_email" text;

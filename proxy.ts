@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { shouldRedirectAppRouteToLogin } from "@/lib/auth-protection";
+import {
+  shouldRedirectAppRouteToLogin,
+  shouldRedirectHomepageToApp,
+} from "@/lib/auth-protection";
 
 export function proxy(request: NextRequest) {
   if (shouldRedirectAppRouteToLogin(request)) {
@@ -8,9 +11,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (shouldRedirectHomepageToApp(request)) {
+    return NextResponse.redirect(new URL("/app", request.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/app/:path*"],
+  matcher: ["/", "/app/:path*"],
 };

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import {
   type AcademyAssetPurpose,
   uploadAcademyAsset,
 } from "@/lib/academy-assets";
 import { countBrochureGalleryImages } from "@/lib/brochure";
-import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import {
+  recordOwnerWriteIfImpersonating,
+  resolveOwnerContext,
+} from "@/lib/owner-context";
 
 const purposes: AcademyAssetPurpose[] = [
   "brochure-gallery",
@@ -14,21 +16,13 @@ const purposes: AcademyAssetPurpose[] = [
 ];
 
 export async function POST(request: Request) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
-
-  if (!session) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (session.user.isSuperAdmin) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
-  const academy = await getOwnedAcademy(session.user.id);
-  if (!academy) {
-    return NextResponse.json({ error: "not-found" }, { status: 404 });
+  const context = await resolveOwnerContext(request.headers);
+  if (!context.ok) {
+    if (context.error === "unauthorized") {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    const status = context.error === "forbidden" ? 403 : 404;
+    return NextResponse.json({ error: context.error }, { status });
   }
 
   const form = await request.formData();
@@ -47,7 +41,7 @@ export async function POST(request: Request) {
   let existingGalleryCount = 0;
   let draftGalleryCount = 0;
   if (purpose === "brochure-gallery") {
-    existingGalleryCount = await countBrochureGalleryImages(academy.id);
+    existingGalleryCount = await countBrochureGalleryImages(context.academy.id);
     if (typeof draftGalleryCountRaw === "string" && draftGalleryCountRaw) {
       const parsed = Number.parseInt(draftGalleryCountRaw, 10);
       if (!Number.isNaN(parsed) && parsed >= 0) {
@@ -57,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   const result = await uploadAcademyAsset(
-    academy.id,
+    context.academy.id,
     purpose as AcademyAssetPurpose,
     file,
     { existingGalleryCount, draftGalleryCount },
@@ -67,6 +61,10 @@ export async function POST(request: Request) {
     const status = result.error === "gallery-limit" ? 409 : 400;
     return NextResponse.json({ error: result.error }, { status });
   }
+
+  await recordOwnerWriteIfImpersonating(context, "academy-asset.upload", {
+    purpose,
+  });
 
   return NextResponse.json({
     storageKey: result.storageKey,

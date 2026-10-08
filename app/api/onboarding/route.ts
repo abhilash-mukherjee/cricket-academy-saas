@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { completeOwnerOnboarding } from "@/lib/owner-onboarding";
+import { logActor } from "@/lib/request-trace";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+
+  logActor(session.user.id);
 
   if (session.user.isSuperAdmin) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });

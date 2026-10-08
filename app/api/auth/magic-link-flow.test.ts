@@ -121,13 +121,27 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(authenticatedApp.headers.get("location")).toBeNull();
 
-      sessionCookie.value = setCookie!;
-      const { default: AppLayout } = await import("@/app/app/layout");
-      const html = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("p", null, "signed in"),
-          params: Promise.resolve({}),
+      const unauthenticatedHome = proxy(new NextRequest(`${origin}/`));
+      expect(unauthenticatedHome.headers.get("location")).toBeNull();
+
+      const authenticatedHome = proxy(
+        new NextRequest(`${origin}/`, {
+          headers: { cookie: setCookie! },
         }),
+      );
+      expect(authenticatedHome.status).toBeGreaterThanOrEqual(300);
+      expect(authenticatedHome.status).toBeLessThan(400);
+      expect(authenticatedHome.headers.get("location")).toBe(`${origin}/app`);
+
+      sessionCookie.value = setCookie!;
+      const { AppChrome } = await import("@/app/app/layout");
+      const html = renderToStaticMarkup(
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          createElement("p", null, "signed in"),
+        ),
       );
       expect(html).toContain(testEmail);
       expect(html).toContain("signed in");

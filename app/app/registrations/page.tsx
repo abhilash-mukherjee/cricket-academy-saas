@@ -1,0 +1,48 @@
+import { redirect } from "next/navigation";
+import { requireStaffSession } from "@/lib/staff-session";
+import { getImpersonationState } from "@/lib/impersonation";
+import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { calendarDateInIst } from "@/lib/player-age";
+import { listPendingRegistrations } from "@/lib/registrations";
+import { DashboardBackLink } from "../dashboard-back-link";
+import { RegistrationInbox } from "./inbox";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
+
+export default async function RegistrationsPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
+  const session = await requireStaffSession();
+  const impersonation = await getImpersonationState(session);
+
+  if (session.user.isSuperAdmin && !impersonation) {
+    redirect("/app/admin/academies");
+  }
+
+  const academy =
+    impersonation?.academy ?? (await getOwnedAcademy(session.user.id));
+  if (!academy) {
+    redirect("/app/onboarding");
+  }
+
+  const pending = await listPendingRegistrations(academy.id);
+
+  return (
+    <main className="flex min-h-full flex-col p-6">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+        <DashboardBackLink />
+        <section className="card bg-base-200 shadow">
+          <div className="card-body gap-4">
+            <h1 className="card-title">Registrations</h1>
+            <RegistrationInbox
+              registrations={pending}
+              today={calendarDateInIst()}
+            />
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

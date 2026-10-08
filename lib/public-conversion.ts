@@ -1,20 +1,30 @@
-import { eq, asc, and } from "drizzle-orm";
-import {
-  academies,
-  batches,
-  batchFeeOptions,
-} from "@/db/domain-schema";
+import { cache } from "react";
+import { eq } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { academies } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
+import { listRegistrableBatches, type RegistrableBatch } from "@/lib/academy-intake";
+import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
+
+/**
+ * Safety TTL for Conversion HTML if a purge trigger is missed (ADR 0028).
+ * The Conversion page `export const revalidate` must use this same numeric literal;
+ * Next.js cannot statically analyze an imported binding.
+ */
+export const PUBLIC_CONVERSION_CACHE_SECONDS = 300;
 
 export type PublicConversion = {
   name: string;
   slug: string;
+  phone: string | null;
+  isOnlineRegistrationAllowed: boolean;
   isIntakeAvailable: boolean;
   upiQrUrl: string | null;
+  batches: RegistrableBatch[];
 };
 
-export async function getPublicConversion(
+async function loadPublicConversion(
   slug: string,
 ): Promise<PublicConversion | null> {
   const db = getDb();
@@ -23,6 +33,7 @@ export async function getPublicConversion(
       id: academies.id,
       name: academies.name,
       slug: academies.slug,
+      phone: academies.phone,
       isActive: academies.isActive,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
       upiQrStorageKey: academies.upiQrStorageKey,
@@ -35,40 +46,35 @@ export async function getPublicConversion(
     return null;
   }
 
-  const openBatches = await db
-    .select({ id: batches.id })
-    .from(batches)
-    .where(
-      and(
-        eq(batches.academyId, academy.id),
-        eq(batches.isOpenForRegistration, true),
-      ),
-    );
-
-  let hasRegistrableBatch = false;
-  for (const batch of openBatches) {
-    const [feeOption] = await db
-      .select({ id: batchFeeOptions.id })
-      .from(batchFeeOptions)
-      .where(eq(batchFeeOptions.batchId, batch.id))
-      .orderBy(asc(batchFeeOptions.sortOrder))
-      .limit(1);
-
-    if (feeOption) {
-      hasRegistrableBatch = true;
-      break;
-    }
-  }
-
-  const isIntakeAvailable =
-    academy.isOnlineRegistrationAllowed && hasRegistrableBatch;
+  const batches = academy.isOnlineRegistrationAllowed
+    ? await listRegistrableBatches(academy.id)
+    : [];
+  const isIntakeAvailable = batches.length > 0;
 
   return {
     name: academy.name,
     slug: academy.slug,
+    phone: academy.phone,
+    isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
     isIntakeAvailable,
     upiQrUrl: isIntakeAvailable
       ? resolvePublicAssetUrl(academy.upiQrStorageKey)
       : null,
+    batches,
   };
 }
+
+function getCachedPublicConversion(
+  slug: string,
+): Promise<PublicConversion | null> {
+  return unstable_cache(
+    () => loadPublicConversion(slug),
+    ["public-conversion", slug, "registrable-ids"],
+    {
+      tags: [publicAcademyCacheTag(slug)],
+      revalidate: PUBLIC_CONVERSION_CACHE_SECONDS,
+    },
+  )();
+}
+
+export const getPublicConversion = cache(getCachedPublicConversion);

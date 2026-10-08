@@ -1,33 +1,34 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import {
+  recordOwnerWriteIfImpersonating,
+  resolveOwnerContext,
+} from "@/lib/owner-context";
 import { updateConversion } from "@/lib/conversion";
+import { revalidatePublicAcademyPages } from "@/lib/public-academy-pages";
 
 type ConversionBody = {
   upiQrStorageKey?: string | null;
+  isOnlineRegistrationAllowed?: boolean;
 };
 
 export async function POST(request: Request) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
-
-  if (!session) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (session.user.isSuperAdmin) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
-  const academy = await getOwnedAcademy(session.user.id);
-  if (!academy) {
-    return NextResponse.json({ error: "not-found" }, { status: 404 });
+  const context = await resolveOwnerContext(request.headers);
+  if (!context.ok) {
+    if (context.error === "unauthorized") {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    const status = context.error === "forbidden" ? 403 : 404;
+    return NextResponse.json({ error: context.error }, { status });
   }
 
   const body = (await request.json()) as ConversionBody;
-  const result = await updateConversion(academy.id, {
-    upiQrStorageKey: body.upiQrStorageKey ?? null,
+  const result = await updateConversion(context.academy.id, {
+    ...("upiQrStorageKey" in body
+      ? { upiQrStorageKey: body.upiQrStorageKey ?? null }
+      : {}),
+    ...("isOnlineRegistrationAllowed" in body
+      ? { isOnlineRegistrationAllowed: body.isOnlineRegistrationAllowed }
+      : {}),
   });
 
   if (!result.ok) {
@@ -39,6 +40,9 @@ export async function POST(request: Request) {
           : 400;
     return NextResponse.json({ error: result.error }, { status });
   }
+
+  await recordOwnerWriteIfImpersonating(context, "conversion.update");
+  revalidatePublicAcademyPages(context.academy.slug);
 
   return NextResponse.json({ ok: true });
 }

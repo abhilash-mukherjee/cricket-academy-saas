@@ -1,25 +1,49 @@
 import { redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
+import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { listBatches } from "@/lib/batches";
+import { listFeeOptions } from "@/lib/batch-fee-options";
+import { countPendingRegistrations } from "@/lib/registrations";
 import { CopyLink } from "./copy-link";
 import { APP_NAME } from "@/lib/constants";
 import { publicOrigin } from "@/lib/public-origin";
 import Link from "next/link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
+import { LinkPendingMark } from "../link-pending-mark";
 
 export default async function DashboardPage() {
-  const session = await requireStaffSession();
-  if (session.user.isSuperAdmin) {
-    redirect("/app");
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
   }
 
-  const academy = await getOwnedAcademy(session.user.id);
+  const session = await requireStaffSession();
+  const impersonation = await getImpersonationState(session);
+
+  if (session.user.isSuperAdmin && !impersonation) {
+    redirect("/app/admin/academies");
+  }
+
+  const academy =
+    impersonation?.academy ?? (await getOwnedAcademy(session.user.id));
   if (!academy) {
     redirect("/app/onboarding");
   }
 
-  const academyBatches = await listBatches(academy.id);
-  const firstBatch = academyBatches[0];
+  const [academyBatches, feeOptions, pendingCount] = await Promise.all([
+    listBatches(academy.id),
+    listFeeOptions(academy.id),
+    countPendingRegistrations(academy.id),
+  ]);
+  const hasBatches = academyBatches.length > 0;
+  const hasFeeOptions = feeOptions.length > 0;
+  const hasOpenBatch = academyBatches.some(
+    (batch) => batch.isOpenForRegistration,
+  );
+  const displayName = impersonation
+    ? impersonation.subjectEmail
+    : session.user.name;
   const origin = publicOrigin();
   const brochureUrl = `${origin}/a/${academy.slug}`;
   const conversionUrl = `${origin}/a/${academy.slug}/join`;
@@ -31,7 +55,13 @@ export default async function DashboardPage() {
           <div className="card-body gap-2">
             <h1 className="card-title">Dashboard</h1>
             <p>
-              Hello {session.user.name}. {academy.name} is live.
+              Hello {displayName}. {academy.name} is live.
+            </p>
+            <p>
+              <Link className="link" href="/app/registrations">
+                Pending Registrations: {pendingCount}
+                <LinkPendingMark />
+              </Link>
             </p>
           </div>
         </section>
@@ -41,23 +71,48 @@ export default async function DashboardPage() {
             <h2 className="card-title text-lg">Setup next steps</h2>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                {firstBatch
-                  ? firstBatch.isOpenForRegistration
-                    ? `${firstBatch.name} is open for Registration.`
-                    : `${firstBatch.name} is closed for Registration. Open it when you are ready.`
-                  : "Add a Batch when you are ready for intake."}
+                {hasBatches ? (
+                  <Link className="link" href="/app/batches">
+                    Batches — open one to rename it, edit fee options, or open
+                    it for Registration
+                    <LinkPendingMark />
+                  </Link>
+                ) : (
+                  <Link className="link" href="/app/batches">
+                    Add your first Batch
+                    <LinkPendingMark />
+                  </Link>
+                )}
               </li>
+              {hasBatches && !hasFeeOptions ? (
+                <li>
+                  <Link className="link" href="/app/batches">
+                    Open a Batch and add a fee option
+                    <LinkPendingMark />
+                  </Link>
+                </li>
+              ) : null}
+              {hasFeeOptions && !hasOpenBatch ? (
+                <li>
+                  <Link className="link" href="/app/batches">
+                    Open a Batch for Registration.
+                    <LinkPendingMark />
+                  </Link>
+                </li>
+              ) : null}
               <li>
                 <Link className="link" href="/app/brochure">
                   Edit your brochure
+                  <LinkPendingMark />
                 </Link>{" "}
                 photos, YouTube, Batch blurbs, and Coach profiles.
               </li>
               <li>
                 <Link className="link" href="/app/conversion">
-                  Upload your conversion page UPI QR
+                  Conversion page
+                  <LinkPendingMark />
                 </Link>{" "}
-                for visitors when intake is open.
+                UPI QR (optional) and online Registration.
               </li>
               <li>
                 Share your public {APP_NAME} links so visitors can find you.

@@ -14,6 +14,8 @@ import {
 import { academies, batches } from "@/db/domain-schema";
 import { user } from "@/db/auth-schema";
 import { getDb } from "@/db/client";
+import { listBatches } from "@/lib/batches";
+import { getOwnedAcademy } from "@/lib/owner-onboarding";
 
 const sessionCookie = vi.hoisted(() => ({ value: "" }));
 
@@ -156,12 +158,23 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(onboardingResponse.status).toBe(200);
 
-      sessionCookie.value = cookie;
-      const { default: DashboardPage } = await import(
-        "@/app/app/dashboard/page"
-      );
-      const html = renderToStaticMarkup(await DashboardPage());
-      expect(html).toContain("U-14 evening is closed for Registration.");
+      const db = getDb();
+      const [owner] = await db
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.email, testEmail))
+        .limit(1);
+      expect(owner).toBeTruthy();
+
+      const academy = await getOwnedAcademy(owner!.id);
+      expect(academy).toBeTruthy();
+
+      await expect(listBatches(academy!.id)).resolves.toEqual([
+        expect.objectContaining({
+          name: "U-14 evening",
+          isOpenForRegistration: false,
+        }),
+      ]);
     });
 
     it("does not let an Owner create a second Academy", async () => {

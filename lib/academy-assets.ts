@@ -4,6 +4,10 @@ import {
   MAX_ACADEMY_IMAGE_BYTES,
   MAX_BROCHURE_GALLERY_IMAGES,
 } from "@/lib/constants";
+import {
+  logWarning,
+  logInfo,
+} from "@/lib/request-trace";
 
 export type AcademyAssetPurpose =
   | "brochure-gallery"
@@ -81,13 +85,15 @@ function pathnameForPurpose(
   return `${academyAssetPrefix(academyId)}${folder}/${id}.${extension}`;
 }
 
+// draftCount is the editor's current gallery size, including images already saved.
 export function validateGalleryCount(
   existingCount: number,
   draftCount = 0,
   incomingCount = 1,
 ): boolean {
   return (
-    existingCount + draftCount + incomingCount <= MAX_BROCHURE_GALLERY_IMAGES
+    Math.max(existingCount, draftCount) + incomingCount <=
+    MAX_BROCHURE_GALLERY_IMAGES
   );
 }
 
@@ -101,10 +107,12 @@ export async function uploadAcademyAsset(
   const extension = extensionForMimeType(mimeType);
 
   if (!extension || !isAllowedImageMimeType(mimeType)) {
+    logWarning("Academy asset was not uploaded.", "invalid-type");
     return { ok: false, error: "invalid-type" };
   }
 
   if (file.size > MAX_ACADEMY_IMAGE_BYTES) {
+    logWarning("Academy asset was not uploaded.", "file-too-large");
     return { ok: false, error: "file-too-large" };
   }
 
@@ -112,6 +120,7 @@ export async function uploadAcademyAsset(
     const existingCount = options?.existingGalleryCount ?? 0;
     const draftCount = options?.draftGalleryCount ?? 0;
     if (!validateGalleryCount(existingCount, draftCount)) {
+      logWarning("Academy asset was not uploaded.", "gallery-limit");
       return { ok: false, error: "gallery-limit" };
     }
   }
@@ -124,6 +133,9 @@ export async function uploadAcademyAsset(
     contentType: mimeType,
   });
 
+  logInfo(
+    `Academy asset uploaded successfully with ID: ${blob.pathname}.`,
+  );
   return {
     ok: true,
     storageKey: blob.pathname,

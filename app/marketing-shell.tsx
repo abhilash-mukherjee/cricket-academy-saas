@@ -1,20 +1,29 @@
+import { LinkPendingMark } from "@/app/app/link-pending-mark";
 import { APP_NAME } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
+import heroImage from "@/public/product-homepage-hero.webp";
 
 type MarketingShellProps = {
   children: React.ReactNode;
+  className?: string;
 };
 
-export function MarketingShell({ children }: MarketingShellProps) {
+export function MarketingShell({ children, className }: MarketingShellProps) {
   return (
-    <main className="relative flex min-h-dvh flex-1 flex-col">
+    <main
+      className={[
+        "relative flex flex-1 flex-col",
+        className ?? "min-h-dvh",
+      ].join(" ")}
+    >
       <Image
-        src="/product-homepage-hero.jpg"
+        src={heroImage}
         alt=""
         fill
         priority
-        sizes="100vw"
+        placeholder="blur"
+        sizes="(max-width: 768px) 100vw, 1600px"
         className="object-cover object-[center_40%]"
       />
       <div className="absolute inset-0 bg-neutral/60" />
@@ -28,13 +37,13 @@ export function MarketingShell({ children }: MarketingShellProps) {
               width={897}
               height={145}
               className="h-6 w-auto"
-              priority
             />
           </Link>
         </div>
         <div className="flex-none">
-          <Link href="/login" className="btn btn-ghost btn-sm text-base-100">
+          <Link href="/app" className="btn btn-ghost btn-sm text-base-100">
             Sign in
+            <LinkPendingMark />
           </Link>
         </div>
       </div>

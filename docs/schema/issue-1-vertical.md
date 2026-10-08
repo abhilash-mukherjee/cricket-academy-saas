@@ -1,6 +1,6 @@
 # Issue #1 vertical — domain schema (v1)
 
-Blueprint for the first vertical's Postgres schema. Parent spec: [#1](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/1). Trade-offs: [ADR-0026](../adr/0026-v1-domain-schema.md).
+Blueprint for the first vertical's Postgres schema. Parent spec: [#1](https://github.com/abhilash-mukherjee/cricket-academy-saas/issues/1). Trade-offs: [ADR-0026](../adr/0026-v1-domain-schema.md), [ADR-0029](../adr/0029-fee-option-intensity.md), [ADR-0032](../adr/0032-phone-parsed-to-canonical-e164.md).
 
 After implementation, `db/domain-schema.ts` and migrations are canonical; update this doc when the schema changes intentionally.
 
@@ -10,7 +10,7 @@ After implementation, `db/domain-schema.ts` and migrations are canonical; update
 - **Timestamps:** `created_at timestamptz NOT NULL DEFAULT now()` on all tables; `updated_at` on mutable domain rows
 - **Tenant isolation:** every Academy-scoped row carries `academy_id` (ADR-0008)
 - **Foreign keys:** `ON DELETE RESTRICT` on all FKs
-- **Phones:** normalized to E.164 on write in the data layer
+- **Phones:** parsed then stored as E.164 on write (ADR 0032); identity keys compare that canonical value
 - **Files:** store `storage_key text` (object-storage path); app resolves to a URL
 
 ## Repo layout
@@ -77,14 +77,16 @@ Standard Better Auth shape. Magic-link only in v1; `account` is likely unused.
 | --- | --- | --- |
 | `id` | `uuid` PK | |
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
-| `name` | `text NOT NULL` | |
+| `name` | `text NOT NULL` | Stored as typed after trim |
 | `blurb` | `text` nullable | Brochure display-only |
 | `is_open_for_registration` | `boolean NOT NULL DEFAULT false` | |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Ordering:** `created_at` (no `sort_order` in v1).
 
-A Batch is registrable only when it has at least one `batch_fee_option` and `is_open_for_registration = true`.
+**Constraints:** `UNIQUE (academy_id, lower(btrim(name)))` — unique at the Academy after trim and case fold; public pages show the stored name.
+
+A Batch is registrable only when it has at least one offered `batch_fee_option` and `is_open_for_registration = true`.
 
 ### `batch_fee_options`
 
@@ -93,12 +95,17 @@ A Batch is registrable only when it has at least one `batch_fee_option` and `is_
 | `id` | `uuid` PK | |
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
-| `term_months` | `integer NOT NULL` | e.g. 1, 3, 6 |
-| `fee_paise` | `integer NOT NULL` | Total fee for that term (INR × 100) |
+| `days_per_week` | `integer NOT NULL` | Intensity count 1–7; not named weekdays |
+| `term_days` | `integer NOT NULL` | Whole calendar days of coverage, at least 1. e.g. 45, 90, 100 |
+| `fee_paise` | `integer NOT NULL` | Total fee for that package (INR × 100) |
+| `label` | `text` nullable | Display name only; not identity |
+| `is_offered` | `boolean NOT NULL DEFAULT true` | `false` hides from conversion; row kept for history |
 | `sort_order` | `integer NOT NULL` | Conversion page order |
 | `created_at` / `updated_at` | `timestamptz` | |
 
-**Constraint:** `UNIQUE (batch_id, term_months)`
+**Constraints:** `UNIQUE (batch_id, days_per_week, term_days)`; `CHECK (days_per_week BETWEEN 1 AND 7)`
+
+End state after the cutover. Stored months become this column in two releases ([ADR-0033](../adr/0033-fee-option-term-in-days.md)). Trade-offs: [ADR-0029](../adr/0029-fee-option-intensity.md), [ADR-0033](../adr/0033-fee-option-term-in-days.md).
 
 ### `registrations`
 
@@ -109,8 +116,9 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
 | `id` | `uuid` PK | |
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
-| `batch_fee_option_id` | `uuid NOT NULL` FK → `batch_fee_options` | Visitor’s term/fee choice |
-| `term_months` | `integer NOT NULL` | Snapshotted at submit |
+| `batch_fee_option_id` | `uuid NOT NULL` FK → `batch_fee_options` | Visitor’s package choice |
+| `days_per_week` | `integer NOT NULL` | Snapshotted at submit |
+| `term_days` | `integer NOT NULL` | Snapshotted at submit. Whole calendar days, at least 1 |
 | `fee_paise` | `integer NOT NULL` | Snapshotted at submit |
 | `player_full_name` | `text NOT NULL` | |
 | `player_full_name_normalized` | `text NOT NULL` | `lower(trim(name))` on insert |
@@ -118,7 +126,8 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
 | `guardian_full_name` | `text` nullable | Required when Player &lt; 18 (app) |
 | `guardian_phone` | `text` nullable | E.164 |
 | `player_phone` | `text` nullable | E.164; required when Player ≥ 18 (app) |
-| `contact_phone` | `text NOT NULL` | E.164; `guardian_phone ?? player_phone` |
+| `contact_phone` | `text NOT NULL` | E.164; Guardian phone when the Player is under 18, otherwise Player phone |
+| `contact_email` | `text` nullable | Optional; not a login; copied onto `players.email` on accept when the Player has none; ignored by the duplicate-pending guard |
 | `note` | `text` nullable | |
 | `status` | `registration_status NOT NULL DEFAULT 'pending'` | |
 | `player_id` | `uuid` nullable FK → `players` | Set on accept |
@@ -138,6 +147,7 @@ Postgres enum `registration_status`: `pending` | `accepted` | `rejected`
   ```
 
 - `(academy_id, status)` for inbox and dashboard pending count
+- `CHECK (days_per_week BETWEEN 1 AND 7)`
 
 Rejected rows are retained; visitors may resubmit after reject.
 
@@ -151,11 +161,12 @@ Rejected rows are retained; visitors may resubmit after reject.
 | `full_name_normalized` | `text NOT NULL` | |
 | `phone` | `text NOT NULL` | E.164 |
 | `date_of_birth` | `date NOT NULL` | |
+| `email` | `text` nullable | Optional contact; not a login; not identity. See [issue #61 operations](./issue-61-operations.md) |
 | `created_at` / `updated_at` | `timestamptz` | |
 
 **Constraint:** `UNIQUE (academy_id, full_name_normalized, phone)`
 
-Accept flow: find by that key → link existing Player, else insert → create `enrollments` row.
+Accept flow: find by that key → link existing Player, else insert → create `enrollments` row. Guardian and email columns on this table, and the copy rules, are in [issue #61 operations](./issue-61-operations.md).
 
 ### `enrollments`
 
@@ -165,15 +176,18 @@ Accept flow: find by that key → link existing Player, else insert → create `
 | `academy_id` | `uuid NOT NULL` FK → `academies` | |
 | `player_id` | `uuid NOT NULL` FK → `players` | |
 | `batch_id` | `uuid NOT NULL` FK → `batches` | |
-| `registration_id` | `uuid NOT NULL` FK → `registrations` | Provenance |
-| `term_months` | `integer NOT NULL` | From accepted Registration |
+| `registration_id` | `uuid` nullable FK → `registrations` | Provenance. Null for manual add. Unique when set. See [issue #61 operations](./issue-61-operations.md) |
+| `days_per_week` | `integer NOT NULL` | From accepted Registration |
+| `term_days` | `integer NOT NULL` | From accepted Registration. Whole calendar days, at least 1 |
 | `fee_paise_paid` | `integer NOT NULL` | From accepted Registration |
-| `valid_from` | `date NOT NULL` | Accept date |
-| `valid_until` | `date NOT NULL` | `valid_from` + `term_months` calendar months |
-| `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | Renewal chain |
+| `valid_from` | `date NOT NULL` | Owner-chosen start. valid-until is derived from the term |
+| `valid_until` | `date NOT NULL` | Last covered day. `valid_from` counts as day one, so `valid_from` + `term_days` − 1 day. The cutover does not rewrite a date already stored |
+| `renewed_from_enrollment_id` | `uuid` nullable FK → `enrollments` | On the table. Product writes leave it null ([ADR-0040](../adr/0040-no-separate-enrollment-renew.md)) |
 | `created_at` / `updated_at` | `timestamptz` | |
 
-No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 3-month stint and a later 6-month renewal are separate rows).
+**Constraint:** `CHECK (days_per_week BETWEEN 1 AND 7)`
+
+No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 90-day stint and a later 180-day term are separate rows).
 
 ### `brochure_images`
 
@@ -240,22 +254,26 @@ user ─────────────────────┬──►
 ## App-layer rules (not DB constraints)
 
 - Slug is immutable after create
+- Age 18 is evaluated in `Asia/Kolkata` as of submit: under 18 until the 18th birthday calendar day; adult on that birthday. Adult Guardian is not collected at intake. `contact_phone` is the Guardian phone when the Player is under 18, otherwise the Player phone; the unused Guardian or Player phone/name columns are null.
+- Optional `contact_email` is copied onto `players.email` on accept when the Player has none; it is not part of the duplicate-pending guard
 - Guardian required when date of birth → age &lt; 18; `player_phone` required when ≥ 18
 - Claim flow: when `pending_owner_email` matches signed-in `user.email`, set `owner_user_id` and clear `pending_owner_email`
 - `enrollments.academy_id` must match both parent `academy_id` values
 - Impersonation writes → insert `impersonation_audit_events`
-- Conversion page: visitor picks an open Batch and a `batch_fee_option`; thank-you shows snapshotted `fee_paise` and Academy UPI QR (display-only; ADR-0002)
-- Duplicate-pending guard ignores fee option — one pending Registration per phone + Batch + Player name
-- Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = `valid_from` + `term_months` calendar months
+- Conversion page: visitor picks an open Batch and an offered `batch_fee_option`; thank-you shows snapshotted `days_per_week`, `term_days` as a day count, `fee_paise`, and Academy UPI QR (display-only; ADR-0002)
+- Duplicate-pending guard ignores fee option **and** email — one pending Registration per phone + Batch + Player name
+- Accept creates an `enrollments` row with `valid_from` = accept date and `valid_until` = last covered day (`valid_from` + `term_days` − 1 day); copies snapshotted `days_per_week`
 - Brochure does not list fees; pricing is conversion-page only
 - Onboarding wizard does not require fee options; Owner adds them in batch settings before intake opens
+- `days_per_week` and `term_days` are immutable after create; price, label, sort order, and `is_offered` may change
+- Stop offering a package by setting `is_offered = false`; delete only when no Registration references it
 
 ## P0 (#1) vs deferred (enrollment)
 
 | In #1 | Deferred |
 | --- | --- |
 | Visitor picks Batch + fee option; amount on conversion/thank-you | Expiry reminders / lapsed membership UI |
-| Registration inbox shows Batch · term · fee | Renewal form / overlap handling |
+| Registration inbox shows Batch · days/week · term · fee | Overlap handling (shipped with accept and manual add). No separate renew action (ADR-0040) |
 | Accept writes `enrollments` with dates | Roster “active until” dashboard |
 | Owner manages `batch_fee_options` in `/app/batches` | Brochure “from ₹X” pricing |
 
@@ -267,6 +285,6 @@ user ─────────────────────┬──►
 | `player_batches` | Replaced by `enrollments` |
 | `impersonation_sessions` | Active state lives in session |
 | `onboarding_drafts` | Infer from missing Academy |
-| Coach auth / `sessions` (attendance) | Out of scope for #1 |
+| Coach auth / `batch_sessions` (attendance) | Out of scope for #1 |
 | SaaS billing / payment verification | Out of scope (ADR-0002) |
 | Hard delete / cascades | Deactivate only; RESTRICT on FKs |

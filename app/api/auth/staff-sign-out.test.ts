@@ -79,6 +79,7 @@ describe("public chrome has no Sign out", () => {
       createElement(MarketingShell, null, createElement("p", null, "hello")),
     );
     expect(homepage).not.toContain("Sign out");
+    expect(homepage).not.toContain("Open menu");
 
     const brochure = renderToStaticMarkup(
       createElement(BrochureView, {
@@ -88,6 +89,7 @@ describe("public chrome has no Sign out", () => {
           tagline: "Play",
           location: "Bengaluru",
           phone: "9999999999",
+          isIntakeAvailable: false,
           images: [],
           youtubeVideoIds: [],
           batches: [],
@@ -96,6 +98,7 @@ describe("public chrome has no Sign out", () => {
       }),
     );
     expect(brochure).not.toContain("Sign out");
+    expect(brochure).not.toContain("Open menu");
   });
 });
 
@@ -122,12 +125,14 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const setCookie = await signInStaff(testEmail);
       sessionCookie.value = setCookie;
 
-      const { default: AppLayout } = await import("@/app/app/layout");
+      const { AppChrome } = await import("@/app/app/layout");
       const html = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("p", null, "signed in"),
-          params: Promise.resolve({}),
-        }),
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          createElement("p", null, "signed in"),
+        ),
       );
       expect(html).toContain(testEmail);
       expect(html).toContain("Sign out");

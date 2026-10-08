@@ -183,7 +183,6 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const html = renderToStaticMarkup(await DashboardPage());
 
       expect(html).toContain("Blitz Cricket Academy");
-      expect(html).toContain("U-14 evening");
       expect(html).toContain(`/a/${slugA}`);
       expect(html).not.toContain("Rival Cricket Academy");
       expect(html).not.toContain("Weekend nets");
