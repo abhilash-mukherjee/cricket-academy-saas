@@ -7,6 +7,7 @@ import {
 } from "@/db/domain-schema";
 import { getDb, type getTransactionalDb } from "@/db/client";
 import { enrollmentTerm, type TermStatus } from "@/lib/enrollments";
+import { realPausedDays, type RealPauseSpan } from "@/lib/enrollment-term";
 
 export type { TermStatus };
 import { normalizeRequiredPhone } from "@/lib/phone";
@@ -78,6 +79,7 @@ export type PlayerEnrollmentView = {
   plannedLastPausedOn: string | null;
   startsLater: boolean;
   continuesPreviousTerm: boolean;
+  realPausedDays: number;
   /** All pause intervals on this Enrollment (for overlap preview; not a history UI). */
   pauseIntervals: {
     pausedOn: string;
@@ -625,6 +627,7 @@ export async function getPlayer(
             pausedOn: enrollmentPauses.pausedOn,
             plannedLastPausedOn: enrollmentPauses.plannedLastPausedOn,
             resumedOn: enrollmentPauses.resumedOn,
+            isDeferred: enrollmentPauses.isDeferred,
           })
           .from(enrollmentPauses)
           .where(
@@ -634,20 +637,14 @@ export async function getPlayer(
             ),
           );
 
-  const pausesByEnrollment = new Map<
-    string,
-    {
-      pausedOn: string;
-      plannedLastPausedOn: string | null;
-      resumedOn: string | null;
-    }[]
-  >();
+  const pausesByEnrollment = new Map<string, RealPauseSpan[]>();
   for (const pause of pauseRows) {
     const list = pausesByEnrollment.get(pause.enrollmentId) ?? [];
     list.push({
       pausedOn: pause.pausedOn,
       plannedLastPausedOn: pause.plannedLastPausedOn,
       resumedOn: pause.resumedOn,
+      isDeferred: pause.isDeferred,
     });
     pausesByEnrollment.set(pause.enrollmentId, list);
   }
@@ -666,6 +663,7 @@ export async function getPlayer(
           : null,
         today,
       );
+      const pauses = pausesByEnrollment.get(row.id) ?? [];
       return {
         id: row.id,
         batchId: row.batchId,
@@ -681,7 +679,12 @@ export async function getPlayer(
         plannedLastPausedOn: term.plannedLastPausedOn,
         startsLater: term.startsLater,
         continuesPreviousTerm: row.renewedFromEnrollmentId !== null,
-        pauseIntervals: pausesByEnrollment.get(row.id) ?? [],
+        realPausedDays: realPausedDays(pauses, today),
+        pauseIntervals: pauses.map((pause) => ({
+          pausedOn: pause.pausedOn,
+          plannedLastPausedOn: pause.plannedLastPausedOn,
+          resumedOn: pause.resumedOn,
+        })),
       };
     }),
   };
