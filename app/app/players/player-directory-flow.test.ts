@@ -1913,6 +1913,186 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(second).not.toContain("page=");
     });
+
+    it("shows real-pause days on every Enrollment card and leaves the directory unchanged", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await ownerAcademy(cookie);
+      const today = calendarDateInIst();
+      const startsOn = addCalendarDays(today, 10);
+      const storedUntil = addCalendarDays(today, 38);
+      const openOn = addCalendarDays(today, -2);
+      const datedLast = addCalendarDays(today, 4);
+      const db = getDb();
+      const [later, open, lapsed, oneDay] = await db
+        .insert(batches)
+        .values([
+          { academyId: academy.id, name: "Later nets" },
+          { academyId: academy.id, name: "Open nets" },
+          { academyId: academy.id, name: "Lapsed nets" },
+          { academyId: academy.id, name: "One-day nets" },
+        ])
+        .returning({ id: batches.id, name: batches.name });
+      const [player] = await db
+        .insert(players)
+        .values({
+          academyId: academy.id,
+          fullName: "Pause Days Rao",
+          fullNameNormalized: "pause days rao",
+          phone: "+919876543210",
+          dateOfBirth: "2012-04-01",
+        })
+        .returning({ id: players.id });
+      const inserted = await db
+        .insert(enrollments)
+        .values([
+          {
+            academyId: academy.id,
+            playerId: player.id,
+            batchId: later.id,
+            daysPerWeek: 3,
+            termDays: 30,
+            feePaisePaid: 150000,
+            validFrom: today,
+            validUntil: lastCoveredDay(today, 30),
+          },
+          {
+            academyId: academy.id,
+            playerId: player.id,
+            batchId: open.id,
+            daysPerWeek: 3,
+            termDays: 90,
+            feePaisePaid: 150000,
+            validFrom: addCalendarDays(today, -40),
+            validUntil: storedUntil,
+          },
+          {
+            academyId: academy.id,
+            playerId: player.id,
+            batchId: lapsed.id,
+            daysPerWeek: 2,
+            termDays: 10,
+            feePaisePaid: 100000,
+            validFrom: addCalendarDays(today, -20),
+            validUntil: addCalendarDays(today, -11),
+          },
+          {
+            academyId: academy.id,
+            playerId: player.id,
+            batchId: oneDay.id,
+            daysPerWeek: 3,
+            termDays: 30,
+            feePaisePaid: 150000,
+            validFrom: addCalendarDays(today, -5),
+            validUntil: addCalendarDays(today, 24),
+          },
+        ])
+        .returning({ id: enrollments.id, batchId: enrollments.batchId });
+      const enrollmentId = (batchId: string) =>
+        inserted.find((row) => row.batchId === batchId)!.id;
+      await db.insert(enrollmentPauses).values([
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(later.id),
+          pausedOn: today,
+          plannedLastPausedOn: addCalendarDays(startsOn, -1),
+          isDeferred: true,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(open.id),
+          pausedOn: addCalendarDays(today, -40),
+          plannedLastPausedOn: addCalendarDays(today, -27),
+          resumedOn: addCalendarDays(today, -26),
+          isDeferred: true,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(open.id),
+          pausedOn: addCalendarDays(today, -10),
+          plannedLastPausedOn: addCalendarDays(today, -6),
+          resumedOn: addCalendarDays(today, -5),
+          isDeferred: false,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(open.id),
+          pausedOn: openOn,
+          plannedLastPausedOn: datedLast,
+          isDeferred: false,
+        },
+        {
+          academyId: academy.id,
+          enrollmentId: enrollmentId(oneDay.id),
+          pausedOn: addCalendarDays(today, -3),
+          plannedLastPausedOn: addCalendarDays(today, -3),
+          resumedOn: addCalendarDays(today, -2),
+          isDeferred: false,
+        },
+      ]);
+      sessionCookie.value = cookie;
+
+      const { default: PlayerPage } = await import("./[playerId]/page");
+      const { default: PlayersPage } = await import("./page");
+      const html = renderToStaticMarkup(
+        await PlayerPage({
+          params: Promise.resolve({ playerId: player.id }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const laterAt = html.indexOf("Later nets");
+      const oneDayAt = html.indexOf("One-day nets");
+      const lapsedAt = html.indexOf("Lapsed nets");
+      const openAt = html.indexOf("Open nets");
+      const laterCard = html.slice(laterAt, oneDayAt);
+      const oneDayCard = html.slice(oneDayAt, lapsedAt);
+      const lapsedCard = html.slice(lapsedAt, openAt);
+      const openCard = html.slice(openAt);
+      const openUntil = `Valid until ${formatCalendarDate(storedUntil)} (to be extended when this pause ends)`;
+      const openPause = `Paused ${formatCalendarDate(openOn)}, through ${formatCalendarDate(datedLast)}`;
+      const laterUntil = `Valid until ${formatCalendarDate(lastCoveredDay(startsOn, 30))}`;
+      const firstDay = `First day ${formatCalendarDate(startsOn)}`;
+
+      expect(laterAt).toBeGreaterThan(-1);
+      expect(oneDayAt).toBeGreaterThan(laterAt);
+      expect(lapsedAt).toBeGreaterThan(oneDayAt);
+      expect(openAt).toBeGreaterThan(lapsedAt);
+
+      expect(openCard).toContain(openUntil);
+      expect(openCard).not.toContain(
+        `Valid until ${formatCalendarDate(addCalendarDays(storedUntil, 3))}`,
+      );
+      expect(openCard.indexOf("8 paused days")).toBeGreaterThan(
+        openCard.indexOf(openUntil),
+      );
+      expect(openCard.indexOf(openPause)).toBeGreaterThan(
+        openCard.indexOf("8 paused days"),
+      );
+
+      expect(laterCard).toContain(laterUntil);
+      expect(laterCard).not.toContain("to be extended when this pause ends");
+      expect(laterCard.indexOf("0 paused days")).toBeGreaterThan(
+        laterCard.indexOf(laterUntil),
+      );
+      expect(laterCard.indexOf(firstDay)).toBeGreaterThan(
+        laterCard.indexOf("0 paused days"),
+      );
+
+      expect(lapsedCard).toContain("Lapsed");
+      expect(lapsedCard).toContain("0 paused days");
+      expect(lapsedCard).not.toContain("to be extended when this pause ends");
+
+      expect(oneDayCard).toContain("1 paused day");
+      expect(oneDayCard).not.toContain("to be extended when this pause ends");
+      expect(oneDayCard).not.toContain("1 paused days");
+
+      const directory = renderToStaticMarkup(
+        await PlayersPage({ searchParams: Promise.resolve({}) }),
+      );
+      expect(directory).toContain("Pause Days Rao");
+      expect(directory).not.toContain("paused day");
+      expect(directory).not.toContain("to be extended when this pause ends");
+    });
   },
 );
 

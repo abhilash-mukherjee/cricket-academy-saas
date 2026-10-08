@@ -36,6 +36,10 @@ function emptyPauseDraft(today: string): PauseDraft {
   return { pausedOn: today, plannedLastPausedOn: "" };
 }
 
+function pausedDaysCopy(days: number): string {
+  return days === 1 ? "1 paused day" : `${days} paused days`;
+}
+
 function pauseCopy(
   pausedOn: string | null,
   plannedLastPausedOn: string | null,
@@ -394,7 +398,11 @@ export function PlayerEnrollmentList({
                 <p>
                   Valid until{" "}
                   {formatCalendarDate(enrollment.effectiveValidUntil)}
+                  {enrollment.status === "paused" && !enrollment.startsLater
+                    ? " (to be extended when this pause ends)"
+                    : null}
                 </p>
+                <p>{pausedDaysCopy(enrollment.realPausedDays)}</p>
                 {enrollment.startsLater && enrollment.plannedLastPausedOn ? (
                   <p>
                     First day{" "}
