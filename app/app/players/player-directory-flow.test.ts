@@ -1502,8 +1502,18 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(playerHtml).toContain(
         `Valid until ${formatCalendarDate(lastCoveredDay(startsOn, 30))}`,
       );
-      expect(playerHtml).toContain(">Resume<");
+      expect(playerHtml).toContain(">Start Now<");
+      expect(playerHtml).not.toContain(">Resume<");
       expect(playerHtml).not.toContain(">Pause<");
+
+      const mixedHtml = renderToStaticMarkup(
+        await PlayerPage({
+          params: Promise.resolve({ playerId: mixed.id }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(mixedHtml.split(">Start Now<").length - 1).toBe(1);
+      expect(mixedHtml.split(">Resume<").length - 1).toBe(1);
 
       const all = renderToStaticMarkup(
         await PlayersPage({ searchParams: Promise.resolve({}) }),

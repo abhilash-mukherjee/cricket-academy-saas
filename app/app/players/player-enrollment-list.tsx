@@ -350,6 +350,7 @@ export function PlayerEnrollmentList({
         {enrollments.map((enrollment) => {
           const pauseOpen = openPauseId === enrollment.id;
           const resumeOpen = openResumeId === enrollment.id;
+          const isDeferredStart = enrollment.startsLater;
           const preview = pauseOpen
             ? pausePreviewCopy(
                 draft,
@@ -431,7 +432,7 @@ export function PlayerEnrollmentList({
                         className="btn btn-sm btn-outline self-start"
                         onClick={() => openResume(enrollment.id)}
                       >
-                        Resume
+                        {isDeferredStart ? "Start Now" : "Resume"}
                       </button>
                     ) : null}
 
