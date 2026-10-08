@@ -519,6 +519,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
       expect(html).toContain("Paused Players are not listed.");
+      expect(html).not.toContain("Players who start later are not listed.");
       expect(html).not.toContain("Arjun Rao");
 
       const stored = await save(cookie, batch.id, today, {
@@ -746,6 +747,139 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(live!.players.map((player) => player.fullName)).toEqual([
         "Arjun Rao",
       ]);
+    });
+
+    it("leaves a Player who starts later off the list and says so", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id);
+      const today = calendarDateInIst();
+
+      const later = await addPlayer(cookie, {
+        playerFullName: "Later Rao",
+        playerDateOfBirth: "1990-06-15",
+        playerPhone: "9876543210",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: addCalendarDays(today, 8),
+      });
+      expect(later.status).toBe(200);
+      const active = await addPlayer(cookie, {
+        playerFullName: "Meera Shah",
+        playerDateOfBirth: "1990-06-15",
+        playerPhone: "9876543211",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: today,
+      });
+      expect(active.status).toBe(200);
+
+      const list = await getSessionAttendance(
+        academy.id,
+        batch.id,
+        today,
+        today,
+      );
+      expect(list!.deferredStartsOmitted).toBe(true);
+      expect(list!.pausedPlayersOmitted).toBe(false);
+      expect(list!.players.map((player) => player.fullName)).toEqual([
+        "Meera Shah",
+      ]);
+
+      sessionCookie.value = cookie;
+      const { default: SessionsPage } = await import(
+        "@/app/app/batches/[batchId]/sessions/page"
+      );
+      const html = renderToStaticMarkup(
+        await SessionsPage({
+          params: Promise.resolve({ batchId: batch.id }),
+          searchParams: Promise.resolve({ date: today }),
+        }),
+      );
+      expect(html).toContain("Players who start later are not listed.");
+      expect(html).not.toContain("Paused Players are not listed.");
+      expect(html).not.toContain("Later Rao");
+    });
+
+    it("shows both notes when a deferred start and a real Pause leave Players off the same list", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id);
+      const today = calendarDateInIst();
+
+      const later = await addPlayer(cookie, {
+        playerFullName: "Later Rao",
+        playerDateOfBirth: "1990-06-15",
+        playerPhone: "9876543210",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: addCalendarDays(today, 8),
+      });
+      expect(later.status).toBe(200);
+
+      const paused = await addPlayer(cookie, {
+        playerFullName: "Arjun Rao",
+        playerDateOfBirth: "1990-06-15",
+        playerPhone: "9876543212",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: today,
+      });
+      expect(paused.status).toBe(200);
+      const pausedId = ((await paused.json()) as { playerId: string }).playerId;
+      const detail = await getPlayer(academy.id, pausedId, today);
+      const enrollmentId = detail!.enrollments[0]!.id;
+      const pause = await pauseEnrollment(
+        new Request(`${origin}/api/enrollments/${enrollmentId}/pause`, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin, cookie },
+          body: JSON.stringify({ pausedOn: today, plannedLastPausedOn: null }),
+        }),
+        { params: Promise.resolve({ enrollmentId }) },
+      );
+      expect(pause.status).toBe(200);
+
+      const active = await addPlayer(cookie, {
+        playerFullName: "Meera Shah",
+        playerDateOfBirth: "1990-06-15",
+        playerPhone: "9876543211",
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: today,
+      });
+      expect(active.status).toBe(200);
+
+      const list = await getSessionAttendance(
+        academy.id,
+        batch.id,
+        today,
+        today,
+      );
+      expect(list!.deferredStartsOmitted).toBe(true);
+      expect(list!.pausedPlayersOmitted).toBe(true);
+      expect(list!.players.map((player) => player.fullName)).toEqual([
+        "Meera Shah",
+      ]);
+
+      sessionCookie.value = cookie;
+      const { default: SessionsPage } = await import(
+        "@/app/app/batches/[batchId]/sessions/page"
+      );
+      const html = renderToStaticMarkup(
+        await SessionsPage({
+          params: Promise.resolve({ batchId: batch.id }),
+          searchParams: Promise.resolve({ date: today }),
+        }),
+      );
+      expect(html).toContain("Players who start later are not listed.");
+      expect(html).toContain("Paused Players are not listed.");
+      expect(html).toContain("Meera Shah");
+      expect(html).not.toContain("Later Rao");
+      expect(html).not.toContain("Arjun Rao");
     });
   },
 );

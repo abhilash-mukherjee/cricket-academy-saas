@@ -15,6 +15,8 @@ import { DashboardBackLink } from "../dashboard-back-link";
 import { ManualAddForm } from "./manual-add-form";
 import { PlayerPager } from "./player-pager";
 import EnrollmentStatus from "../enrollment-status";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
+import { LinkPendingMark } from "../link-pending-mark";
 
 type PlayersPageProps = {
   searchParams: Promise<{
@@ -64,10 +66,18 @@ function emptyDirectoryCopy(q: string, cut: DirectoryCut): string {
   if (cut === "lapsed") {
     return "No lapsed Players.";
   }
+  if (cut === "starts-later") {
+    return "No Players start later.";
+  }
   return "No Players yet.";
 }
 
 export default async function PlayersPage({ searchParams }: PlayersPageProps) {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const params = await searchParams;
   const q = firstParam(params.q);
   const cut = directoryCut(firstParam(params.status));
@@ -119,6 +129,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                   ["all", "All"],
                   ["paused", "Paused"],
                   ["lapsed", "Lapsed"],
+                  ["starts-later", "Starts later"],
                 ] as const
               ).map(([choice, label]) => (
                 <Link
@@ -128,6 +139,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                   aria-current={choice === cut ? "page" : undefined}
                 >
                   {label}
+                  <LinkPendingMark />
                 </Link>
               ))}
             </nav>
@@ -157,6 +169,7 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                         href={`/app/players/${player.id}`}
                       >
                         {player.fullName}
+                        <LinkPendingMark />
                       </Link>
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}
@@ -164,7 +177,10 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
                       {player.lines.map((line) => (
                         <p key={`${line.batchId}-${line.validFrom}`}>
                           {line.batchName}
-                          <EnrollmentStatus status={line.status}/>
+                          <EnrollmentStatus
+                            status={line.status}
+                            startsLater={line.startsLater}
+                          />
                         </p>
                       ))}
                     </div>

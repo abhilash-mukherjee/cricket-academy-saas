@@ -6,8 +6,14 @@ import { calendarDateInIst } from "@/lib/player-age";
 import { listPendingRegistrations } from "@/lib/registrations";
 import { DashboardBackLink } from "../dashboard-back-link";
 import { RegistrationInbox } from "./inbox";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 export default async function RegistrationsPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

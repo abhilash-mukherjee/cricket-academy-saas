@@ -1,0 +1,1 @@
+ALTER TABLE "enrollment_pauses" ADD COLUMN "is_deferred" boolean DEFAULT false NOT NULL;

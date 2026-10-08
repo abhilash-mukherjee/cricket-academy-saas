@@ -512,6 +512,94 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
     }, 20_000);
 
+    it("does not mark a Pause the Owner applies as a deferred start", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const feeOptionId = await openBatch(cookie, batch.id);
+      const today = calendarDateInIst();
+      const created = await addPlayer(cookie, {
+        ...adult,
+        batchId: batch.id,
+        batchFeeOptionId: feeOptionId,
+        validFrom: today,
+      });
+      const { playerId } = (await created.json()) as { playerId: string };
+      const detail = await getPlayer(academy.id, playerId, today);
+      const enrollmentId = detail!.enrollments[0]!.id;
+
+      const paused = await pause(cookie, enrollmentId, {
+        pausedOn: today,
+        plannedLastPausedOn: addCalendarDays(today, 4),
+      });
+      expect(paused.status).toBe(200);
+
+      const db = getDb();
+      const [row] = await db
+        .select()
+        .from(enrollmentPauses)
+        .where(eq(enrollmentPauses.enrollmentId, enrollmentId));
+      expect(row.isDeferred).toBe(false);
+    }, 20_000);
+
+    it("ends a deferred start early and keeps the mark", async () => {
+      const cookie = await signInOwner(ownerEmail);
+      await onboardOwner(cookie, slug);
+      const academy = await academyFor(cookie);
+      const [batch] = await listBatches(academy.id);
+      const today = calendarDateInIst();
+      const pausedOn = addCalendarDays(today, -4);
+      const db = getDb();
+      const [player] = await db
+        .insert(players)
+        .values({
+          academyId: academy.id,
+          fullName: "Later Rao",
+          fullNameNormalized: "later rao",
+          phone: "+919876543210",
+          dateOfBirth: "2012-04-01",
+        })
+        .returning({ id: players.id });
+      const storedUntil = lastCoveredDay(pausedOn, 30);
+      const [enrollment] = await db
+        .insert(enrollments)
+        .values({
+          academyId: academy.id,
+          playerId: player.id,
+          batchId: batch.id,
+          daysPerWeek: 3,
+          termDays: 30,
+          feePaisePaid: 150000,
+          validFrom: pausedOn,
+          validUntil: storedUntil,
+        })
+        .returning({ id: enrollments.id });
+      await db.insert(enrollmentPauses).values({
+        academyId: academy.id,
+        enrollmentId: enrollment.id,
+        pausedOn,
+        plannedLastPausedOn: addCalendarDays(today, 6),
+        isDeferred: true,
+      });
+
+      const resumed = await resume(cookie, enrollment.id);
+      expect(resumed.status).toBe(200);
+      await expect(resumed.json()).resolves.toMatchObject({
+        daysAdded: 4,
+        validUntil: addCalendarDays(storedUntil, 4),
+      });
+
+      const [pause] = await db
+        .select()
+        .from(enrollmentPauses)
+        .where(eq(enrollmentPauses.enrollmentId, enrollment.id));
+      expect(pause).toMatchObject({
+        isDeferred: true,
+        resumedOn: today,
+      });
+    }, 20_000);
+
     it("isolates pause and resume across Academies", async () => {
       const cookie = await signInOwner(ownerEmail);
       await onboardOwner(cookie, slug);

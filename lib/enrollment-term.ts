@@ -13,6 +13,44 @@ export function lastCoveredDay(validFrom: string, termDays: number): string {
   return shiftCalendarDate(validFrom, termDays - 1);
 }
 
+export type RecordedStart =
+  | {
+      ok: true;
+      validFrom: string;
+      validUntil: string;
+      deferred: { pausedOn: string; plannedLastPausedOn: string } | null;
+    }
+  | { ok: false; error: "term-not-covering-today" };
+
+/**
+ * Today or earlier is valid-from and creates no pause.
+ * A later start stores valid-from as today and a dated pause through the day before that start.
+ * A term that is already over is rejected. There is no cap on how far ahead.
+ */
+export function recordedStart(
+  startsOn: string,
+  termDays: number,
+  today: string,
+): RecordedStart {
+  if (startsOn > today) {
+    return {
+      ok: true,
+      validFrom: today,
+      validUntil: lastCoveredDay(today, termDays),
+      deferred: {
+        pausedOn: today,
+        plannedLastPausedOn: addCalendarDays(startsOn, -1),
+      },
+    };
+  }
+
+  const validUntil = lastCoveredDay(startsOn, termDays);
+  if (validUntil < today) {
+    return { ok: false, error: "term-not-covering-today" };
+  }
+  return { ok: true, validFrom: startsOn, validUntil, deferred: null };
+}
+
 export function addCalendarDays(isoDate: string, days: number): string {
   return shiftCalendarDate(isoDate, days);
 }
@@ -64,6 +102,33 @@ export function pauseCoversDate(
   }
   const end = pauseEndExclusive(pause);
   return end === null || date < end;
+}
+
+export type RealPauseSpan = {
+  pausedOn: string;
+  plannedLastPausedOn: string | null;
+  resumedOn: string | null;
+  isDeferred: boolean;
+};
+
+/** Real pauses only: finished in full, open through today, deferred starts as none. */
+export function realPausedDays(pauses: RealPauseSpan[], today: string): number {
+  let total = 0;
+  for (const pause of pauses) {
+    if (pause.isDeferred) {
+      continue;
+    }
+    total += realPauseSpanDays(pause, today);
+  }
+  return total;
+}
+
+function realPauseSpanDays(pause: RealPauseSpan, today: string): number {
+  const end = pauseEndExclusive(pause);
+  const dayAfterToday = addCalendarDays(today, 1);
+  const endExclusive =
+    end === null || end > dayAfterToday ? dayAfterToday : end;
+  return calendarDaysBetween(pause.pausedOn, endExclusive);
 }
 
 /** Half-open intervals `[start, endExclusive)`; null end means unbounded. */

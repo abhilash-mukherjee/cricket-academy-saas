@@ -5,8 +5,14 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { getConversionEditor } from "@/lib/conversion";
 import { ConversionEditor } from "./conversion-editor";
 import { DashboardBackLink } from "../dashboard-back-link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 export default async function ConversionEditorPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

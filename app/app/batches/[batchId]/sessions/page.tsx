@@ -9,6 +9,7 @@ import {
   listSavedSessions,
 } from "@/lib/batch-sessions";
 import { AttendanceEditor } from "./attendance-editor";
+import { deactivatedOwnerPage } from "../../../deactivated-owner-page";
 
 type SessionsPageProps = {
   params: Promise<{ batchId: string }>;
@@ -50,6 +51,11 @@ export default async function BatchSessionsPage({
   params,
   searchParams,
 }: SessionsPageProps) {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const { batchId } = await params;
   const query = await searchParams;
   const session = await requireStaffSession();

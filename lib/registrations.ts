@@ -8,7 +8,7 @@ import {
   registrations,
 } from "@/db/domain-schema";
 import { getDb, getTransactionalDb } from "@/db/client";
-import { lastCoveredDay } from "@/lib/enrollment-term";
+import { recordedStart } from "@/lib/enrollment-term";
 import { guardNewEnrollment, insertEnrollment } from "@/lib/enrollments";
 import { calendarDateInIst, isValidCalendarDate } from "@/lib/player-age";
 import { findOrCreatePlayer } from "@/lib/players";
@@ -260,7 +260,8 @@ export type RegistrationCommandError =
   | "not-pending"
   | "term-not-covering-today"
   | "overlaps"
-  | "paused";
+  | "paused"
+  | "starts-later";
 
 const acceptBodySchema = z.object({
   validFrom: z.string(),
@@ -287,15 +288,7 @@ export async function acceptRegistration(
     );
     return { ok: false, error: "invalid-input" };
   }
-  if (parsed.data.validFrom > today) {
-    logWarning(
-      `Registration was not accepted with ID: ${registrationId}.`,
-      "invalid-input",
-    );
-    return { ok: false, error: "invalid-input" };
-  }
-
-  const validFrom = parsed.data.validFrom;
+  const startsOn = parsed.data.validFrom;
   const db = getTransactionalDb();
 
   try {
@@ -318,10 +311,11 @@ export async function acceptRegistration(
         throw new RegistrationCommandFailure("not-pending");
       }
 
-      const validUntil = lastCoveredDay(validFrom, registration.termDays);
-      if (validUntil < today) {
-        throw new RegistrationCommandFailure("term-not-covering-today");
+      const start = recordedStart(startsOn, registration.termDays, today);
+      if (!start.ok) {
+        throw new RegistrationCommandFailure(start.error);
       }
+      const { validFrom, validUntil, deferred } = start;
 
       const [existingPlayer] = await tx
         .select({ id: players.id })
@@ -386,6 +380,7 @@ export async function acceptRegistration(
         feePaisePaid: registration.feePaise,
         validFrom,
         validUntil,
+        deferred,
       });
 
       const accepted = await tx

@@ -3,8 +3,14 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { resolveStaffAccess } from "@/lib/staff-access";
 import { OnboardingWizard } from "./onboarding-wizard";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 export default async function OnboardingPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

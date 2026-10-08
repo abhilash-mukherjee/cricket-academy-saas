@@ -4,6 +4,7 @@ import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { formatCalendarDate } from "@/lib/format-date";
+import { addCalendarDays } from "@/lib/enrollment-term";
 import { calendarDateInIst } from "@/lib/player-age";
 import { listBatches } from "@/lib/batches";
 import { listFeeOptions } from "@/lib/batch-fee-options";
@@ -13,6 +14,7 @@ import { LinkPendingMark } from "../../link-pending-mark";
 import { PlayerPager } from "../../players/player-pager";
 import { BatchEditor } from "../batch-editor";
 import EnrollmentStatus from "../../enrollment-status";
+import { deactivatedOwnerPage } from "../../deactivated-owner-page";
 
 type BatchRosterPageProps = {
   params: Promise<{ batchId: string }>;
@@ -51,6 +53,11 @@ export default async function BatchRosterPage({
   params,
   searchParams,
 }: BatchRosterPageProps) {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const { batchId } = await params;
   const query = await searchParams;
   const session = await requireStaffSession();
@@ -118,12 +125,30 @@ export default async function BatchRosterPage({
                         href={`/app/players/${player.id}?fromBatch=${batchId}`}
                       >
                         {player.fullName}
+                        <LinkPendingMark />
                       </Link>
                       <a className="link relative z-10" href={`tel:${player.phone}`}>
                         {player.phone}
                       </a>
-                      <EnrollmentStatus status={player.status}/>
-                      {player.status === "paused" ? (
+                      <EnrollmentStatus
+                        status={player.status}
+                        startsLater={player.startsLater}
+                      />
+                      {player.startsLater && player.plannedLastPausedOn ? (
+                        <>
+                          <p>
+                            First day{" "}
+                            {formatCalendarDate(
+                              addCalendarDays(player.plannedLastPausedOn, 1),
+                            )}
+                          </p>
+                          <p>Valid from {formatCalendarDate(player.validFrom)}</p>
+                          <p>
+                            Valid until{" "}
+                            {formatCalendarDate(player.effectiveValidUntil)}
+                          </p>
+                        </>
+                      ) : player.status === "paused" ? (
                         <p>
                           {pauseCopy(
                             player.pausedOn,

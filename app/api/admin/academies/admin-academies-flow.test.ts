@@ -331,13 +331,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       const ownerId = await sessionUserId(ownerCookie);
       sessionCookie.value = ownerCookie;
 
-      const AppLayout = (await import("@/app/app/layout")).default;
-      renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("div", null, "claimed"),
-          params: Promise.resolve({}),
-        }),
-      );
+      const { AppChrome } = await import("@/app/app/layout");
+      renderToStaticMarkup(await AppChrome());
 
       const owned = await getOwnedAcademy(ownerId);
       expect(owned?.slug).toBe(slug);
@@ -493,15 +488,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
 
       sessionCookie.value = ownerCookie;
-      const AppLayout = (await import("@/app/app/layout")).default;
-      const html = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("div", null, "should-not-see"),
-          params: Promise.resolve({}),
-        }),
-      );
+      const { default: DashboardPage } = await import("@/app/app/dashboard/page");
+      const html = renderToStaticMarkup(await DashboardPage());
       expect(html).toContain("Academy deactivated — contact support");
-      expect(html).not.toContain("should-not-see");
+      expect(html).not.toContain("is live");
     });
 
     it("impersonates an Owner with banner and exits back to admin Academies", async () => {
@@ -550,13 +540,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(impersonateResponse.status).toBe(200);
 
-      const AppLayout = (await import("@/app/app/layout")).default;
+      const { AppChrome } = await import("@/app/app/layout");
       const DashboardPage = (await import("@/app/app/dashboard/page")).default;
       const bannerHtml = renderToStaticMarkup(
-        await AppLayout({
-          children: await DashboardPage(),
-          params: Promise.resolve({}),
-        }),
+        createElement("div", null, await AppChrome(), await DashboardPage()),
       );
       expect(bannerHtml).toContain("Impersonating");
       expect(bannerHtml).toContain(ownerEmail);
@@ -601,10 +588,12 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(exitBody.redirectTo).toBe("/app/admin/academies");
 
       const afterExit = renderToStaticMarkup(
-        await AppLayout({
-          children: createElement("div", null, "admin-home"),
-          params: Promise.resolve({}),
-        }),
+        createElement(
+          "div",
+          null,
+          await AppChrome(),
+          createElement("div", null, "admin-home"),
+        ),
       );
       expect(afterExit).not.toContain("Impersonating");
       expect(afterExit).toContain("admin-home");

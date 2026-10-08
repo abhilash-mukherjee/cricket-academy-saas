@@ -5,8 +5,14 @@ import { getOwnedAcademy } from "@/lib/owner-onboarding";
 import { getBrochureEditor } from "@/lib/brochure";
 import { BrochureEditor } from "./brochure-editor";
 import { DashboardBackLink } from "../dashboard-back-link";
+import { deactivatedOwnerPage } from "../deactivated-owner-page";
 
 export default async function BrochureEditorPage() {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const session = await requireStaffSession();
   const impersonation = await getImpersonationState(session);
 

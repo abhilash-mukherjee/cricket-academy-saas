@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { LinkPendingMark } from "../link-pending-mark";
 import { useRouter } from "next/navigation";
 import {
   addCalendarDays,
@@ -33,6 +34,10 @@ type PauseInterval = PlayerEnrollmentView["pauseIntervals"][number];
 
 function emptyPauseDraft(today: string): PauseDraft {
   return { pausedOn: today, plannedLastPausedOn: "" };
+}
+
+function pausedDaysCopy(days: number): string {
+  return days === 1 ? "1 paused day" : `${days} paused days`;
 }
 
 function pauseCopy(
@@ -176,16 +181,17 @@ function draftCoversSavedSession(
   );
 }
 
-function resumeConfirmCopy(
+export function resumeConfirmCopy(
   pausedOn: string,
   today: string,
-  validUntil: string,
+  storedValidUntil: string,
+  shownValidUntil: string,
 ): string {
   const daysAdded = calendarDaysBetween(pausedOn, today);
-  if (daysAdded === 0) {
-    return "Adds 0 days; valid-until unchanged";
+  const nextUntil = addCalendarDays(storedValidUntil, daysAdded);
+  if (nextUntil === shownValidUntil) {
+    return `Adds ${daysAdded} days; valid-until unchanged`;
   }
-  const nextUntil = addCalendarDays(validUntil, daysAdded);
   return `Adds ${daysAdded} days → valid-until ${formatCalendarDate(nextUntil)}`;
 }
 
@@ -348,6 +354,7 @@ export function PlayerEnrollmentList({
         {enrollments.map((enrollment) => {
           const pauseOpen = openPauseId === enrollment.id;
           const resumeOpen = openResumeId === enrollment.id;
+          const isDeferredStart = enrollment.startsLater;
           const preview = pauseOpen
             ? pausePreviewCopy(
                 draft,
@@ -374,8 +381,12 @@ export function PlayerEnrollmentList({
                   href={`/app/batches/${enrollment.batchId}`}
                 >
                   {enrollment.batchName}
+                  <LinkPendingMark />
                 </Link>
-                <EnrollmentStatus status={enrollment.status}/>
+                <EnrollmentStatus
+                  status={enrollment.status}
+                  startsLater={enrollment.startsLater}
+                />
                 <p>
                   {packageFactsCopy({
                     daysPerWeek: enrollment.daysPerWeek,
@@ -387,8 +398,19 @@ export function PlayerEnrollmentList({
                 <p>
                   Valid until{" "}
                   {formatCalendarDate(enrollment.effectiveValidUntil)}
+                  {enrollment.status === "paused" && !enrollment.startsLater
+                    ? " (to be extended when this pause ends)"
+                    : null}
                 </p>
-                {enrollment.status === "paused" ? (
+                <p>{pausedDaysCopy(enrollment.realPausedDays)}</p>
+                {enrollment.startsLater && enrollment.plannedLastPausedOn ? (
+                  <p>
+                    First day{" "}
+                    {formatCalendarDate(
+                      addCalendarDays(enrollment.plannedLastPausedOn, 1),
+                    )}
+                  </p>
+                ) : enrollment.status === "paused" ? (
                   <p>
                     {pauseCopy(
                       enrollment.pausedOn,
@@ -418,7 +440,7 @@ export function PlayerEnrollmentList({
                         className="btn btn-sm btn-outline self-start"
                         onClick={() => openResume(enrollment.id)}
                       >
-                        Resume
+                        {isDeferredStart ? "Start Now" : "Resume"}
                       </button>
                     ) : null}
 
@@ -505,6 +527,7 @@ export function PlayerEnrollmentList({
                           {resumeConfirmCopy(
                             enrollment.pausedOn,
                             today,
+                            enrollment.validUntil,
                             enrollment.effectiveValidUntil,
                           )}
                         </p>

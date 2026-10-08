@@ -12,6 +12,7 @@ import { getPlayer } from "@/lib/players";
 import { PlayerPageBackLink } from "../../player-page-back-link";
 import { ManualAddForm } from "../manual-add-form";
 import { PlayerEnrollmentList } from "../player-enrollment-list";
+import { deactivatedOwnerPage } from "../../deactivated-owner-page";
 
 type PlayerPageProps = {
   params: Promise<{ playerId: string }>;
@@ -43,6 +44,11 @@ export default async function PlayerPage({
   params,
   searchParams,
 }: PlayerPageProps) {
+  const blocked = await deactivatedOwnerPage();
+  if (blocked) {
+    return blocked;
+  }
+
   const { playerId } = await params;
   const query = await searchParams;
   const session = await requireStaffSession();
