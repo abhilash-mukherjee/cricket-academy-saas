@@ -389,6 +389,34 @@ export const youtubeEmbeds = pgTable("youtube_embeds", {
     .defaultNow(),
 });
 
+export const coaches = pgTable(
+  "coaches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("coaches_academy_id_name_unique").on(
+      table.academyId,
+      sql`lower(btrim(${table.name}))`,
+    ),
+    check(
+      "coaches_name_length",
+      sql`char_length(${table.name}) between 1 and 200`,
+    ),
+  ],
+);
+
 export const coachProfiles = pgTable("coach_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   academyId: uuid("academy_id")

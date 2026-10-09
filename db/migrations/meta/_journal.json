@@ -85,6 +85,13 @@
       "when": 1791270863325,
       "tag": "0011_enrollment_pause_is_deferred",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791548525804,
+      "tag": "0012_coaches",
+      "breakpoints": true
     }
   ]
 }
