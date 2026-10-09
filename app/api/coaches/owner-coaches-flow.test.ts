@@ -14,6 +14,7 @@ import {
 import {
   academies,
   batches,
+  coachAttendance,
   coaches,
   impersonationAuditEvents,
 } from "@/db/domain-schema";
@@ -135,6 +136,9 @@ async function deleteAcademyBySlug(slug: string) {
   if (!academy) {
     return;
   }
+  await db
+    .delete(coachAttendance)
+    .where(eq(coachAttendance.academyId, academy.id));
   await db.delete(coaches).where(eq(coaches.academyId, academy.id));
   await db
     .delete(impersonationAuditEvents)
@@ -164,6 +168,9 @@ async function deleteOwnerByEmail(email: string) {
       .from(academies)
       .where(eq(academies.ownerUserId, owner.id));
     for (const academy of owned) {
+      await db
+        .delete(coachAttendance)
+        .where(eq(coachAttendance.academyId, academy.id));
       await db.delete(coaches).where(eq(coaches.academyId, academy.id));
       await db
         .delete(impersonationAuditEvents)

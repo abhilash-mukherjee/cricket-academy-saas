@@ -417,6 +417,39 @@ export const coaches = pgTable(
   ],
 );
 
+export const coachAttendance = pgTable(
+  "coach_attendance",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    academyId: uuid("academy_id")
+      .notNull()
+      .references(() => academies.id, { onDelete: "restrict" }),
+    coachId: uuid("coach_id")
+      .notNull()
+      .references(() => coaches.id, { onDelete: "restrict" }),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => batches.id, { onDelete: "restrict" }),
+    markedOn: date("marked_on").notNull(),
+    isPresent: boolean("is_present").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    unique("coach_attendance_academy_coach_batch_day_unique").on(
+      table.academyId,
+      table.coachId,
+      table.batchId,
+      table.markedOn,
+    ),
+  ],
+);
+
 export const coachProfiles = pgTable("coach_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   academyId: uuid("academy_id")

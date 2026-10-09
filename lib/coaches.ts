@@ -1,7 +1,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { coaches } from "@/db/domain-schema";
-import { getDb } from "@/db/client";
+import { coachAttendance, coaches } from "@/db/domain-schema";
+import { getDb, getTransactionalDb } from "@/db/client";
 import { postgresConstraint } from "@/lib/postgres-constraint";
 import { logInfo, logWarning } from "@/lib/request-trace";
 
@@ -140,19 +140,56 @@ export async function renameCoach(
   }
 }
 
+class MissingCoach extends Error {
+  constructor() {
+    super("not-found");
+  }
+}
+
 export async function removeCoach(
   academyId: string,
   coachId: string,
 ): Promise<RemoveCoachResult> {
-  const db = getDb();
-  const deleted = await db
-    .delete(coaches)
-    .where(and(eq(coaches.id, coachId), eq(coaches.academyId, academyId)))
-    .returning({ id: coaches.id });
+  const db = getTransactionalDb();
+  try {
+    const removed = await db.transaction(async (tx) => {
+      const existing = await tx
+        .select({ id: coaches.id })
+        .from(coaches)
+        .where(and(eq(coaches.id, coachId), eq(coaches.academyId, academyId)))
+        .limit(1);
+      if (existing.length === 0) {
+        return false;
+      }
 
-  if (deleted.length === 0) {
-    logWarning(`Coach was not removed with ID: ${coachId}.`, "not-found");
-    return { ok: false, error: "not-found" };
+      await tx
+        .delete(coachAttendance)
+        .where(
+          and(
+            eq(coachAttendance.academyId, academyId),
+            eq(coachAttendance.coachId, coachId),
+          ),
+        );
+      const deleted = await tx
+        .delete(coaches)
+        .where(and(eq(coaches.id, coachId), eq(coaches.academyId, academyId)))
+        .returning({ id: coaches.id });
+      if (deleted.length === 0) {
+        throw new MissingCoach();
+      }
+      return true;
+    });
+
+    if (!removed) {
+      logWarning(`Coach was not removed with ID: ${coachId}.`, "not-found");
+      return { ok: false, error: "not-found" };
+    }
+  } catch (error) {
+    if (error instanceof MissingCoach) {
+      logWarning(`Coach was not removed with ID: ${coachId}.`, "not-found");
+      return { ok: false, error: "not-found" };
+    }
+    throw error;
   }
 
   logInfo(`Coach removed successfully with ID: ${coachId}.`);

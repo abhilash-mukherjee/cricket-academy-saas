@@ -92,6 +92,13 @@
       "when": 1791548525804,
       "tag": "0012_coaches",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791549984460,
+      "tag": "0013_coach_attendance",
+      "breakpoints": true
     }
   ]
 }

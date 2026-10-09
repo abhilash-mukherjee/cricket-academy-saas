@@ -2,9 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { requireStaffSession } from "@/lib/staff-session";
 import { getImpersonationState } from "@/lib/impersonation";
 import { getOwnedAcademy } from "@/lib/owner-onboarding";
+import { listBatches } from "@/lib/batches";
 import { getCoach } from "@/lib/coaches";
+import { calendarDateInIst } from "@/lib/player-age";
 import { DashboardBackLink } from "../../dashboard-back-link";
 import { deactivatedOwnerPage } from "../../deactivated-owner-page";
+import { CoachAttendance } from "../coach-attendance";
 import { CoachEditor } from "../coach-editor";
 
 type CoachPageProps = {
@@ -36,6 +39,8 @@ export default async function CoachPage({ params }: CoachPageProps) {
     notFound();
   }
 
+  const academyBatches = await listBatches(academy.id);
+
   return (
     <main className="flex min-h-full flex-col p-6">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
@@ -46,6 +51,14 @@ export default async function CoachPage({ params }: CoachPageProps) {
             <CoachEditor coach={coach} />
           </div>
         </section>
+        <CoachAttendance
+          coachId={coach.id}
+          batches={academyBatches.map((batch) => ({
+            id: batch.id,
+            name: batch.name,
+          }))}
+          today={calendarDateInIst()}
+        />
       </div>
     </main>
   );
