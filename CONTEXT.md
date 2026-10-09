@@ -65,11 +65,11 @@ One occurrence of a Batch on a calendar date (a Batch session), today or in the 
 _Avoid_: login session, class, practice
 
 **Owner**:
-The logged-in user who runs an Academy: brochure, conversion page, Registration inbox (accept and reject), roster, Enrollment lifecycle, and Player attendance on Sessions. Signs up from the product homepage via email magic link (or claims an Academy a Super-admin assigned); provides a display name during onboarding. One login owns one Academy in this phase. Staff screens live under `/app/…`. The same user can also be a Coach. SaaS billing is not part of the first slice.
+The logged-in user who runs an Academy: brochure, conversion page, Registration inbox (accept and reject), Player directory, Enrollment lifecycle, Player attendance on Sessions, the Coach directory, and Coach attendance. Signs up from the product homepage via email magic link (or claims an Academy a Super-admin assigned); provides a display name during onboarding. One login owns one Academy in this phase. Staff screens live under `/app/…`. SaaS billing is not part of the first slice.
 _Avoid_: Admin, manager
 
 **Super-admin**:
-A platform operator with cross-Academy access at `/app/admin/…`. Provisioned out of band (seeded email, magic-link sign-in) — not self-registration. Does not belong to any Academy as Owner or Coach. Can list Academies, open public links, create an Academy and assign an Owner email to claim, deactivate and reactivate an Academy, and impersonate an Owner with full access (persistent banner, exit control, impersonation audit).
+A platform operator with cross-Academy access at `/app/admin/…`. Provisioned out of band (seeded email, magic-link sign-in) — not self-registration. Does not belong to any Academy as Owner. Can list Academies, open public links, create an Academy and assign an Owner email to claim, deactivate and reactivate an Academy, and impersonate an Owner with full access (persistent banner, exit control, impersonation audit).
 _Avoid_: Admin (in Owner-facing language), root user
 
 **Impersonation audit**:
@@ -77,5 +77,17 @@ A record that a Super-admin, while impersonating an Owner, successfully changed 
 _Avoid_: log, request trace
 
 **Coach**:
-A logged-in user who will mark Session attendance for an Academy when Coach login ships. Until then, the Owner marks Player attendance (including while a Super-admin is impersonating that Owner). The same user can also be the Owner. An Owner may add display-only Coach profiles on the brochure (name, image, optional blurb); these may or may not match a logged-in Coach. Parents and Guardians do not have accounts in this phase.
-_Avoid_: Trainer, teacher
+A named person at an Academy, listed in the Coach directory. Names are unique at an Academy (case-insensitive, trimmed); the directory shows the name as typed. The Owner may rename them; Coach attendance stays on that same Coach, and the new name must still be unique. A Coach has no login, no pause, and no lapse. Removing a Coach removes their Coach attendance, after which that name may be added again. Removal stands only when the Owner types the Coach's current full name exactly. A Coach is not a Coach profile.
+_Avoid_: Trainer, teacher, staff login
+
+**Coach directory**:
+The Academy-wide list of every Coach. The Owner opens it from the staff menu, adds a Coach by name, and stays on this list. Opening a Coach is where that name is changed, and where Coach attendance is marked and read for a month.
+_Avoid_: roster (that word is the Batch roster: Active and paused Players on one Batch)
+
+**Coach profile**:
+A display-only brochure entry: name, optional photo, and optional blurb. Not a Coach. The name may or may not match a Coach.
+_Avoid_: Coach
+
+**Coach attendance**:
+A Coach marked present or absent for one Batch on one calendar date, today or in the past. Any Batch at the Academy can be marked, including one closed for Registration or with no Players. A renamed Batch keeps its Coach attendance. Unmarked days are neither. It is not a Session: no Session is required, and discarding a Session leaves the Coach attendance in place. One Coach may hold different marks on different Batches the same day, and more than one Coach may be marked for the same Batch that day. Marking the same Coach, Batch, and date again replaces the earlier mark; clearing it leaves that day unmarked. For one Coach, one month, and one Batch, the present dates and the absent dates are that month's marks, with a count of each.
+_Avoid_: Session, Player attendance
