@@ -23,6 +23,15 @@ type CoachAttendanceProps = {
 
 type Writing = "present" | "absent" | "clear" | null;
 
+type MarkResult = {
+  key: string;
+  value: boolean | null;
+};
+
+type MonthResult =
+  | { key: string; status: "ok"; value: MonthMarks }
+  | { key: string; status: "error" };
+
 function withMark(
   view: MonthMarks,
   markedOn: string,
@@ -41,6 +50,14 @@ function withMark(
   return { presentDates, absentDates };
 }
 
+function markKeyFor(batchId: string, date: string) {
+  return `${batchId}:${date}`;
+}
+
+function monthKeyFor(batchId: string, month: string) {
+  return `${batchId}:${month}`;
+}
+
 export function CoachAttendance({
   coachId,
   batches,
@@ -50,14 +67,27 @@ export function CoachAttendance({
   const [markBatchId, setMarkBatchId] = useState("");
   const [month, setMonth] = useState(today.slice(0, 7));
   const [monthBatchId, setMonthBatchId] = useState("");
-  const [mark, setMark] = useState<boolean | null | undefined>(undefined);
-  const [monthMarks, setMonthMarks] = useState<MonthMarks | null>(null);
+  const [markResult, setMarkResult] = useState<MarkResult | null>(null);
+  const [monthResult, setMonthResult] = useState<MonthResult | null>(null);
   const [writing, setWriting] = useState<Writing>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorId, setErrorId] = useState(0);
   const monthTicket = useRef(0);
   const writingLock = useRef(false);
   const dismissError = useCallback(() => setError(null), []);
+
+  const markKey = markBatchId ? markKeyFor(markBatchId, markDate) : "";
+  const monthKey = monthBatchId ? monthKeyFor(monthBatchId, month) : "";
+  const mark =
+    markKey && markResult?.key === markKey ? markResult.value : undefined;
+  const monthMarks =
+    monthKey && monthResult?.key === monthKey && monthResult.status === "ok"
+      ? monthResult.value
+      : null;
+  const markLoading = Boolean(markBatchId) && mark === undefined;
+  const monthLoading =
+    Boolean(monthBatchId) &&
+    (monthResult === null || monthResult.key !== monthKey);
 
   function showError(message: string) {
     setError(message);
@@ -66,12 +96,11 @@ export function CoachAttendance({
 
   useEffect(() => {
     if (!markBatchId) {
-      setMark(undefined);
       return;
     }
 
+    const key = markKeyFor(markBatchId, markDate);
     let cancelled = false;
-    setMark(undefined);
     const path = `/api/coaches/${coachId}/attendance/${markBatchId}/${markDate}`;
     void (async () => {
       try {
@@ -80,14 +109,14 @@ export function CoachAttendance({
           return;
         }
         if (!response.ok) {
-          setMark(null);
+          setMarkResult({ key, value: null });
           return;
         }
         const body = (await response.json()) as { isPresent: boolean | null };
-        setMark(body.isPresent);
+        setMarkResult({ key, value: body.isPresent });
       } catch {
         if (!cancelled) {
-          setMark(null);
+          setMarkResult({ key, value: null });
         }
       }
     })();
@@ -99,14 +128,13 @@ export function CoachAttendance({
 
   useEffect(() => {
     if (!monthBatchId) {
-      setMonthMarks(null);
       return;
     }
 
+    const key = monthKeyFor(monthBatchId, month);
     const ticket = ++monthTicket.current;
     const path = `/api/coaches/${coachId}/attendance?batchId=${monthBatchId}&month=${month}`;
     let cancelled = false;
-    setMonthMarks(null);
     void (async () => {
       try {
         const response = await fetch(path);
@@ -114,15 +142,22 @@ export function CoachAttendance({
           return;
         }
         if (!response.ok) {
+          setMonthResult({ key, status: "error" });
           return;
         }
         const body = (await response.json()) as MonthMarks;
-        setMonthMarks({
-          presentDates: body.presentDates,
-          absentDates: body.absentDates,
+        setMonthResult({
+          key,
+          status: "ok",
+          value: {
+            presentDates: body.presentDates,
+            absentDates: body.absentDates,
+          },
         });
       } catch {
-        // Leave the lists hidden. This read is not a failed write.
+        if (!cancelled && ticket === monthTicket.current) {
+          setMonthResult({ key, status: "error" });
+        }
       }
     })();
 
@@ -150,10 +185,10 @@ export function CoachAttendance({
         next === null
           ? await fetch(path, { method: "DELETE" })
           : await fetch(path, {
-              method: "PUT",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ isPresent: next }),
-            });
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ isPresent: next }),
+          });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
           error?: string;
@@ -163,7 +198,7 @@ export function CoachAttendance({
       }
 
       saved = true;
-      setMark(next);
+      setMarkResult({ key: markKeyFor(markBatchId, markDate), value: next });
     } catch {
       showError(coachWriteErrorCopy(null));
     } finally {
@@ -179,8 +214,15 @@ export function CoachAttendance({
       return;
     }
 
-    setMonthMarks((current) =>
-      current ? withMark(current, markDate, next) : current,
+    const viewKey = monthKeyFor(monthBatchId, month);
+    setMonthResult((current) =>
+      current?.key === viewKey && current.status === "ok"
+        ? {
+            key: viewKey,
+            status: "ok",
+            value: withMark(current.value, markDate, next),
+          }
+        : current,
     );
     const ticket = ++monthTicket.current;
     try {
@@ -190,9 +232,13 @@ export function CoachAttendance({
         return;
       }
       const body = (await monthResponse.json()) as MonthMarks;
-      setMonthMarks({
-        presentDates: body.presentDates,
-        absentDates: body.absentDates,
+      setMonthResult({
+        key: viewKey,
+        status: "ok",
+        value: {
+          presentDates: body.presentDates,
+          absentDates: body.absentDates,
+        },
       });
     } catch {
       // The mark is already stored. Leave the lists that were updated in place.
@@ -204,134 +250,157 @@ export function CoachAttendance({
     mark === true ? "Present" : mark === false ? "Absent" : "No mark";
 
   return (
-    <section className="card bg-base-200 shadow">
-      <div className="card-body gap-6">
-        <h2 className="card-title">Coach attendance</h2>
-        <fieldset className="flex flex-col gap-3" disabled={busy}>
-          <legend className="text-sm font-medium">Mark</legend>
-          <label className="flex flex-col gap-1 text-sm">
-            Date
-            <input
-              type="date"
-              className="input input-bordered"
-              value={markDate}
-              onChange={(event) => setMarkDate(event.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Batch
-            <select
-              className="select select-bordered"
-              value={markBatchId}
-              onChange={(event) => setMarkBatchId(event.target.value)}
-            >
-              <option value=""></option>
-              {batches.map((batch) => (
-                <option key={batch.id} value={batch.id}>
-                  {batch.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {markBatchId && mark !== undefined ? (
-            <div className="flex flex-col gap-3">
-              <p>{markLabel}</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void commit(true)}
-                >
-                  {writing === "present" ? (
-                    <span
-                      className="loading loading-spinner"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  Present
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => void commit(false)}
-                >
-                  {writing === "absent" ? (
-                    <span
-                      className="loading loading-spinner"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  Absent
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => void commit(null)}
-                >
-                  {writing === "clear" ? (
-                    <span
-                      className="loading loading-spinner"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  Clear
-                </button>
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+      <section className="card bg-base-200 shadow">
+        <div className="card-body gap-6">
+          <h2 className="card-title">Mark Coach Attendance</h2>
+          <fieldset className="flex flex-col gap-3" disabled={busy}>
+            <label className="flex flex-col gap-1 text-sm">
+              Date
+              <input
+                type="date"
+                className="input input-bordered"
+                max={today}
+                value={markDate}
+                onChange={(event) => setMarkDate(event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Batch
+              <select
+                className="select select-bordered"
+                value={markBatchId}
+                onChange={(event) => setMarkBatchId(event.target.value)}
+              >
+                <option value=""></option>
+                {batches.map((batch) => (
+                  <option key={batch.id} value={batch.id}>
+                    {batch.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {markLoading ? (
+              <div
+                className="flex flex-col items-center gap-3 py-4"
+                role="status"
+              >
+                <span className="loading loading-spinner" aria-hidden="true" />
+                Loading
               </div>
-            </div>
-          ) : null}
-        </fieldset>
+            ) : null}
+            {markBatchId && mark !== undefined ? (
+              <div className="flex flex-col gap-3">
+                <p>{markLabel}</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-neutral"
+                    onClick={() => void commit(true)}
+                  >
+                    {writing === "present" ? (
+                      <span
+                        className="loading loading-spinner"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    Present
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => void commit(false)}
+                  >
+                    {writing === "absent" ? (
+                      <span
+                        className="loading loading-spinner"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    Absent
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => void commit(null)}
+                  >
+                    {writing === "clear" ? (
+                      <span
+                        className="loading loading-spinner"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    Clear
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </fieldset>
+        </div>
+      </section>
 
-        <fieldset className="flex flex-col gap-3" disabled={busy}>
-          <legend className="text-sm font-medium">Month</legend>
-          <label className="flex flex-col gap-1 text-sm">
-            Month
-            <input
-              type="month"
-              className="input input-bordered"
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Batch
-            <select
-              className="select select-bordered"
-              value={monthBatchId}
-              onChange={(event) => setMonthBatchId(event.target.value)}
-            >
-              <option value=""></option>
-              {batches.map((batch) => (
-                <option key={batch.id} value={batch.id}>
-                  {batch.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {monthBatchId && monthMarks ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <h3 className="font-medium">Present</h3>
-                <p>{monthMarks.presentDates.length}</p>
-                <ul aria-label="Present dates" className="flex flex-col gap-1">
-                  {monthMarks.presentDates.map((date) => (
-                    <li key={date}>{formatCalendarDate(date)}</li>
-                  ))}
-                </ul>
+      <section className="card bg-base-200 shadow">
+        <div className="card-body gap-6">
+          <h2 className="card-title">View Attendance</h2>
+          <fieldset className="flex flex-col gap-3" disabled={busy}>
+            <label className="flex flex-col gap-1 text-sm">
+              Month
+              <input
+                type="month"
+                className="input input-bordered"
+                value={month}
+                onChange={(event) => setMonth(event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Batch
+              <select
+                className="select select-bordered"
+                value={monthBatchId}
+                onChange={(event) => setMonthBatchId(event.target.value)}
+              >
+                <option value=""></option>
+                {batches.map((batch) => (
+                  <option key={batch.id} value={batch.id}>
+                    {batch.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {monthLoading ? (
+              <div
+                className="flex flex-col items-center gap-3 py-4"
+                role="status"
+              >
+                <span className="loading loading-spinner" aria-hidden="true" />
+                Loading
               </div>
-              <div className="flex flex-col gap-2">
-                <h3 className="font-medium">Absent</h3>
-                <p>{monthMarks.absentDates.length}</p>
-                <ul aria-label="Absent dates" className="flex flex-col gap-1">
-                  {monthMarks.absentDates.map((date) => (
-                    <li key={date}>{formatCalendarDate(date)}</li>
-                  ))}
-                </ul>
+            ) : null}
+            {monthMarks ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <h2 className="font-medium"><b>Present Dates</b> (Total: {monthMarks.presentDates.length})</h2>
+                  {/* <p> <b> Total Days:</b> {monthMarks.presentDates.length}</p> */}
+                  <ul aria-label="Present dates" className="flex flex-col gap-1">
+                    {monthMarks.presentDates.map((date) => (
+                      <li key={date}>{formatCalendarDate(date)}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex flex-col gap-2">
+                <h2 className="font-medium"><b>Absent Dates</b> (Total: {monthMarks.absentDates.length})</h2>
+                  <ul aria-label="Absent dates" className="flex flex-col gap-1">
+                    {monthMarks.absentDates.map((date) => (
+                      <li key={date}>{formatCalendarDate(date)}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          ) : null}
-        </fieldset>
-        <ErrorToast key={errorId} message={error} onDismiss={dismissError} />
-      </div>
-    </section>
+            ) : null}
+          </fieldset>
+          <ErrorToast key={errorId} message={error} onDismiss={dismissError} />
+        </div>
+      </section>
+    </div>
   );
 }

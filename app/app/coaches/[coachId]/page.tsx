@@ -47,7 +47,6 @@ export default async function CoachPage({ params }: CoachPageProps) {
         <DashboardBackLink href="/app/coaches" label="Coaches" />
         <section className="card bg-base-200 shadow">
           <div className="card-body gap-4">
-            <h1 className="card-title">{coach.name}</h1>
             <CoachEditor coach={coach} />
           </div>
         </section>

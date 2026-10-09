@@ -56,7 +56,8 @@ export function CoachesDirectory({ coaches }: CoachesDirectoryProps) {
       return;
     }
 
-    window.location.assign("/app/coaches");
+    // Full navigation; avoids useRouter (breaks SSR tests).
+    window.location.assign("/app/coaches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
   }
 
   async function onConfirmDelete() {
@@ -83,7 +84,8 @@ export function CoachesDirectory({ coaches }: CoachesDirectoryProps) {
       return;
     }
 
-    window.location.assign("/app/coaches");
+    // Full navigation; avoids useRouter (breaks SSR tests).
+    window.location.assign("/app/coaches"); // eslint-disable-line @next/next/no-location-assign-relative-destination
   }
 
   function openDelete(coach: CoachRecord) {
