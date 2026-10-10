@@ -221,7 +221,7 @@ No `UNIQUE (player_id, batch_id)` — history is preserved (e.g. a 90-day stint 
 | `sort_order` | `integer NOT NULL` | |
 | `created_at` | `timestamptz` | |
 
-Display-only; no login link in v1.
+Display-only brochure card; no login link in v1. Not a Coach. The Coach directory is `coaches` ([issue #95](./issue-95-coaches.md), [ADR-0043](../adr/0043-coach-is-not-a-coach-profile.md)).
 
 ### `impersonation_audit_events`
 
@@ -248,6 +248,7 @@ user ─────────────────────┬──►
   └── is_super_admin      ├── brochure_images
                           ├── youtube_embeds
                           ├── coach_profiles
+                          ├── coaches ──► coach_attendance
                           └── impersonation_audit_events
 ```
 

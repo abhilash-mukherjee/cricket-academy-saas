@@ -1,0 +1,5 @@
+# A Coach is a roster person, not a brochure card or a login
+
+The brochure already stores Coach profiles (name, optional photo, optional blurb), and Coach used to mean a future logged-in user who would mark Player attendance. The Owner needs a named person they can mark present or absent and remove for good. A Coach is that person: name only, unique per Academy, no login, no pause, no lapse. A Coach profile stays display-only and is not a Coach; the names may disagree. Removing a Coach removes their Coach attendance. Reusing the brochure card would make that removal unpublish the public page, and would force photo and blurb onto a list that only needs a name. A login can be linked later; this record is not an account.
+
+**Considered options:** The same record as the Coach profile (rejected — delete would change the brochure, and add would no longer be name-only); the future staff login created early (rejected — there is no account yet, and hard delete would remove a person who might later sign in).
