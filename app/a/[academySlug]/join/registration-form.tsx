@@ -239,12 +239,16 @@ export function RegistrationForm({
                     option.id ||
                     `${batch.id || batch.name}-${option.daysPerWeek}-${option.termDays}`
                   }
-                  className="card bg-base-200 cursor-pointer"
+                  className={`card bg-base-200 cursor-pointer border-2 ${
+                    values.batchFeeOptionId === option.id
+                      ? "border-primary"
+                      : "border-transparent"
+                  }`}
                 >
                   <div className="card-body flex-row items-start gap-3 py-3">
                     <input
                       type="radio"
-                      className="radio mt-1"
+                      className="radio radio-primary mt-1"
                       name="batchFeeOptionId"
                       value={option.id}
                       checked={values.batchFeeOptionId === option.id}

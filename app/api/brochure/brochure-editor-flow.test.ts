@@ -7,6 +7,7 @@ import { POST as saveBrochure } from "./route";
 import AcademyBrochurePage, {
   generateMetadata as generateBrochureMetadata,
 } from "@/app/a/[academySlug]/page";
+import ConversionPage from "@/app/a/[academySlug]/join/page";
 import {
   clearCapturedMail,
   disableMailCapture,
@@ -500,6 +501,236 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       });
 
       expect(metadata.robots).toEqual({ index: false, follow: false });
+    });
+
+    it("saves about, aboutLabel (with blank reset), themeMode, and themeAccent onto /a/{slug} and /a/{slug}/join", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const customSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            tagline: "Match-day clarity",
+            aboutLabel: "  Our Philosophy  ",
+            about: "  Coach-led nets.\nSmall batches.  ",
+            themeMode: "light",
+            themeAccent: "emerald",
+          }),
+        }),
+      );
+      expect(customSave.status).toBe(200);
+
+      const brochureHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(brochureHtml).toContain('data-theme="light"');
+      expect(brochureHtml).toContain("--color-primary:#10b981");
+      expect(brochureHtml).toContain('id="about"');
+      expect(brochureHtml).toContain(">Our Philosophy<");
+      expect(brochureHtml).toContain("Coach-led nets.\nSmall batches.");
+      expect(brochureHtml).toContain("/logo-black.svg");
+
+      const joinHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(joinHtml).toContain('data-theme="light"');
+      expect(joinHtml).toContain("--color-primary:#10b981");
+      expect(joinHtml).toContain(`href="/a/${slug}"`);
+      expect(joinHtml).toContain("/logo-black.svg");
+
+      const resetLabelSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            aboutLabel: "   ",
+            about: "Still has copy",
+          }),
+        }),
+      );
+      expect(resetLabelSave.status).toBe(200);
+
+      const afterResetHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(afterResetHtml).toContain(">About Us<");
+      expect(afterResetHtml).toContain('data-theme="light"');
+      expect(afterResetHtml).toContain("--color-primary:#10b981");
+    });
+
+    it("rejects invalid themeMode and themeAccent values with 400 invalid-input", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      for (const payload of [
+        { name: "Blitz Cricket Academy", themeMode: "sepia" },
+        { name: "Blitz Cricket Academy", themeMode: "" },
+        { name: "Blitz Cricket Academy", themeMode: null },
+        { name: "Blitz Cricket Academy", themeAccent: "pink" },
+        { name: "Blitz Cricket Academy", themeAccent: "" },
+        { name: "Blitz Cricket Academy", themeAccent: null },
+        { name: "Blitz Cricket Academy", about: 123 },
+        { name: "Blitz Cricket Academy", aboutLabel: {} },
+        { name: "Blitz Cricket Academy", logoStorageKey: 42 },
+      ]) {
+        const response = await saveBrochure(
+          new Request(`${origin}/api/brochure`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              origin,
+              cookie,
+            },
+            body: JSON.stringify(payload),
+          }),
+        );
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "invalid-input" });
+      }
+    });
+
+    it("preserves omitted about, aboutLabel, logoStorageKey, themeMode, and themeAccent on partial updates", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const db = getDb();
+      const [academy] = await db
+        .select({ id: academies.id })
+        .from(academies)
+        .where(eq(academies.slug, slug))
+        .limit(1);
+      expect(academy).toBeTruthy();
+      const logoKey = `academies/${academy!.id}/academy-logo/existing.png`;
+
+      const initialSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            aboutLabel: "Academy Story",
+            about: "Established 2015",
+            logoStorageKey: logoKey,
+            themeMode: "light",
+            themeAccent: "violet",
+          }),
+        }),
+      );
+      expect(initialSave.status).toBe(200);
+
+      const partialSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy Updated",
+            tagline: "Updated tagline only",
+          }),
+        }),
+      );
+      expect(partialSave.status).toBe(200);
+
+      const [updated] = await db
+        .select({
+          name: academies.name,
+          aboutLabel: academies.aboutLabel,
+          about: academies.about,
+          logoStorageKey: academies.logoStorageKey,
+          themeMode: academies.themeMode,
+          themeAccent: academies.themeAccent,
+        })
+        .from(academies)
+        .where(eq(academies.id, academy!.id))
+        .limit(1);
+
+      expect(updated).toEqual({
+        name: "Blitz Cricket Academy Updated",
+        aboutLabel: "Academy Story",
+        about: "Established 2015",
+        logoStorageKey: logoKey,
+        themeMode: "light",
+        themeAccent: "violet",
+      });
+    });
+
+    it("falls back generateMetadata description from tagline to about to undefined", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const aboutFallbackSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            tagline: "",
+            about: "About copy becomes meta description",
+          }),
+        }),
+      );
+      expect(aboutFallbackSave.status).toBe(200);
+
+      const withAbout = await generateBrochureMetadata({
+        params: Promise.resolve({ academySlug: slug }),
+        searchParams: Promise.resolve({}),
+      });
+      expect(withAbout.description).toBe("About copy becomes meta description");
+
+      const emptyBothSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            tagline: "",
+            about: "",
+          }),
+        }),
+      );
+      expect(emptyBothSave.status).toBe(200);
+
+      const withNeither = await generateBrochureMetadata({
+        params: Promise.resolve({ academySlug: slug }),
+        searchParams: Promise.resolve({}),
+      });
+      expect(withNeither.description).toBeUndefined();
     });
   },
 );

@@ -4,6 +4,12 @@ import { unstable_cache } from "next/cache";
 import { academies } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
+import {
+  type AcademyThemeAccent,
+  type AcademyThemeMode,
+  resolveAcademyThemeAccent,
+  resolveAcademyThemeMode,
+} from "@/lib/academy-theme";
 import { listRegistrableBatches, type RegistrableBatch } from "@/lib/academy-intake";
 import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
 
@@ -18,6 +24,9 @@ export type PublicConversion = {
   name: string;
   slug: string;
   phone: string | null;
+  logoUrl: string | null;
+  themeMode: AcademyThemeMode;
+  themeAccent: AcademyThemeAccent;
   isOnlineRegistrationAllowed: boolean;
   isIntakeAvailable: boolean;
   upiQrUrl: string | null;
@@ -34,6 +43,9 @@ async function loadPublicConversion(
       name: academies.name,
       slug: academies.slug,
       phone: academies.phone,
+      logoStorageKey: academies.logoStorageKey,
+      themeMode: academies.themeMode,
+      themeAccent: academies.themeAccent,
       isActive: academies.isActive,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
       upiQrStorageKey: academies.upiQrStorageKey,
@@ -55,6 +67,9 @@ async function loadPublicConversion(
     name: academy.name,
     slug: academy.slug,
     phone: academy.phone,
+    logoUrl: resolvePublicAssetUrl(academy.logoStorageKey),
+    themeMode: resolveAcademyThemeMode(academy.themeMode),
+    themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
     isIntakeAvailable,
     upiQrUrl: isIntakeAvailable

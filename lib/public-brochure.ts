@@ -10,6 +10,12 @@ import {
 } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
 import { resolvePublicAssetUrl } from "@/lib/academy-assets";
+import {
+  type AcademyThemeAccent,
+  type AcademyThemeMode,
+  resolveAcademyThemeAccent,
+  resolveAcademyThemeMode,
+} from "@/lib/academy-theme";
 import { brochureUrl } from "@/lib/public-origin";
 import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
 import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
@@ -18,6 +24,11 @@ export type PublicBrochure = {
   name: string;
   slug: string;
   tagline: string | null;
+  aboutLabel: string;
+  about: string | null;
+  logoUrl: string | null;
+  themeMode: AcademyThemeMode;
+  themeAccent: AcademyThemeAccent;
   location: string | null;
   phone: string | null;
   isIntakeAvailable: boolean;
@@ -41,6 +52,11 @@ async function loadPublicBrochure(
       name: academies.name,
       slug: academies.slug,
       tagline: academies.tagline,
+      aboutLabel: academies.aboutLabel,
+      about: academies.about,
+      logoStorageKey: academies.logoStorageKey,
+      themeMode: academies.themeMode,
+      themeAccent: academies.themeAccent,
       location: academies.location,
       phone: academies.phone,
       isActive: academies.isActive,
@@ -90,6 +106,11 @@ async function loadPublicBrochure(
     name: academy.name,
     slug: academy.slug,
     tagline: academy.tagline,
+    aboutLabel: academy.aboutLabel,
+    about: academy.about,
+    logoUrl: resolvePublicAssetUrl(academy.logoStorageKey),
+    themeMode: resolveAcademyThemeMode(academy.themeMode),
+    themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     location: academy.location,
     phone: academy.phone,
     isIntakeAvailable,

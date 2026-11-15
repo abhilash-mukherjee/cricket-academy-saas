@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, type MouseEvent } from "react";
 import { LinkPendingMark } from "@/app/app/link-pending-mark";
+import { resolveAboutLabel } from "@/lib/academy-theme";
 
 type BrochureMenuProps = {
   slug: string;
   phone: string | null;
   isIntakeAvailable: boolean;
+  hasAbout: boolean;
+  aboutLabel: string;
   hasBatches: boolean;
   hasCoaches: boolean;
 };
@@ -17,6 +20,8 @@ export function BrochureMenu({
   slug,
   phone,
   isIntakeAvailable,
+  hasAbout,
+  aboutLabel,
   hasBatches,
   hasCoaches,
 }: BrochureMenuProps) {
@@ -28,7 +33,7 @@ export function BrochureMenu({
 
   function scrollToSection(
     event: MouseEvent<HTMLAnchorElement>,
-    sectionId: "batches" | "coaches",
+    sectionId: "about" | "batches" | "coaches",
   ) {
     closeMenu();
     const root = event.currentTarget.closest("[data-brochure-root]");
@@ -87,6 +92,16 @@ export function BrochureMenu({
               <li>
                 <a href={`tel:${phone}`} onClick={closeMenu}>
                   Contact: {phone}
+                </a>
+              </li>
+            ) : null}
+            {hasAbout ? (
+              <li>
+                <a
+                  href="#about"
+                  onClick={(event) => scrollToSection(event, "about")}
+                >
+                  {resolveAboutLabel(aboutLabel)}
                 </a>
               </li>
             ) : null}

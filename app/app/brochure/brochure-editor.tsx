@@ -4,11 +4,25 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import type { BrochureEditorState } from "@/lib/brochure";
 import { BrochureView } from "@/app/a/[academySlug]/brochure-view";
-import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
+import {
+  ACADEMY_THEME_ACCENTS,
+  ACADEMY_THEME_ACCENT_LABELS,
+  ACADEMY_THEME_MODES,
+  publicAcademyThemeStyle,
+  resolveAboutLabel,
+  type AcademyThemeAccent,
+  type AcademyThemeMode,
+} from "@/lib/academy-theme";
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  MAX_BROCHURE_GALLERY_IMAGES,
+} from "@/lib/constants";
 import { normalizeOptionalPhone, PHONE_INVALID_COPY } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import Link from "next/link";
+
+const ACCEPTED_IMAGE_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES.join(",");
 
 type BrochureEditorProps = {
   brochure: BrochureEditorState;
@@ -49,7 +63,7 @@ function errorCopy(error: string | null): string | null {
 
 async function uploadImage(
   file: File,
-  purpose: "brochure-gallery" | "coach-photo",
+  purpose: "academy-logo" | "brochure-gallery" | "coach-photo",
   draftGalleryCount?: number,
 ): Promise<{ storageKey: string; url: string }> {
   const form = new FormData();
@@ -76,7 +90,19 @@ async function uploadImage(
 
 export function BrochureEditor({ brochure }: BrochureEditorProps) {
   const [name, setName] = useState(brochure.name);
+  const [logoStorageKey, setLogoStorageKey] = useState<string | null>(
+    brochure.logoStorageKey,
+  );
+  const [logoUrl, setLogoUrl] = useState<string | null>(brochure.logoUrl);
+  const [themeMode, setThemeMode] = useState<AcademyThemeMode>(
+    brochure.themeMode,
+  );
+  const [themeAccent, setThemeAccent] = useState<AcademyThemeAccent>(
+    brochure.themeAccent,
+  );
   const [tagline, setTagline] = useState(brochure.tagline ?? "");
+  const [aboutLabel, setAboutLabel] = useState(brochure.aboutLabel);
+  const [about, setAbout] = useState(brochure.about ?? "");
   const [location, setLocation] = useState(brochure.location ?? "");
   const [phone, setPhone] = useState(brochure.phone ?? "");
   const [images, setImages] = useState<GalleryImage[]>(brochure.images);
@@ -109,6 +135,11 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       name: name.trim() || brochure.name,
       slug: brochure.slug,
       tagline: tagline.trim() || null,
+      aboutLabel: resolveAboutLabel(aboutLabel),
+      about: about.trim() || null,
+      logoUrl,
+      themeMode,
+      themeAccent,
       location: location.trim() || null,
       phone: normalizedPhone.ok
         ? normalizedPhone.phone
@@ -135,7 +166,12 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
     };
   }, [
     name,
+    logoUrl,
+    themeMode,
+    themeAccent,
     tagline,
+    aboutLabel,
+    about,
     location,
     phone,
     images,
@@ -147,6 +183,22 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
     brochure.batches,
     brochure.isIntakeAvailable,
   ]);
+
+  async function uploadLogo(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const uploaded = await uploadImage(file, "academy-logo");
+      setLogoStorageKey(uploaded.storageKey);
+      setLogoUrl(uploaded.url);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error ? uploadError.message : "upload-failed",
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function addGalleryImage(file: File) {
     if (images.length >= MAX_BROCHURE_GALLERY_IMAGES) {
@@ -204,7 +256,12 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name,
+        logoStorageKey,
+        themeMode,
+        themeAccent,
         tagline,
+        aboutLabel,
+        about,
         location,
         phone,
         imageStorageKeys: images.map((image) => image.storageKey),
@@ -242,14 +299,139 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
             onChange={(event) => setName(event.target.value)}
           />
         </label>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-medium">Academy logo</legend>
+          {logoUrl ? (
+            <div className="flex items-center">
+              <Image
+                src={logoUrl}
+                alt={`${name.trim() || brochure.name} logo`}
+                width={160}
+                height={64}
+                sizes="10rem"
+                className="max-h-16 w-auto object-contain"
+              />
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <label className="btn btn-neutral btn-sm">
+              {logoStorageKey ? "Replace logo" : "Upload logo"}
+              <input
+                type="file"
+                accept={ACCEPTED_IMAGE_MIME_TYPES}
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void uploadLogo(file);
+                  }
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            {logoStorageKey ? (
+              <button
+                type="button"
+                className="btn btn-neutral btn-sm"
+                onClick={() => {
+                  setLogoStorageKey(null);
+                  setLogoUrl(null);
+                }}
+              >
+                Remove logo
+              </button>
+            ) : null}
+          </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-medium">Appearance</legend>
+          <div className="flex flex-col gap-1.5">
+            <span className="label-text">Mode</span>
+            <div className="join" role="group" aria-label="Appearance mode">
+              {ACADEMY_THEME_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={themeMode === mode}
+                  className={`btn btn-sm join-item ${
+                    themeMode === mode
+                      ? "btn-neutral"
+                      : "btn-ghost border-base-300"
+                  }`}
+                  onClick={() => setThemeMode(mode)}
+                >
+                  {mode === "dark" ? "Dark" : "Light"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="label-text">Accent colour</span>
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="Accent colour"
+            >
+              {ACADEMY_THEME_ACCENTS.map((accent) => {
+                const label = ACADEMY_THEME_ACCENT_LABELS[accent];
+                const isSelected = themeAccent === accent;
+                return (
+                  <button
+                    key={accent}
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={isSelected}
+                    data-accent={accent}
+                    className={`btn btn-sm gap-2 ${
+                      isSelected
+                        ? "btn-neutral"
+                        : "btn-ghost border-base-300"
+                    }`}
+                    onClick={() => setThemeAccent(accent)}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={publicAcademyThemeStyle(accent)}
+                      className="border-base-content/20 size-3.5 rounded-full border bg-[var(--color-primary)]"
+                    />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </fieldset>
+
         <label className="form-control w-full">
-          <span className="label-text mb-1">Details</span>
+          <span className="label-text mb-1">Tagline</span>
           <textarea
             className="textarea textarea-bordered w-full"
             name="tagline"
-            rows={8}
+            rows={3}
             value={tagline}
             onChange={(event) => setTagline(event.target.value)}
+          />
+        </label>
+        <label className="form-control w-full">
+          <span className="label-text mb-1">About heading</span>
+          <input
+            className="input input-bordered w-full"
+            name="aboutLabel"
+            value={aboutLabel}
+            onChange={(event) => setAboutLabel(event.target.value)}
+          />
+        </label>
+        <label className="form-control w-full">
+          <span className="label-text mb-1">About</span>
+          <textarea
+            className="textarea textarea-bordered w-full"
+            name="about"
+            rows={6}
+            value={about}
+            onChange={(event) => setAbout(event.target.value)}
           />
         </label>
         <label className="form-control w-full">
@@ -308,7 +490,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
               {uploading ? "Uploading…" : "Add image"}
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={ACCEPTED_IMAGE_MIME_TYPES}
                 className="hidden"
                 disabled={uploading}
                 onChange={(event) => {
@@ -403,7 +585,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
                   {coach.imageStorageKey ? "Replace photo" : "Upload photo"}
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept={ACCEPTED_IMAGE_MIME_TYPES}
                     className="hidden"
                     disabled={uploading}
                     onChange={(event) => {
@@ -489,7 +671,8 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       </div>
 
       <section
-        data-theme="dark"
+        data-theme={preview.themeMode}
+        style={publicAcademyThemeStyle(preview.themeAccent)}
         className="border-base-300 bg-base-100 text-base-content relative overflow-clip rounded-box border p-2"
       >
         <h2 className="px-4 pt-4 text-lg font-semibold">Preview</h2>

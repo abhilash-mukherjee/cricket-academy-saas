@@ -209,3 +209,33 @@ describe("deferred start mark on a pause", () => {
     );
   });
 });
+
+describe("brochure about, logo, and theme appearance on academies", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0014_brochure_appearance.sql",
+  );
+
+  it("adds about_label, about, logo_storage_key, theme_mode, theme_accent and check constraints", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "about_label" text DEFAULT \'About Us\' NOT NULL;',
+    );
+    expect(sql).toContain('ALTER TABLE "academies" ADD COLUMN "about" text;');
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "logo_storage_key" text;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "theme_mode" text DEFAULT \'dark\' NOT NULL;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "theme_accent" text DEFAULT \'default\' NOT NULL;',
+    );
+    expect(sql).toContain('CONSTRAINT "academies_about_label_not_blank"');
+    expect(sql).toContain('CONSTRAINT "academies_theme_mode_check"');
+    expect(sql).toContain('CONSTRAINT "academies_theme_accent_check"');
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+  });
+});

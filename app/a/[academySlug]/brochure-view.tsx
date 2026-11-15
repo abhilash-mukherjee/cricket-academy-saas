@@ -1,7 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LinkPendingMark } from "@/app/app/link-pending-mark";
-import { APP_NAME } from "@/lib/constants";
+import {
+  publicAcademyThemeStyle,
+  resolveAboutLabel,
+  type AcademyThemeMode,
+} from "@/lib/academy-theme";
+import { AcademyLogoMark } from "./academy-logo";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import { BrochureCarousel } from "./brochure-gallery";
 import { BrochureMenu } from "./brochure-header";
@@ -15,31 +20,39 @@ type BrochureViewProps = {
 };
 
 function BrochureHeader({
+  name,
   slug,
   phone,
+  logoUrl,
+  themeMode,
   isIntakeAvailable,
+  hasAbout,
+  aboutLabel,
   hasBatches,
   hasCoaches,
 }: {
+  name: string;
   slug: string;
   phone: string | null;
+  logoUrl: string | null;
+  themeMode: AcademyThemeMode;
   isIntakeAvailable: boolean;
+  hasAbout: boolean;
+  aboutLabel: string;
   hasBatches: boolean;
   hasCoaches: boolean;
 }) {
   const hasMenuOptions =
-    isIntakeAvailable || Boolean(phone) || hasBatches || hasCoaches;
+    isIntakeAvailable || Boolean(phone) || hasAbout || hasBatches || hasCoaches;
 
   return (
     <header className="navbar bg-base-100/75 sticky top-0 z-30 -mb-16 h-16 px-4 backdrop-blur-md">
       <div className="flex-1">
         <span className="inline-flex items-center">
-          <Image
-            src="/logo-white.svg"
-            alt={APP_NAME}
-            width={893}
-            height={143}
-            className="h-6 w-auto"
+          <AcademyLogoMark
+            name={name}
+            logoUrl={logoUrl}
+            themeMode={themeMode}
           />
         </span>
       </div>
@@ -48,6 +61,8 @@ function BrochureHeader({
           slug={slug}
           phone={phone}
           isIntakeAvailable={isIntakeAvailable}
+          hasAbout={hasAbout}
+          aboutLabel={aboutLabel}
           hasBatches={hasBatches}
           hasCoaches={hasCoaches}
         />
@@ -116,21 +131,41 @@ function HeroCta({
 
 /** Public Academy Brochure view shared by /a/{slug} and the Owner's editor preview. */
 export function BrochureView({ brochure }: BrochureViewProps) {
+  const hasAbout = Boolean(brochure.about?.trim());
+  const aboutLabel = resolveAboutLabel(brochure.aboutLabel);
+  const hasHeroImages = brochure.images.length > 0;
+  const heroTextClass = hasHeroImages
+    ? "text-neutral-content"
+    : "text-base-content";
+  const heroTaglineClass = hasHeroImages
+    ? "text-neutral-content/85"
+    : "text-base-content/85";
+  const heroMetaClass = hasHeroImages
+    ? "text-neutral-content/90"
+    : "text-base-content/90";
+
   const hasBelowHeroContent =
+    hasAbout ||
     brochure.youtubeVideoIds.length > 0 ||
     brochure.batches.length > 0 ||
     brochure.coaches.length > 0;
 
   return (
     <div
-      data-theme="dark"
+      data-theme={brochure.themeMode}
+      style={publicAcademyThemeStyle(brochure.themeAccent)}
       data-brochure-root=""
       className="@container bg-base-100 text-base-content"
     >
       <BrochureHeader
+        name={brochure.name}
         slug={brochure.slug}
         phone={brochure.phone}
+        logoUrl={brochure.logoUrl}
+        themeMode={brochure.themeMode}
         isIntakeAvailable={brochure.isIntakeAvailable}
+        hasAbout={hasAbout}
+        aboutLabel={aboutLabel}
         hasBatches={brochure.batches.length > 0}
         hasCoaches={brochure.coaches.length > 0}
       />
@@ -140,16 +175,24 @@ export function BrochureView({ brochure }: BrochureViewProps) {
           className="from-base-300 via-base-200 to-base-100 relative flex min-h-dvh flex-col justify-center overflow-hidden bg-gradient-to-b"
         >
           <HeroBackground images={brochure.images} />
-          <div aria-hidden="true" className="bg-neutral/65 absolute inset-0" />
-          <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-6 pt-24 pb-16 text-center">
+          {hasHeroImages ? (
+            <div aria-hidden="true" className="bg-neutral/65 absolute inset-0" />
+          ) : null}
+          <div
+            className={`relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-6 pt-24 pb-16 text-center ${heroTextClass}`}
+          >
             <h1 className="text-4xl font-bold sm:text-5xl">{brochure.name}</h1>
             {brochure.tagline ? (
-              <p className="text-base-content/85 max-w-2xl text-lg whitespace-pre-wrap">
+              <p
+                className={`${heroTaglineClass} max-w-2xl text-lg whitespace-pre-wrap`}
+              >
                 {brochure.tagline}
               </p>
             ) : null}
             {brochure.location || brochure.phone ? (
-              <div className="text-base-content/90 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+              <div
+                className={`${heroMetaClass} flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm`}
+              >
                 {brochure.location ? (
                   <BrochureLocation location={brochure.location} />
                 ) : null}
@@ -168,6 +211,17 @@ export function BrochureView({ brochure }: BrochureViewProps) {
 
         {hasBelowHeroContent ? (
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-12">
+            {hasAbout ? (
+              <section id="about" className="flex scroll-mt-20 flex-col gap-4">
+                <h2 className="text-xl font-semibold">{aboutLabel}</h2>
+                <article className="card bg-base-200">
+                  <div className="card-body">
+                    <p className="whitespace-pre-wrap">{brochure.about}</p>
+                  </div>
+                </article>
+              </section>
+            ) : null}
+
             {brochure.youtubeVideoIds.length > 0 ? (
               <section className="flex flex-col gap-4" aria-label="Videos">
                 {brochure.youtubeVideoIds.map((videoId) => (
