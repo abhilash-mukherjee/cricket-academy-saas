@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { BrochureEditorState } from "@/lib/brochure";
 import { BrochureView } from "@/app/a/[academySlug]/brochure-view";
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
-import { PHONE_INVALID_COPY } from "@/lib/phone";
+import { normalizeOptionalPhone, PHONE_INVALID_COPY } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import Link from "next/link";
@@ -103,13 +103,16 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const preview: PublicBrochure = useMemo(
-    () => ({
+  const preview: PublicBrochure = useMemo(() => {
+    const normalizedPhone = normalizeOptionalPhone(phone);
+    return {
       name: name.trim() || brochure.name,
       slug: brochure.slug,
       tagline: tagline.trim() || null,
       location: location.trim() || null,
-      phone: phone.trim() || null,
+      phone: normalizedPhone.ok
+        ? normalizedPhone.phone
+        : phone.trim() || null,
       isIntakeAvailable: brochure.isIntakeAvailable,
       images: images
         .map((image) => image.url)
@@ -129,22 +132,21 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
           imageUrl: coach.imageUrl,
           blurb: coach.blurb.trim() || null,
         })),
-    }),
-    [
-      name,
-      tagline,
-      location,
-      phone,
-      images,
-      youtubeUrls,
-      batchBlurbs,
-      coaches,
-      brochure.name,
-      brochure.slug,
-      brochure.batches,
-      brochure.isIntakeAvailable,
-    ],
-  );
+    };
+  }, [
+    name,
+    tagline,
+    location,
+    phone,
+    images,
+    youtubeUrls,
+    batchBlurbs,
+    coaches,
+    brochure.name,
+    brochure.slug,
+    brochure.batches,
+    brochure.isIntakeAvailable,
+  ]);
 
   async function addGalleryImage(file: File) {
     if (images.length >= MAX_BROCHURE_GALLERY_IMAGES) {
@@ -486,9 +488,12 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
 
       </div>
 
-      <section className="border-base-300 relative overflow-hidden rounded-box border p-2">
+      <section
+        data-theme="dark"
+        className="border-base-300 bg-base-100 text-base-content relative overflow-clip rounded-box border p-2"
+      >
         <h2 className="px-4 pt-4 text-lg font-semibold">Preview</h2>
-        <BrochureView brochure={preview} ctaPlacement="frame" />
+        <BrochureView brochure={preview} />
       </section>
     </div>
   );

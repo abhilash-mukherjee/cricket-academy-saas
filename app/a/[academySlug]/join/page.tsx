@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublicConversion } from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
-import { BrochureCta } from "../brochure-cta";
 import { BrochurePhone } from "../brochure-phone";
 import { RegistrationForm } from "./registration-form";
 
@@ -39,15 +38,8 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
     notFound();
   }
 
-  const showCopyPhone =
-    !conversion.isOnlineRegistrationAllowed && Boolean(conversion.phone);
-
   return (
-    <div
-      className={
-        showCopyPhone ? "bg-base-100 min-h-dvh pb-20" : "bg-base-100 min-h-dvh"
-      }
-    >
+    <div data-theme="dark" className="bg-base-100 text-base-content min-h-dvh">
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 p-6">
         <h1 className="text-3xl font-bold">{conversion.name}</h1>
         {conversion.isIntakeAvailable ? (
@@ -72,14 +64,6 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
           </>
         )}
       </main>
-      {showCopyPhone ? (
-        <BrochureCta
-          slug={conversion.slug}
-          phone={conversion.phone}
-          isIntakeAvailable={false}
-          placement="viewport"
-        />
-      ) : null}
       <footer className="text-base-content/60 p-6 text-center text-sm">
         Built with {APP_NAME}
       </footer>

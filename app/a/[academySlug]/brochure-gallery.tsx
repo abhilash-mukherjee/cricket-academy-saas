@@ -1,97 +1,74 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
+
+export const HERO_CAROUSEL_INTERVAL_MS = 5000;
+
+type MediaQueryFn = (query: string) => { matches: boolean };
+
+/** Start the 5-second ambient hero carousel interval when 2+ slides exist and motion is allowed. */
+export function startHeroCarouselTimer(
+  slideCount: number,
+  onAdvance: () => void,
+  matchMedia: MediaQueryFn | undefined = typeof window !== "undefined" &&
+    typeof window.matchMedia === "function"
+    ? window.matchMedia.bind(window)
+    : undefined,
+): () => void {
+  if (slideCount < 2) {
+    return () => undefined;
+  }
+  if (matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+    return () => undefined;
+  }
+
+  const timerId = setInterval(onAdvance, HERO_CAROUSEL_INTERVAL_MS);
+  return () => clearInterval(timerId);
+}
 
 type BrochureCarouselProps = {
   images: { url: string }[];
 };
 
+/** Full-bleed ambient crossfade carousel behind the hero scrim. */
 export function BrochureCarousel({ images }: BrochureCarouselProps) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  const slideCount = images.length;
+  const activeIndex = slideCount > 0 ? index % slideCount : 0;
 
-  function goTo(nextIndex: number) {
-    const scroller = scrollerRef.current;
-    if (!scroller || images.length === 0) {
-      return;
-    }
-
-    const wrapped =
-      (nextIndex + images.length) % images.length;
-    setIndex(wrapped);
-    scroller.scrollTo({
-      left: wrapped * scroller.clientWidth,
-      behavior: "smooth",
-    });
-  }
-
-  function syncIndexFromScroll() {
-    const scroller = scrollerRef.current;
-    if (!scroller || scroller.clientWidth === 0) {
-      return;
-    }
-
-    const next = Math.round(scroller.scrollLeft / scroller.clientWidth);
-    setIndex(Math.min(images.length - 1, Math.max(0, next)));
-  }
+  useEffect(() => {
+    return startHeroCarouselTimer(slideCount, () =>
+      setIndex((current) => (current + 1) % slideCount),
+    );
+  }, [slideCount]);
 
   return (
-    <section className="flex flex-col gap-2" aria-label="Photos">
-      <div className="relative">
+    <div
+      data-carousel="hero"
+      aria-hidden="true"
+      className="absolute inset-0 overflow-hidden"
+    >
+      {images.map((image, slideIndex) => (
         <div
-          ref={scrollerRef}
-          className="carousel w-full rounded-box"
-          onScroll={syncIndexFromScroll}
+          key={`${image.url}-${slideIndex}`}
+          data-slide-active={slideIndex === activeIndex ? "true" : "false"}
+          className={
+            slideIndex === activeIndex
+              ? "absolute inset-0 opacity-100 transition-opacity duration-1000 ease-in-out motion-reduce:transition-none"
+              : "absolute inset-0 opacity-0 transition-opacity duration-1000 ease-in-out motion-reduce:transition-none"
+          }
         >
-          {images.map((image, slideIndex) => (
-            <div key={image.url} className="carousel-item w-full">
-              <div className="relative aspect-[4/3] w-full overflow-hidden">
-                <Image
-                  src={image.url}
-                  alt=""
-                  fill
-                  sizes="(min-width: 1024px) 32rem, 100vw"
-                  priority={slideIndex === 0}
-                  className="object-cover"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="btn btn-circle absolute top-1/2 left-5 z-10 -translate-y-1/2"
-          aria-label="Previous"
-          onClick={() => goTo(index - 1)}
-        >
-          ❮
-        </button>
-        <button
-          type="button"
-          className="btn btn-circle absolute top-1/2 right-5 z-10 -translate-y-1/2"
-          aria-label="Next"
-          onClick={() => goTo(index + 1)}
-        >
-          ❯
-        </button>
-      </div>
-      <div className="flex w-full justify-center gap-2 py-2">
-        {images.map((image, slideIndex) => (
-          <button
-            key={image.url}
-            type="button"
-            className={
-              slideIndex === index
-                ? "bg-base-content size-2 rounded-full"
-                : "bg-base-content/40 hover:bg-base-content size-2 rounded-full"
-            }
-            aria-label={`Photo ${slideIndex + 1}`}
-            aria-current={slideIndex === index ? "true" : undefined}
-            onClick={() => goTo(slideIndex)}
+          <Image
+            src={image.url}
+            alt=""
+            fill
+            sizes="100vw"
+            preload={slideIndex === 0}
+            className="object-cover"
           />
-        ))}
-      </div>
-    </section>
+        </div>
+      ))}
+    </div>
   );
 }

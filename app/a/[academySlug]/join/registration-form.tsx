@@ -21,6 +21,7 @@ import {
 import type { RegistrationSnapshot } from "@/lib/registrations";
 import { RegistrationThankYou } from "./registration-thank-you";
 import { UpiPayQr } from "./upi-pay-qr";
+import { PUBLIC_PRIMARY_BUTTON_CLASS } from "../public-button";
 
 type RegistrationFormProps = {
   academySlug: string;
@@ -392,7 +393,7 @@ export function RegistrationForm({
 
       <button
         type="submit"
-        className="btn btn-neutral"
+        className={PUBLIC_PRIMARY_BUTTON_CLASS}
         disabled={submitting}
       >
         Submit Registration

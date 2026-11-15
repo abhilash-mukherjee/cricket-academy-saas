@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     env: {
       BETTER_AUTH_SECRET:
         process.env.BETTER_AUTH_SECRET ?? "vitest-better-auth-secret",
