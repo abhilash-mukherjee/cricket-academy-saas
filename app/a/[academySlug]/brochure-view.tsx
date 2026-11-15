@@ -11,7 +11,7 @@ import {
 import { AcademyLogoMark } from "./academy-logo";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import { BrochureCarousel } from "./brochure-gallery";
-import { BrochureMenu } from "./brochure-header";
+import { BrochureMenu, HeroScrollNudge } from "./brochure-header";
 import { BrochureLocation } from "./brochure-location";
 import { BrochurePhone } from "./brochure-phone";
 import { BrochureYoutube } from "./brochure-youtube";
@@ -211,10 +211,16 @@ export function BrochureView({ brochure }: BrochureViewProps) {
               isIntakeAvailable={brochure.isIntakeAvailable}
             />
           </div>
+          {hasBelowHeroContent ? (
+            <HeroScrollNudge hasHeroImages={hasHeroImages} />
+          ) : null}
         </section>
 
         {hasBelowHeroContent ? (
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-12">
+          <div
+            data-brochure-content=""
+            className="mx-auto flex w-full max-w-3xl scroll-mt-16 flex-col gap-10 px-6 py-12"
+          >
             {hasAbout ? (
               <section id="about" className="flex scroll-mt-20 flex-col gap-4">
                 <h2 className="text-xl font-semibold">{aboutLabel}</h2>

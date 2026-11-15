@@ -461,6 +461,55 @@ describe("Academy Brochure public seam", () => {
     expect(batchesIndex).toBeGreaterThan(videosIndex);
     expect(coachesIndex).toBeGreaterThan(batchesIndex);
   });
+
+  it("renders a minimal animated hero scroll nudge only when below-hero content exists, matching hero contrast", () => {
+    const emptyBelowHeroHtml = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          about: null,
+          youtubeVideoIds: [],
+          batches: [],
+          coaches: [],
+        })}
+      />,
+    );
+    expect(emptyBelowHeroHtml).not.toContain('aria-label="Scroll to content"');
+    expect(emptyBelowHeroHtml).not.toContain("data-brochure-content");
+
+    const plainHeroHtml = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          about: "Coach-led training.",
+          images: [],
+        })}
+      />,
+    );
+    const plainHero =
+      plainHeroHtml.match(/<section[^>]*aria-label="Academy hero"[\s\S]*?<\/section>/)?.[0] ??
+      "";
+    expect(plainHero).toMatch(/<button[^>]*type="button"[^>]*aria-label="Scroll to content"/);
+    expect(plainHero).toContain("text-base-content/60");
+    expect(plainHero).toContain("animate-[hero-nudge_2.2s_ease-in-out_infinite]");
+    expect(plainHero).toContain("motion-reduce:animate-none");
+    expect(plainHero).toContain('aria-hidden="true"');
+    expect(plainHeroHtml).toContain('data-brochure-content=""');
+    expect(plainHeroHtml).toContain("scroll-mt-16");
+
+    const imageHeroHtml = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          batches: [{ name: "U-14 evening", blurb: null }],
+          images: [{ url: "https://blob.test/academies/a/brochure-gallery/1.png" }],
+        })}
+      />,
+    );
+    const imageHero =
+      imageHeroHtml.match(/<section[^>]*aria-label="Academy hero"[\s\S]*?<\/section>/)?.[0] ??
+      "";
+    expect(imageHero).toContain('aria-label="Scroll to content"');
+    expect(imageHero).toContain("text-neutral-content/70");
+    expect(imageHero).not.toContain("text-base-content/60");
+  });
 });
 
 describe("public Academy dark theme and primary buttons", () => {
