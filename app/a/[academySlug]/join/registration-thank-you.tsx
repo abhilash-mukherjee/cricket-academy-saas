@@ -1,6 +1,7 @@
 import { packageFactsCopy } from "@/lib/package-copy";
 import type { RegistrationSnapshot } from "@/lib/registrations";
 import { UpiPayQr } from "./upi-pay-qr";
+import { PUBLIC_PRIMARY_BUTTON_CLASS } from "../public-button";
 
 type RegistrationThankYouProps = {
   snapshot: RegistrationSnapshot;
@@ -33,7 +34,7 @@ export function RegistrationThankYou({
       ) : null}
       <button
         type="button"
-        className="btn btn-neutral"
+        className={PUBLIC_PRIMARY_BUTTON_CLASS}
         onClick={onRegisterAnother}
       >
         Register another Player

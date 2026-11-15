@@ -270,8 +270,9 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expectOptimizedAsset(html, coachPhoto.storageKey);
       expect(html).toContain("Ravi Kumar");
       expect(html).toContain("Head Coach");
-      expect(html).toContain("aspect-[4/3]");
-      expect(html).not.toContain("carousel");
+      expect(html).toContain("min-h-dvh");
+      expect(html).toContain("object-cover");
+      expect(html).not.toContain('data-carousel="hero"');
       expect(html).not.toContain("Previous");
     });
 
@@ -315,7 +316,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(fourth.storageKey).toBeTruthy();
     });
 
-    it("shows DaisyUI carousel chrome when the gallery has two photos", async () => {
+    it("shows ambient hero carousel without arrows or dot controls when the gallery has two photos", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);
 
@@ -352,9 +353,10 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
 
       expectOptimizedAsset(html, first.storageKey);
       expectOptimizedAsset(html, second.storageKey);
-      expect(html).toContain("carousel");
-      expect(html).toContain("Previous");
-      expect(html).toContain("Next");
+      expect(html).toContain('data-carousel="hero"');
+      expect(html).not.toContain("Previous");
+      expect(html).not.toContain("Next");
+      expect(html).not.toContain("Photo 1");
     });
 
     it("shows uploaded UPI QR on GET /a/{slug}/join when intake is available", async () => {

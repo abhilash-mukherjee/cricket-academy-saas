@@ -325,7 +325,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Brochure");
     });
 
-    it("explains on /join when online Registration is off, with copy-phone and no form, QR, or Batch list", async () => {
+    it("explains on /join when online Registration is off, with phone number and no bottom floating CTA bar, form, QR, or Batch list", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug, "U-14 evening");
       const academy = await getOwnedAcademy(await sessionUserId(cookie));
@@ -383,13 +383,15 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
+      expect(joinHtml).toContain('data-theme="dark"');
       expect(joinHtml).toMatch(/online Registration is off/i);
       expect(joinHtml).not.toMatch(/intake is closed/i);
       expect(joinHtml).not.toContain("<form");
       expect(joinHtml).not.toContain("Pay with UPI");
       expect(joinHtml).not.toContain("U-14 evening");
       expect(joinHtml).not.toContain("Weekday nets");
-      expect(joinHtml).toContain("Call to Register");
+      expect(joinHtml).not.toContain("Call to Register");
+      expect(joinHtml).not.toContain("fixed inset-x-0 bottom-0");
       expect(joinHtml).toContain("+919876543210");
 
       const brochureHtml = renderToStaticMarkup(
