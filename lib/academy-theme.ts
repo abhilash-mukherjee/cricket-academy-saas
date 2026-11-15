@@ -80,9 +80,11 @@ export function resolveAboutLabel(value?: string | null): string {
  * for the selected Academy brand accent swatch.
  */
 export function publicAcademyThemeStyle(
-  themeAccent: AcademyThemeAccent,
+  themeAccent?: AcademyThemeAccent | null,
 ): CSSProperties {
-  const { primary, primaryContent } = ACADEMY_THEME_ACCENT_COLORS[themeAccent];
+  const resolvedAccent = resolveAcademyThemeAccent(themeAccent);
+  const { primary, primaryContent } =
+    ACADEMY_THEME_ACCENT_COLORS[resolvedAccent];
   return {
     "--color-primary": primary,
     "--color-primary-content": primaryContent,

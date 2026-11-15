@@ -83,6 +83,14 @@ describe("academy theme accents", () => {
       "--color-primary": "#ea580c",
       "--color-primary-content": "#ffffff",
     });
+    expect(publicAcademyThemeStyle(undefined)).toEqual({
+      "--color-primary": "var(--color-base-content)",
+      "--color-primary-content": "var(--color-base-100)",
+    });
+    expect(publicAcademyThemeStyle(null)).toEqual({
+      "--color-primary": "var(--color-base-content)",
+      "--color-primary-content": "var(--color-base-100)",
+    });
   });
 
   it("exposes Zod schemas and normalization helpers with safe defaults", () => {

@@ -4,6 +4,8 @@ import { LinkPendingMark } from "@/app/app/link-pending-mark";
 import {
   publicAcademyThemeStyle,
   resolveAboutLabel,
+  resolveAcademyThemeAccent,
+  resolveAcademyThemeMode,
   type AcademyThemeMode,
 } from "@/lib/academy-theme";
 import { AcademyLogoMark } from "./academy-logo";
@@ -133,6 +135,8 @@ function HeroCta({
 export function BrochureView({ brochure }: BrochureViewProps) {
   const hasAbout = Boolean(brochure.about?.trim());
   const aboutLabel = resolveAboutLabel(brochure.aboutLabel);
+  const themeMode = resolveAcademyThemeMode(brochure.themeMode);
+  const themeAccent = resolveAcademyThemeAccent(brochure.themeAccent);
   const hasHeroImages = brochure.images.length > 0;
   const heroTextClass = hasHeroImages
     ? "text-neutral-content"
@@ -152,8 +156,8 @@ export function BrochureView({ brochure }: BrochureViewProps) {
 
   return (
     <div
-      data-theme={brochure.themeMode}
-      style={publicAcademyThemeStyle(brochure.themeAccent)}
+      data-theme={themeMode}
+      style={publicAcademyThemeStyle(themeAccent)}
       data-brochure-root=""
       className="@container bg-base-100 text-base-content"
     >
@@ -162,7 +166,7 @@ export function BrochureView({ brochure }: BrochureViewProps) {
         slug={brochure.slug}
         phone={brochure.phone}
         logoUrl={brochure.logoUrl}
-        themeMode={brochure.themeMode}
+        themeMode={themeMode}
         isIntakeAvailable={brochure.isIntakeAvailable}
         hasAbout={hasAbout}
         aboutLabel={aboutLabel}

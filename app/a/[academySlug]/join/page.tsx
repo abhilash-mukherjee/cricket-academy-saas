@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LinkPendingMark } from "@/app/app/link-pending-mark";
-import { publicAcademyThemeStyle } from "@/lib/academy-theme";
+import {
+  publicAcademyThemeStyle,
+  resolveAcademyThemeAccent,
+  resolveAcademyThemeMode,
+} from "@/lib/academy-theme";
 import {
   getPublicConversion,
   type PublicConversion,
@@ -43,10 +47,13 @@ export function ConversionView({
 }: {
   conversion: PublicConversion;
 }) {
+  const themeMode = resolveAcademyThemeMode(conversion.themeMode);
+  const themeAccent = resolveAcademyThemeAccent(conversion.themeAccent);
+
   return (
     <div
-      data-theme={conversion.themeMode}
-      style={publicAcademyThemeStyle(conversion.themeAccent)}
+      data-theme={themeMode}
+      style={publicAcademyThemeStyle(themeAccent)}
       className="bg-base-100 text-base-content min-h-dvh"
     >
       <header className="navbar bg-base-100/75 sticky top-0 z-30 h-16 px-4 backdrop-blur-md">
@@ -58,7 +65,7 @@ export function ConversionView({
             <AcademyLogoMark
               name={conversion.name}
               logoUrl={conversion.logoUrl}
-              themeMode={conversion.themeMode}
+              themeMode={themeMode}
             />
             <LinkPendingMark />
           </Link>

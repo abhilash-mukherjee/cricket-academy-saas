@@ -79,17 +79,27 @@ async function loadPublicConversion(
   };
 }
 
-function getCachedPublicConversion(
+async function getCachedPublicConversion(
   slug: string,
 ): Promise<PublicConversion | null> {
-  return unstable_cache(
+  const cached = await unstable_cache(
     () => loadPublicConversion(slug),
-    ["public-conversion", slug, "registrable-ids"],
+    ["public-conversion", slug, "registrable-ids", "appearance-v1"],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: PUBLIC_CONVERSION_CACHE_SECONDS,
     },
   )();
+  if (!cached) {
+    return null;
+  }
+
+  return {
+    ...cached,
+    logoUrl: cached.logoUrl ?? null,
+    themeMode: resolveAcademyThemeMode(cached.themeMode),
+    themeAccent: resolveAcademyThemeAccent(cached.themeAccent),
+  };
 }
 
 export const getPublicConversion = cache(getCachedPublicConversion);

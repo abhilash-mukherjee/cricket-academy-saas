@@ -13,6 +13,7 @@ import { resolvePublicAssetUrl } from "@/lib/academy-assets";
 import {
   type AcademyThemeAccent,
   type AcademyThemeMode,
+  resolveAboutLabel,
   resolveAcademyThemeAccent,
   resolveAcademyThemeMode,
 } from "@/lib/academy-theme";
@@ -106,7 +107,7 @@ async function loadPublicBrochure(
     name: academy.name,
     slug: academy.slug,
     tagline: academy.tagline,
-    aboutLabel: academy.aboutLabel,
+    aboutLabel: resolveAboutLabel(academy.aboutLabel),
     about: academy.about,
     logoUrl: resolvePublicAssetUrl(academy.logoStorageKey),
     themeMode: resolveAcademyThemeMode(academy.themeMode),
@@ -128,15 +129,29 @@ async function loadPublicBrochure(
   };
 }
 
-function getCachedPublicBrochure(slug: string): Promise<PublicBrochure | null> {
-  return unstable_cache(
+async function getCachedPublicBrochure(
+  slug: string,
+): Promise<PublicBrochure | null> {
+  const cached = await unstable_cache(
     () => loadPublicBrochure(slug),
-    ["public-brochure", slug],
+    ["public-brochure", slug, "appearance-v1"],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: false,
     },
   )();
+  if (!cached) {
+    return null;
+  }
+
+  return {
+    ...cached,
+    aboutLabel: resolveAboutLabel(cached.aboutLabel),
+    about: cached.about ?? null,
+    logoUrl: cached.logoUrl ?? null,
+    themeMode: resolveAcademyThemeMode(cached.themeMode),
+    themeAccent: resolveAcademyThemeAccent(cached.themeAccent),
+  };
 }
 
 export const getPublicBrochure = cache(getCachedPublicBrochure);
