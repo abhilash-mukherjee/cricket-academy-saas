@@ -239,3 +239,27 @@ describe("brochure about, logo, and theme appearance on academies", () => {
     expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
   });
 });
+
+describe("brochure instagram handle and whatsapp on academies", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0015_brochure_instagram_whatsapp.sql",
+  );
+
+  it("adds instagram_handle, whatsapp, and instagram handle format constraint without destructive DDL", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "instagram_handle" text;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "whatsapp" text;',
+    );
+    expect(sql).toContain('CONSTRAINT "academies_instagram_handle_format"');
+    expect(sql).toMatch(
+      /"academies"\."instagram_handle" is null or "academies"\."instagram_handle" ~ '\^\[A-Za-z0-9\._\]\{1,30\}\$'/,
+    );
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+  });
+});

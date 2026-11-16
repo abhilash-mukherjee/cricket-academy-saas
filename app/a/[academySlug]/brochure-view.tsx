@@ -12,13 +12,19 @@ import { AcademyLogoMark } from "./academy-logo";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import { BrochureCarousel } from "./brochure-gallery";
 import { BrochureMenu, HeroScrollNudge } from "./brochure-header";
+import { BrochureInstagram } from "./brochure-instagram";
 import { BrochureLocation } from "./brochure-location";
 import { BrochurePhone } from "./brochure-phone";
+import {
+  BrochureWhatsapp,
+  type BrochureFloatingPlacement,
+} from "./brochure-whatsapp";
 import { BrochureYoutube } from "./brochure-youtube";
 import { PUBLIC_PRIMARY_BUTTON_CLASS } from "./public-button";
 
 type BrochureViewProps = {
   brochure: PublicBrochure;
+  floatingPlacement?: BrochureFloatingPlacement;
 };
 
 function BrochureHeader({
@@ -132,7 +138,10 @@ function HeroCta({
 }
 
 /** Public Academy Brochure view shared by /a/{slug} and the Owner's editor preview. */
-export function BrochureView({ brochure }: BrochureViewProps) {
+export function BrochureView({
+  brochure,
+  floatingPlacement = "viewport",
+}: BrochureViewProps) {
   const hasAbout = Boolean(brochure.about?.trim());
   const aboutLabel = resolveAboutLabel(brochure.aboutLabel);
   const themeMode = resolveAcademyThemeMode(brochure.themeMode);
@@ -159,7 +168,7 @@ export function BrochureView({ brochure }: BrochureViewProps) {
       data-theme={themeMode}
       style={publicAcademyThemeStyle(themeAccent)}
       data-brochure-root=""
-      className="@container bg-base-100 text-base-content"
+      className="@container relative bg-base-100 text-base-content"
     >
       <BrochureHeader
         name={brochure.name}
@@ -193,7 +202,7 @@ export function BrochureView({ brochure }: BrochureViewProps) {
                 {brochure.tagline}
               </p>
             ) : null}
-            {brochure.location || brochure.phone ? (
+            {brochure.location || brochure.phone || brochure.instagramHandle ? (
               <div
                 className={`${heroMetaClass} flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm`}
               >
@@ -202,6 +211,11 @@ export function BrochureView({ brochure }: BrochureViewProps) {
                 ) : null}
                 {brochure.phone ? (
                   <BrochurePhone phone={brochure.phone} />
+                ) : null}
+                {brochure.instagramHandle ? (
+                  <BrochureInstagram
+                    instagramHandle={brochure.instagramHandle}
+                  />
                 ) : null}
               </div>
             ) : null}
@@ -314,6 +328,13 @@ export function BrochureView({ brochure }: BrochureViewProps) {
           </div>
         ) : null}
       </main>
+      {brochure.whatsapp ? (
+        <BrochureWhatsapp
+          whatsapp={brochure.whatsapp}
+          academyName={brochure.name}
+          floatingPlacement={floatingPlacement}
+        />
+      ) : null}
     </div>
   );
 }

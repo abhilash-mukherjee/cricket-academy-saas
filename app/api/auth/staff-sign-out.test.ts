@@ -94,6 +94,8 @@ describe("public chrome has no Sign out", () => {
           themeAccent: "default",
           location: "Bengaluru",
           phone: "9999999999",
+          instagramHandle: null,
+          whatsapp: null,
           isIntakeAvailable: false,
           images: [],
           youtubeVideoIds: [],

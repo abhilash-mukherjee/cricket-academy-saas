@@ -13,9 +13,18 @@ import {
 } from "./join/registration-form";
 import { RegistrationThankYou } from "./join/registration-thank-you";
 import { ConversionView } from "./join/page";
-import { BrochureEditor } from "@/app/app/brochure/brochure-editor";
+import {
+  BrochureEditor,
+  changeEditorPhone,
+  changeEditorWhatsapp,
+  initialPhoneSyncState,
+  toggleWhatsappSameAsPhone,
+} from "@/app/app/brochure/brochure-editor";
 import { ACADEMY_THEME_ACCENTS } from "@/lib/academy-theme";
-import { ACADEMY_NOT_FOUND } from "@/lib/constants";
+import {
+  ACADEMY_NOT_FOUND,
+  WHATSAPP_CHAT_MESSAGE_TEMPLATE,
+} from "@/lib/constants";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import type { PublicConversion } from "@/lib/public-conversion";
 import { PUBLIC_PRIMARY_BUTTON_CLASS } from "./public-button";
@@ -64,6 +73,8 @@ function makeBrochure(overrides: Partial<PublicBrochure> = {}): PublicBrochure {
     themeAccent: "default",
     location: "Koramangala",
     phone: "+919876543210",
+    instagramHandle: null,
+    whatsapp: null,
     isIntakeAvailable: false,
     images: [],
     youtubeVideoIds: [],
@@ -584,6 +595,98 @@ describe("Academy Brochure public seam", () => {
     expect(closedCard).not.toContain("/join");
     expect(closedCard).not.toContain(">Register<");
   });
+
+  it("renders Instagram in the hero metadata row when set, omits it when null, and never adds it to the hamburger menu", () => {
+    const withAllMeta = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          location: "Koramangala",
+          phone: "+919876543210",
+          instagramHandle: "Elite_Cricket",
+          isIntakeAvailable: true,
+        })}
+      />,
+    );
+    const header = withAllMeta.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "";
+    expect(header).not.toContain("Follow us on Instagram");
+    expect(header).not.toContain("instagram.com");
+
+    const hero =
+      withAllMeta.match(/<section[^>]*aria-label="Academy hero"[\s\S]*?<\/section>/)?.[0] ??
+      "";
+    expect(hero).toContain("Follow us on Instagram");
+    expect(hero).toContain('href="https://www.instagram.com/Elite_Cricket"');
+    expect(hero).toContain('target="_blank"');
+    expect(hero).toContain('rel="noopener noreferrer"');
+
+    const locationAt = hero.indexOf("Koramangala");
+    const phoneAt = hero.indexOf("+919876543210");
+    const igAt = hero.indexOf("Follow us on Instagram");
+    expect(phoneAt).toBeGreaterThan(locationAt);
+    expect(igAt).toBeGreaterThan(phoneAt);
+
+    const onlyInstagram = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          location: null,
+          phone: null,
+          instagramHandle: "elite.cricket",
+        })}
+      />,
+    );
+    expect(onlyInstagram).toContain("Follow us on Instagram");
+    expect(onlyInstagram).toContain('href="https://www.instagram.com/elite.cricket"');
+
+    const withoutInstagram = renderToStaticMarkup(
+      <BrochureView brochure={makeBrochure({ instagramHandle: null })} />,
+    );
+    expect(withoutInstagram).not.toContain("Follow us on Instagram");
+    expect(withoutInstagram).not.toContain("instagram.com");
+  });
+
+  it("renders floating WhatsApp CTA in viewport or frame placement and keeps Phone vs WhatsApp strictly separate", () => {
+    const expectedText = WHATSAPP_CHAT_MESSAGE_TEMPLATE.replace(
+      "{academy_name}",
+      "Blitz Cricket Academy",
+    );
+    const expectedHref = `https://wa.me/919876543210?text=${encodeURIComponent(expectedText)}`;
+
+    const withWhatsapp = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          phone: null,
+          isIntakeAvailable: false,
+          whatsapp: "+919876543210",
+        })}
+      />,
+    );
+    expect(withWhatsapp).toMatch(/data-brochure-root=""[^>]*class="[^"]*\brelative\b/);
+    expect(withWhatsapp).toContain("Chat with us");
+    expect(withWhatsapp).toContain(`href="${expectedHref}"`);
+    expect(withWhatsapp).toContain('target="_blank"');
+    expect(withWhatsapp).toContain('rel="noopener noreferrer"');
+    expect(withWhatsapp).toContain("fixed right-6 bottom-6 z-30");
+    expect(withWhatsapp).toContain("bg-[#25D366]");
+    expect(withWhatsapp).not.toContain("Contact Us");
+    expect(withWhatsapp).not.toContain("Contact:");
+
+    const inFrame = renderToStaticMarkup(
+      <BrochureView
+        floatingPlacement="frame"
+        brochure={makeBrochure({
+          whatsapp: "+919876543210",
+        })}
+      />,
+    );
+    expect(inFrame).toContain("absolute right-6 bottom-6 z-30");
+    expect(inFrame).not.toContain("fixed right-6 bottom-6 z-30");
+
+    const withoutWhatsapp = renderToStaticMarkup(
+      <BrochureView brochure={makeBrochure({ whatsapp: null })} />,
+    );
+    expect(withoutWhatsapp).not.toContain("Chat with us");
+    expect(withoutWhatsapp).not.toContain("https://wa.me/");
+  });
 });
 
 describe("public Academy dark theme and primary buttons", () => {
@@ -796,6 +899,8 @@ describe("public Academy dark theme and primary buttons", () => {
           themeAccent: "crimson",
           location: "Koramangala",
           phone: "9876543210",
+          instagramUrl: null,
+          whatsapp: null,
           isIntakeAvailable: false,
           images: [],
           youtubeUrls: [],
@@ -864,6 +969,8 @@ describe("public Academy dark theme and primary buttons", () => {
           themeAccent: "default",
           location: null,
           phone: null,
+          instagramUrl: null,
+          whatsapp: null,
           isIntakeAvailable: false,
           images: [],
           youtubeUrls: [],
@@ -890,6 +997,8 @@ describe("public Academy dark theme and primary buttons", () => {
           themeAccent: "default",
           location: null,
           phone: null,
+          instagramUrl: null,
+          whatsapp: null,
           isIntakeAvailable: true,
           images: [],
           youtubeUrls: [],
@@ -993,5 +1102,150 @@ describe("public Academy dark theme and primary buttons", () => {
     expect(offHeader).toContain('src="/logo-black.svg"');
     expect(offLightHtml).toContain("Online Registration is off.");
     expect(offLightHtml).toContain('href="tel:+919876543210"');
+    expect(offLightHtml).not.toContain("Follow us on Instagram");
+    expect(offLightHtml).not.toContain("Chat with us");
+    expect(offLightHtml).not.toContain("https://wa.me/");
+  });
+
+  it("renders WhatsApp, Same as phone checkbox, and Instagram in BrochureEditor with frame preview and reload hydration", () => {
+    const html = renderToStaticMarkup(
+      <BrochureEditor
+        brochure={{
+          name: "Blitz Cricket Academy",
+          slug: "blitz-cricket",
+          tagline: "Evening nets",
+          aboutLabel: "About Us",
+          about: "Coach-led training.",
+          logoStorageKey: null,
+          logoUrl: null,
+          themeMode: "dark",
+          themeAccent: "default",
+          location: "Koramangala",
+          phone: "+919876543210",
+          instagramUrl: "https://www.instagram.com/Elite_Cricket",
+          whatsapp: "+919876543210",
+          isIntakeAvailable: false,
+          images: [],
+          youtubeUrls: [],
+          batches: [],
+          coaches: [],
+        }}
+      />,
+    );
+
+    const previewIndex = html.indexOf(">Preview<");
+    const formMarkup = html.slice(0, previewIndex);
+    const previewMarkup = html.slice(previewIndex);
+
+    const phoneAt = formMarkup.indexOf('name="phone"');
+    const whatsappAt = formMarkup.indexOf('name="whatsapp"');
+    const sameAsPhoneAt = formMarkup.indexOf('name="whatsappSameAsPhone"');
+    const instagramAt = formMarkup.indexOf('name="instagram"');
+    const galleryAt = formMarkup.indexOf(">Gallery images<");
+
+    expect(whatsappAt).toBeGreaterThan(phoneAt);
+    expect(sameAsPhoneAt).toBeGreaterThan(whatsappAt);
+    expect(instagramAt).toBeGreaterThan(sameAsPhoneAt);
+    expect(galleryAt).toBeGreaterThan(instagramAt);
+
+    expect(formMarkup).toContain('value="https://www.instagram.com/Elite_Cricket"');
+    const whatsappInput =
+      formMarkup.match(/<input[^>]*name="whatsapp"[^>]*>/)?.[0] ?? "";
+    expect(whatsappInput).toContain('value="+919876543210"');
+    const sameCheckbox =
+      formMarkup.match(/<input[^>]*name="whatsappSameAsPhone"[^>]*>/)?.[0] ?? "";
+    expect(sameCheckbox).toContain('checked=""');
+
+    expect(previewMarkup).toContain("Follow us on Instagram");
+    expect(previewMarkup).toContain('href="https://www.instagram.com/Elite_Cricket"');
+    expect(previewMarkup).toContain("Chat with us");
+    expect(previewMarkup).toContain("absolute right-6 bottom-6 z-30");
+    expect(previewMarkup).not.toContain("fixed right-6 bottom-6 z-30");
+
+    const separateHtml = renderToStaticMarkup(
+      <BrochureEditor
+        brochure={{
+          name: "Blitz Cricket Academy",
+          slug: "blitz-cricket",
+          tagline: null,
+          aboutLabel: "About Us",
+          about: null,
+          logoStorageKey: null,
+          logoUrl: null,
+          themeMode: "dark",
+          themeAccent: "default",
+          location: null,
+          phone: "+919876543210",
+          instagramUrl: null,
+          whatsapp: "+919123456789",
+          isIntakeAvailable: false,
+          images: [],
+          youtubeUrls: [],
+          batches: [],
+          coaches: [],
+        }}
+      />,
+    );
+    const separateForm = separateHtml.slice(0, separateHtml.indexOf(">Preview<"));
+    const separateCheckbox =
+      separateForm.match(/<input[^>]*name="whatsappSameAsPhone"[^>]*>/)?.[0] ?? "";
+    expect(separateCheckbox).not.toContain('checked=""');
+  });
+
+  it("syncs Phone into WhatsApp when Same as phone is checked and allows a separate WhatsApp when unchecked", () => {
+    const start = initialPhoneSyncState(null, null);
+    expect(start).toEqual({
+      phone: "",
+      whatsapp: "",
+      whatsappSameAsPhone: false,
+    });
+
+    const typedPhone = changeEditorPhone(start, "9876543210");
+    expect(typedPhone).toEqual({
+      phone: "9876543210",
+      whatsapp: "",
+      whatsappSameAsPhone: false,
+    });
+
+    const checked = toggleWhatsappSameAsPhone(typedPhone, true);
+    expect(checked).toEqual({
+      phone: "9876543210",
+      whatsapp: "9876543210",
+      whatsappSameAsPhone: true,
+    });
+
+    const updatedPhoneWhileChecked = changeEditorPhone(checked, "+919876543210");
+    expect(updatedPhoneWhileChecked).toEqual({
+      phone: "+919876543210",
+      whatsapp: "+919876543210",
+      whatsappSameAsPhone: true,
+    });
+
+    const editedWhatsappManually = changeEditorWhatsapp(
+      updatedPhoneWhileChecked,
+      "+919123456789",
+    );
+    expect(editedWhatsappManually).toEqual({
+      phone: "+919876543210",
+      whatsapp: "+919123456789",
+      whatsappSameAsPhone: false,
+    });
+
+    const rechecked = toggleWhatsappSameAsPhone(editedWhatsappManually, true);
+    expect(rechecked).toEqual({
+      phone: "+919876543210",
+      whatsapp: "+919876543210",
+      whatsappSameAsPhone: true,
+    });
+
+    const unchecked = toggleWhatsappSameAsPhone(rechecked, false);
+    expect(unchecked).toEqual({
+      phone: "+919876543210",
+      whatsapp: "+919876543210",
+      whatsappSameAsPhone: false,
+    });
+
+    const reloadedMatch = initialPhoneSyncState("+919876543210", "+919876543210");
+    expect(reloadedMatch.whatsappSameAsPhone).toBe(true);
   });
 });

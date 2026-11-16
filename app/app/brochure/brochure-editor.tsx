@@ -17,12 +17,69 @@ import {
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_BROCHURE_GALLERY_IMAGES,
 } from "@/lib/constants";
+import {
+  INSTAGRAM_INVALID_COPY,
+  parseInstagramHandle,
+} from "@/lib/instagram";
 import { normalizeOptionalPhone, PHONE_INVALID_COPY } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import type { PublicBrochure } from "@/lib/public-brochure";
 import Link from "next/link";
 
 const ACCEPTED_IMAGE_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES.join(",");
+
+export type PhoneSyncState = {
+  phone: string;
+  whatsapp: string;
+  whatsappSameAsPhone: boolean;
+};
+
+export function initialPhoneSyncState(
+  phone: string | null,
+  whatsapp: string | null,
+): PhoneSyncState {
+  return {
+    phone: phone ?? "",
+    whatsapp: whatsapp ?? "",
+    whatsappSameAsPhone: Boolean(phone && whatsapp && phone === whatsapp),
+  };
+}
+
+export function changeEditorPhone(
+  state: PhoneSyncState,
+  nextPhone: string,
+): PhoneSyncState {
+  return {
+    ...state,
+    phone: nextPhone,
+    whatsapp: state.whatsappSameAsPhone ? nextPhone : state.whatsapp,
+  };
+}
+
+export function changeEditorWhatsapp(
+  state: PhoneSyncState,
+  nextWhatsapp: string,
+): PhoneSyncState {
+  return {
+    ...state,
+    whatsapp: nextWhatsapp,
+    whatsappSameAsPhone:
+      state.whatsappSameAsPhone && nextWhatsapp !== state.phone
+        ? false
+        : state.whatsappSameAsPhone,
+  };
+}
+
+export function toggleWhatsappSameAsPhone(
+  state: PhoneSyncState,
+  nextChecked: boolean,
+): PhoneSyncState {
+  return {
+    ...state,
+    whatsappSameAsPhone: nextChecked,
+    whatsapp: nextChecked ? state.phone : state.whatsapp,
+  };
+}
 
 type BrochureEditorProps = {
   brochure: BrochureEditorState;
@@ -44,6 +101,8 @@ function errorCopy(error: string | null): string | null {
   switch (error) {
     case "invalid-phone":
       return PHONE_INVALID_COPY;
+    case "invalid-instagram":
+      return INSTAGRAM_INVALID_COPY;
     case "invalid-storage-key":
       return "Images must belong to your Academy.";
     case "invalid-youtube-url":
@@ -104,7 +163,11 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
   const [aboutLabel, setAboutLabel] = useState(brochure.aboutLabel);
   const [about, setAbout] = useState(brochure.about ?? "");
   const [location, setLocation] = useState(brochure.location ?? "");
-  const [phone, setPhone] = useState(brochure.phone ?? "");
+  const [phoneSync, setPhoneSync] = useState<PhoneSyncState>(() =>
+    initialPhoneSyncState(brochure.phone, brochure.whatsapp),
+  );
+  const { phone, whatsapp, whatsappSameAsPhone } = phoneSync;
+  const [instagram, setInstagram] = useState(brochure.instagramUrl ?? "");
   const [images, setImages] = useState<GalleryImage[]>(brochure.images);
   const [youtubeUrls, setYoutubeUrls] = useState(
     brochure.youtubeUrls.length > 0 ? brochure.youtubeUrls : [""],
@@ -131,6 +194,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
 
   const preview: PublicBrochure = useMemo(() => {
     const normalizedPhone = normalizeOptionalPhone(phone);
+    const normalizedWhatsapp = normalizeOptionalPhone(whatsapp);
     return {
       name: name.trim() || brochure.name,
       slug: brochure.slug,
@@ -144,6 +208,8 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
       phone: normalizedPhone.ok
         ? normalizedPhone.phone
         : phone.trim() || null,
+      instagramHandle: parseInstagramHandle(instagram),
+      whatsapp: normalizedWhatsapp.ok ? normalizedWhatsapp.phone : null,
       isIntakeAvailable: brochure.isIntakeAvailable,
       images: images
         .map((image) => image.url)
@@ -176,6 +242,8 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
     about,
     location,
     phone,
+    whatsapp,
+    instagram,
     images,
     youtubeUrls,
     batchBlurbs,
@@ -266,6 +334,8 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
         about,
         location,
         phone,
+        whatsapp,
+        instagram,
         imageStorageKeys: images.map((image) => image.storageKey),
         youtubeUrls,
         batchBlurbs: brochure.batches.map((batch) => ({
@@ -459,7 +529,51 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
             name="phone"
             placeholder="+919876543210"
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={(event) =>
+              setPhoneSync((current) =>
+                changeEditorPhone(current, event.target.value),
+              )
+            }
+          />
+        </label>
+        <div className="flex flex-col gap-2">
+          <label className="form-control w-full">
+            <span className="label-text mb-1">WhatsApp</span>
+            <input
+              className="input input-bordered w-full"
+              name="whatsapp"
+              placeholder="+919876543210"
+              value={whatsapp}
+              onChange={(event) =>
+                setPhoneSync((current) =>
+                  changeEditorWhatsapp(current, event.target.value),
+                )
+              }
+            />
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 self-start">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              name="whatsappSameAsPhone"
+              checked={whatsappSameAsPhone}
+              onChange={(event) =>
+                setPhoneSync((current) =>
+                  toggleWhatsappSameAsPhone(current, event.target.checked),
+                )
+              }
+            />
+            <span className="label-text">Same as phone</span>
+          </label>
+        </div>
+        <label className="form-control w-full">
+          <span className="label-text mb-1">Instagram</span>
+          <input
+            className="input input-bordered w-full"
+            name="instagram"
+            placeholder="https://www.instagram.com/..."
+            value={instagram}
+            onChange={(event) => setInstagram(event.target.value)}
           />
         </label>
 
@@ -682,7 +796,7 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
         className="border-base-300 bg-base-100 text-base-content relative overflow-clip rounded-box border p-2"
       >
         <h2 className="px-4 pt-4 text-lg font-semibold">Preview</h2>
-        <BrochureView brochure={preview} />
+        <BrochureView brochure={preview} floatingPlacement="frame" />
       </section>
     </div>
   );

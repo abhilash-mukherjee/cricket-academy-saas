@@ -5,6 +5,7 @@ import {
 } from "@/lib/owner-context";
 import {
   brochureAppearanceInputSchema,
+  brochureSocialInputSchema,
   updateBrochure,
 } from "@/lib/brochure";
 import { revalidatePublicAcademyPages } from "@/lib/public-academy-pages";
@@ -19,6 +20,8 @@ type BrochureBody = {
   themeAccent?: unknown;
   location?: string | null;
   phone?: string | null;
+  instagram?: unknown;
+  whatsapp?: unknown;
   imageStorageKeys?: string[];
   youtubeUrls?: string[];
   batchBlurbs?: { id: string; blurb: string }[];
@@ -29,12 +32,18 @@ type BrochureBody = {
   }[];
 };
 
-const APPEARANCE_INPUT_KEYS = [
+const brochureOptionalInputSchema = brochureAppearanceInputSchema.extend(
+  brochureSocialInputSchema.shape,
+);
+
+const OPTIONAL_INPUT_KEYS = [
   "aboutLabel",
   "about",
   "logoStorageKey",
   "themeMode",
   "themeAccent",
+  "instagram",
+  "whatsapp",
 ] as const;
 
 export async function POST(request: Request) {
@@ -51,15 +60,15 @@ export async function POST(request: Request) {
   const body: BrochureBody =
     rawBody && typeof rawBody === "object" ? (rawBody as BrochureBody) : {};
 
-  const rawAppearanceInput: Record<string, unknown> = {};
-  for (const key of APPEARANCE_INPUT_KEYS) {
+  const rawOptionalInput: Record<string, unknown> = {};
+  for (const key of OPTIONAL_INPUT_KEYS) {
     if (Object.hasOwn(body, key)) {
-      rawAppearanceInput[key] = body[key];
+      rawOptionalInput[key] = body[key];
     }
   }
-  const parsedAppearance =
-    brochureAppearanceInputSchema.safeParse(rawAppearanceInput);
-  if (!parsedAppearance.success) {
+  const parsedOptional =
+    brochureOptionalInputSchema.safeParse(rawOptionalInput);
+  if (!parsedOptional.success) {
     return NextResponse.json({ error: "invalid-input" }, { status: 400 });
   }
 
@@ -68,7 +77,7 @@ export async function POST(request: Request) {
     tagline: String(body.tagline ?? ""),
     location: String(body.location ?? ""),
     phone: String(body.phone ?? ""),
-    ...parsedAppearance.data,
+    ...parsedOptional.data,
     imageStorageKeys: body.imageStorageKeys,
     youtubeUrls: body.youtubeUrls,
     batchBlurbs: body.batchBlurbs,

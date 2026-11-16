@@ -32,7 +32,16 @@ export const brochureAppearanceInputSchema = z.object({
   themeMode: academyThemeModeSchema.optional(),
   themeAccent: academyThemeAccentSchema.optional(),
 });
+
+export const brochureSocialInputSchema = z.object({
+  instagram: z.string().nullable().optional(),
+  whatsapp: z.string().nullable().optional(),
+});
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
+import {
+  instagramProfileUrl,
+  normalizeOptionalInstagram,
+} from "@/lib/instagram";
 import { normalizeOptionalPhone } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
 import { listRegistrableBatchIds } from "@/lib/academy-intake";
@@ -57,6 +66,8 @@ export type BrochureEditInput = {
   themeAccent?: string;
   location?: string | null;
   phone?: string | null;
+  instagram?: string | null;
+  whatsapp?: string | null;
   imageStorageKeys?: string[];
   youtubeUrls?: string[];
   batchBlurbs?: { id: string; blurb: string }[];
@@ -66,6 +77,7 @@ export type BrochureEditInput = {
 export type BrochureEditError =
   | "invalid-input"
   | "invalid-phone"
+  | "invalid-instagram"
   | "invalid-storage-key"
   | "invalid-youtube-url"
   | "gallery-limit"
@@ -106,6 +118,8 @@ export type BrochureEditorState = {
   themeAccent: AcademyThemeAccent;
   location: string | null;
   phone: string | null;
+  instagramUrl: string | null;
+  whatsapp: string | null;
   isIntakeAvailable: boolean;
   images: BrochureEditorImage[];
   youtubeUrls: string[];
@@ -168,6 +182,8 @@ export async function getBrochureEditor(
       themeAccent: academies.themeAccent,
       location: academies.location,
       phone: academies.phone,
+      instagramHandle: academies.instagramHandle,
+      whatsapp: academies.whatsapp,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
     })
     .from(academies)
@@ -228,6 +244,10 @@ export async function getBrochureEditor(
     themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     location: academy.location,
     phone: academy.phone,
+    instagramUrl: academy.instagramHandle
+      ? instagramProfileUrl(academy.instagramHandle)
+      : null,
+    whatsapp: academy.whatsapp,
     isIntakeAvailable: registrableBatchIds.size > 0,
     images: images
       .map((image) => normalizeStoredKey(image.storageKey))
@@ -280,7 +300,57 @@ export async function updateBrochure(
     return { ok: false, error: "invalid-phone" };
   }
 
-  const brochureFields = { name, phone: phoneResult.phone };
+  const parsedSocial = brochureSocialInputSchema.safeParse({
+    ...(input.instagram !== undefined ? { instagram: input.instagram } : {}),
+    ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp } : {}),
+  });
+  if (!parsedSocial.success) {
+    logWarning(
+      `Brochure was not updated with ID: ${academyId}.`,
+      "invalid-input",
+      { name, phone: phoneResult.phone },
+    );
+    return { ok: false, error: "invalid-input" };
+  }
+
+  let nextWhatsapp: string | null | undefined;
+  if (parsedSocial.data.whatsapp !== undefined) {
+    const whatsappResult = normalizeOptionalPhone(parsedSocial.data.whatsapp);
+    if (!whatsappResult.ok) {
+      logWarning(
+        `Brochure was not updated with ID: ${academyId}.`,
+        "invalid-phone",
+        { name, whatsapp: parsedSocial.data.whatsapp },
+      );
+      return { ok: false, error: "invalid-phone" };
+    }
+    nextWhatsapp = whatsappResult.phone;
+  }
+
+  let nextInstagramHandle: string | null | undefined;
+  if (parsedSocial.data.instagram !== undefined) {
+    const instagramResult = normalizeOptionalInstagram(
+      parsedSocial.data.instagram,
+    );
+    if (!instagramResult.ok) {
+      logWarning(
+        `Brochure was not updated with ID: ${academyId}.`,
+        "invalid-instagram",
+        { name, instagram: parsedSocial.data.instagram },
+      );
+      return { ok: false, error: "invalid-instagram" };
+    }
+    nextInstagramHandle = instagramResult.instagramHandle;
+  }
+
+  const brochureFields = {
+    name,
+    phone: phoneResult.phone,
+    ...(nextWhatsapp !== undefined ? { whatsapp: nextWhatsapp } : {}),
+    ...(nextInstagramHandle !== undefined
+      ? { instagramHandle: nextInstagramHandle }
+      : {}),
+  };
   const brochureNotUpdated = (error: BrochureEditError): BrochureEditResult => {
     logWarning(
       `Brochure was not updated with ID: ${academyId}.`,
@@ -406,6 +476,8 @@ export async function updateBrochure(
     tagline: string | null;
     location: string | null;
     phone: string | null;
+    instagramHandle?: string | null;
+    whatsapp?: string | null;
     aboutLabel?: string;
     about?: string | null;
     logoStorageKey?: string | null;
@@ -417,6 +489,12 @@ export async function updateBrochure(
     location: optionalText(input.location),
     phone: phoneResult.phone,
   };
+  if (nextInstagramHandle !== undefined) {
+    academyUpdate.instagramHandle = nextInstagramHandle;
+  }
+  if (nextWhatsapp !== undefined) {
+    academyUpdate.whatsapp = nextWhatsapp;
+  }
   if (parsedAppearance.data.aboutLabel !== undefined) {
     academyUpdate.aboutLabel = resolveAboutLabel(
       optionalText(parsedAppearance.data.aboutLabel),

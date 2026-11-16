@@ -39,6 +39,8 @@ export type PublicBrochure = {
   themeAccent: AcademyThemeAccent;
   location: string | null;
   phone: string | null;
+  instagramHandle: string | null;
+  whatsapp: string | null;
   isIntakeAvailable: boolean;
   images: { url: string }[];
   youtubeVideoIds: string[];
@@ -67,6 +69,8 @@ async function loadPublicBrochure(
       themeAccent: academies.themeAccent,
       location: academies.location,
       phone: academies.phone,
+      instagramHandle: academies.instagramHandle,
+      whatsapp: academies.whatsapp,
       isActive: academies.isActive,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
     })
@@ -121,6 +125,8 @@ async function loadPublicBrochure(
     themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     location: academy.location,
     phone: academy.phone,
+    instagramHandle: academy.instagramHandle,
+    whatsapp: academy.whatsapp,
     isIntakeAvailable: registrableBatchIds.size > 0,
     images: images
       .map((image) => resolvePublicAssetUrl(image.storageKey))
@@ -146,7 +152,13 @@ async function getCachedPublicBrochure(
 ): Promise<PublicBrochure | null> {
   const cached = await unstable_cache(
     () => loadPublicBrochure(slug),
-    ["public-brochure", slug, "appearance-v1", "batch-registration-v1"],
+    [
+      "public-brochure",
+      slug,
+      "appearance-v1",
+      "batch-registration-v1",
+      "social-v1",
+    ],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: false,
@@ -161,6 +173,8 @@ async function getCachedPublicBrochure(
     aboutLabel: resolveAboutLabel(cached.aboutLabel),
     about: cached.about ?? null,
     logoUrl: cached.logoUrl ?? null,
+    instagramHandle: cached.instagramHandle ?? null,
+    whatsapp: cached.whatsapp ?? null,
     themeMode: resolveAcademyThemeMode(cached.themeMode),
     themeAccent: resolveAcademyThemeAccent(cached.themeAccent),
     batches: cached.batches.map((batch) => ({

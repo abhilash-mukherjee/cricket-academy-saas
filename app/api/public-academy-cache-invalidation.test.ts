@@ -281,6 +281,83 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).not.toContain("Original tagline");
     });
 
+    it("purges public pages when the Owner updates Instagram or WhatsApp", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const firstSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            instagram: "@elite_cricket",
+            whatsapp: "9876543210",
+          }),
+        }),
+      );
+      expect(firstSave.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const firstHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(firstHtml).toContain("Follow us on Instagram");
+      expect(firstHtml).toContain('href="https://www.instagram.com/elite_cricket"');
+      expect(firstHtml).toContain("Chat with us");
+      expect(firstHtml).toContain(
+        `href="https://wa.me/919876543210?text=${encodeURIComponent("I want to know more about Blitz Cricket Academy")}"`,
+      );
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const secondSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            instagram: "https://instagram.com/New_Handle/",
+            whatsapp: "+919123456789",
+          }),
+        }),
+      );
+      expect(secondSave.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const secondHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(secondHtml).toContain('href="https://www.instagram.com/New_Handle"');
+      expect(secondHtml).not.toContain("elite_cricket");
+      expect(secondHtml).toContain("https://wa.me/919123456789?text=");
+      expect(secondHtml).not.toContain("https://wa.me/919876543210");
+    });
+
     it("purges public pages when the Owner saves conversion UPI QR", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);
