@@ -111,7 +111,7 @@ function HeroCta({
         href={`/a/${slug}/join`}
         className={`${PUBLIC_PRIMARY_BUTTON_CLASS} btn-lg`}
       >
-        Register
+        Register Now
         <LinkPendingMark />
       </Link>
     );
@@ -123,7 +123,7 @@ function HeroCta({
         href={`tel:${phone}`}
         className={`${PUBLIC_PRIMARY_BUTTON_CLASS} btn-lg`}
       >
-        Call to Register
+        Contact Us
       </a>
     );
   }

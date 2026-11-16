@@ -390,7 +390,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(joinHtml).not.toContain("Pay with UPI");
       expect(joinHtml).not.toContain("U-14 evening");
       expect(joinHtml).not.toContain("Weekday nets");
-      expect(joinHtml).not.toContain("Call to Register");
+      expect(joinHtml).not.toContain("Contact Us");
       expect(joinHtml).not.toContain("fixed inset-x-0 bottom-0");
       expect(joinHtml).toContain("+919876543210");
 
@@ -400,7 +400,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureHtml).toContain("Call to Register");
+      expect(brochureHtml).toContain("Contact Us");
       expect(brochureHtml).not.toContain(`href="/a/${slug}/join"`);
     });
 
@@ -444,7 +444,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
       expect(joinHtml).toMatch(/online Registration is off/i);
-      expect(joinHtml).not.toContain("Call to Register");
+      expect(joinHtml).not.toContain("Contact Us");
       expect(joinHtml).not.toContain("<form");
 
       const brochureHtml = renderToStaticMarkup(
@@ -453,7 +453,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureHtml).not.toContain("Call to Register");
+      expect(brochureHtml).not.toContain("Contact Us");
       expect(brochureHtml).not.toContain(`href="/a/${slug}/join"`);
     });
 

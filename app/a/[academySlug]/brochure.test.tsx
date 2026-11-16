@@ -377,7 +377,7 @@ describe("Academy Brochure public seam", () => {
     expect(advance).toHaveBeenCalledTimes(2);
   });
 
-  it("overlays hero details and switches the hero CTA between Register, Call to Register, and omitted", () => {
+  it("overlays hero details and switches the hero CTA between Register Now, Contact Us, and omitted", () => {
     const openHtml = renderToStaticMarkup(
       <BrochureView
         brochure={makeBrochure({
@@ -395,8 +395,8 @@ describe("Academy Brochure public seam", () => {
     expect(openHero).toContain('href="https://maps.google.com/?q=Koramangala"');
     expect(openHero).toContain('href="tel:+919876543210"');
     expect(openHero).toContain('href="/a/blitz-cricket/join"');
-    expect(openHero).toContain("Register");
-    expect(openHero).not.toContain("Call to Register");
+    expect(openHero).toContain("Register Now");
+    expect(openHero).not.toContain("Contact Us");
     expect(openHero).not.toContain("btn-neutral");
     expect(openHero).toContain(PUBLIC_PRIMARY_BUTTON_CLASS);
 
@@ -411,7 +411,7 @@ describe("Academy Brochure public seam", () => {
     const callHero =
       callHtml.match(/<section[^>]*aria-label="Academy hero"[\s\S]*?<\/section>/)?.[0] ??
       "";
-    expect(callHero).toContain("Call to Register");
+    expect(callHero).toContain("Contact Us");
     expect(callHero).toContain('href="tel:+919876543210"');
     expect(callHero).not.toContain('href="/a/blitz-cricket/join"');
     expect(callHero).not.toContain("btn-neutral");
@@ -428,7 +428,7 @@ describe("Academy Brochure public seam", () => {
       omittedHtml.match(/<section[^>]*aria-label="Academy hero"[\s\S]*?<\/section>/)?.[0] ??
       "";
     expect(omittedHero).not.toContain("Register");
-    expect(omittedHero).not.toContain("Call to Register");
+    expect(omittedHero).not.toContain("Contact Us");
   });
 
   it("stacks Videos, Batches, and Coaches in a single column below the hero with anchor targets", () => {
@@ -661,7 +661,7 @@ describe("public Academy dark theme and primary buttons", () => {
     expect(previewWrapperTag).toContain("--color-primary:#e11d48");
     expect(previewWrapperTag).toContain("overflow-clip");
     expect(previewWrapperTag).not.toContain("overflow-hidden");
-    expect(previewSection).toContain("Call to Register");
+    expect(previewSection).toContain("Contact Us");
     expect(previewSection).toContain("+919876543210");
     expect(previewSection).toContain("Coach-led training.");
     expect(previewSection).toContain(

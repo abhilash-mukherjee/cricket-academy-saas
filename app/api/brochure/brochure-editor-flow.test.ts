@@ -285,7 +285,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain("Call to Register");
+      expect(html).toContain("Contact Us");
       expect(html).toContain("+919876543210");
       expect(html).not.toContain(`href="/a/${slug}/join"`);
     });
@@ -329,7 +329,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         }),
       );
 
-      expect(html).toContain("Register");
+      expect(html).toContain("Register Now");
       expect(html).toContain(`/a/${slug}/join`);
       expect(html).toContain("+919876543210");
       expect(html).not.toContain("Contact +919876543210");
@@ -377,7 +377,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       const html = renderToStaticMarkup(await BrochureEditorPage());
 
-      expect(html).toContain("Call to Register");
+      expect(html).toContain("Contact Us");
       expect(html).toContain(
         "A place name or a map link.",
       );

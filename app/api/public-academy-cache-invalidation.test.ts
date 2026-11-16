@@ -588,7 +588,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterOpen).toContain("Register");
+      expect(brochureAfterOpen).toContain("Register Now");
       expect(brochureAfterOpen).toContain(`/a/${slug}/join`);
       expect(joinAfterOpen).toContain("U-14 evening");
       expect(joinAfterOpen).toContain("Weekday nets");
@@ -626,7 +626,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterClose).toContain("Call to Register");
+      expect(brochureAfterClose).toContain("Contact Us");
       expect(brochureAfterClose).not.toContain(`href="/a/${slug}/join"`);
       expect(joinAfterClose).toContain("Intake is closed.");
     });
@@ -824,7 +824,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterOff).toContain("Call to Register");
+      expect(brochureAfterOff).toContain("Contact Us");
       expect(brochureAfterOff).not.toContain(`href="/a/${slug}/join"`);
       expect(joinAfterOff).toMatch(/online Registration is off/i);
       expect(joinAfterOff).not.toContain("Weekday nets");
@@ -861,7 +861,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterOn).toContain("Register");
+      expect(brochureAfterOn).toContain("Register Now");
       expect(brochureAfterOn).toContain(`/a/${slug}/join`);
       expect(joinAfterOn).toContain("U-14 evening");
       expect(joinAfterOn).toContain("Weekday nets");

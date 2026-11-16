@@ -89,7 +89,7 @@ Applying these custom properties on the public Academy root container makes `btn
 
 Used on:
 
-- Hero CTA (`Register` / `Call to Register`) in `BrochureView`
+- Hero CTA (`Register Now` / `Contact Us`) in `BrochureView`
 - `Submit Registration` in `RegistrationForm`
 - `Register another Player` in `RegistrationThankYou`
 

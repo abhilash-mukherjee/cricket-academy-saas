@@ -316,7 +316,11 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
           ) : null}
           <div className="flex flex-wrap gap-2">
             <label className="btn btn-neutral btn-sm">
-              {logoStorageKey ? "Replace logo" : "Upload logo"}
+              {uploading
+                ? "Uploading…"
+                : logoStorageKey
+                  ? "Replace logo"
+                  : "Upload logo"}
               <input
                 type="file"
                 accept={ACCEPTED_IMAGE_MIME_TYPES}
