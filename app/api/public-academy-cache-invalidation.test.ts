@@ -590,6 +590,11 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(brochureAfterOpen).toContain("Register Now");
       expect(brochureAfterOpen).toContain(`/a/${slug}/join`);
+      expect(brochureAfterOpen).toContain("Open for Registration");
+      expect(brochureAfterOpen).toContain("badge-success");
+      expect(brochureAfterOpen).toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
       expect(joinAfterOpen).toContain("U-14 evening");
       expect(joinAfterOpen).toContain("Weekday nets");
       expect(joinAfterOpen).toContain("₹15,000");
@@ -628,6 +633,11 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(brochureAfterClose).toContain("Contact Us");
       expect(brochureAfterClose).not.toContain(`href="/a/${slug}/join"`);
+      expect(brochureAfterClose).not.toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
+      expect(brochureAfterClose).toContain("Registration closed");
+      expect(brochureAfterClose).toContain("badge-error");
       expect(joinAfterClose).toContain("Intake is closed.");
     });
 
@@ -826,6 +836,11 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(brochureAfterOff).toContain("Contact Us");
       expect(brochureAfterOff).not.toContain(`href="/a/${slug}/join"`);
+      expect(brochureAfterOff).not.toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
+      expect(brochureAfterOff).toContain("Registration closed");
+      expect(brochureAfterOff).toContain("badge-error");
       expect(joinAfterOff).toMatch(/online Registration is off/i);
       expect(joinAfterOff).not.toContain("Weekday nets");
       expect(joinAfterOff).not.toContain("Pay with UPI");
@@ -863,6 +878,11 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       );
       expect(brochureAfterOn).toContain("Register Now");
       expect(brochureAfterOn).toContain(`/a/${slug}/join`);
+      expect(brochureAfterOn).toContain("Open for Registration");
+      expect(brochureAfterOn).toContain("badge-success");
+      expect(brochureAfterOn).toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
       expect(joinAfterOn).toContain("U-14 evening");
       expect(joinAfterOn).toContain("Weekday nets");
     });

@@ -248,10 +248,32 @@ export function BrochureView({ brochure }: BrochureViewProps) {
                 <h2 className="text-xl font-semibold">Batches</h2>
                 <div className="flex flex-col gap-3">
                   {brochure.batches.map((batch) => (
-                    <article key={batch.name} className="card bg-base-200">
-                      <div className="card-body gap-1">
-                        <h3 className="card-title text-base">{batch.name}</h3>
+                    <article key={batch.id} className="card bg-base-200">
+                      <div className="card-body gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="card-title text-base">{batch.name}</h3>
+                          {batch.isRegistrable ? (
+                            <span className="badge badge-soft badge-success">
+                              Open for Registration
+                            </span>
+                          ) : (
+                            <span className="badge badge-soft badge-error">
+                              Registration closed
+                            </span>
+                          )}
+                        </div>
                         {batch.blurb ? <p>{batch.blurb}</p> : null}
+                        {batch.isRegistrable ? (
+                          <div className="card-actions">
+                            <Link
+                              href={`/a/${brochure.slug}/join?batch=${encodeURIComponent(batch.id)}`}
+                              className={`${PUBLIC_PRIMARY_BUTTON_CLASS} btn-sm`}
+                            >
+                              Register
+                              <LinkPendingMark />
+                            </Link>
+                          </div>
+                        ) : null}
                       </div>
                     </article>
                   ))}

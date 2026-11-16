@@ -153,8 +153,10 @@ export function BrochureEditor({ brochure }: BrochureEditorProps) {
         .map((url) => parseYoutubeVideoId(url))
         .filter((id): id is string => Boolean(id)),
       batches: brochure.batches.map((batch) => ({
+        id: batch.id,
         name: batch.name,
         blurb: batchBlurbs[batch.id]?.trim() || null,
+        isRegistrable: batch.isRegistrable,
       })),
       coaches: coaches
         .filter((coach) => coach.fullName.trim())

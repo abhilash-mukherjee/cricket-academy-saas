@@ -41,11 +41,20 @@ export async function generateMetadata({
   };
 }
 
+function firstParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+  return value ?? null;
+}
+
 /** Public registration view rendered under `/a/[academySlug]/join`. */
 export function ConversionView({
   conversion,
+  initialBatchId,
 }: {
   conversion: PublicConversion;
+  initialBatchId?: string | null;
 }) {
   const themeMode = resolveAcademyThemeMode(conversion.themeMode);
   const themeAccent = resolveAcademyThemeAccent(conversion.themeAccent);
@@ -75,9 +84,11 @@ export function ConversionView({
         <h1 className="text-3xl font-bold">{conversion.name}</h1>
         {conversion.isIntakeAvailable ? (
           <RegistrationForm
+            key={initialBatchId ?? ""}
             academySlug={conversion.slug}
             batches={conversion.batches}
             upiQrUrl={conversion.upiQrUrl}
+            initialBatchId={initialBatchId}
           />
         ) : conversion.isOnlineRegistrationAllowed ? (
           <>
@@ -102,12 +113,23 @@ export function ConversionView({
   );
 }
 
-export default async function ConversionPage({ params }: ConversionPageProps) {
-  const { academySlug } = await params;
+export default async function ConversionPage({
+  params,
+  searchParams,
+}: ConversionPageProps) {
+  const [{ academySlug }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({}),
+  ]);
   const conversion = await getPublicConversion(academySlug);
   if (!conversion) {
     notFound();
   }
 
-  return <ConversionView conversion={conversion} />;
+  return (
+    <ConversionView
+      conversion={conversion}
+      initialBatchId={firstParam(resolvedSearchParams.batch)}
+    />
+  );
 }

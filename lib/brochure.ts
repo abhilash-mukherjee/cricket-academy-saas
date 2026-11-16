@@ -35,7 +35,7 @@ export const brochureAppearanceInputSchema = z.object({
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
 import { normalizeOptionalPhone } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
-import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import { listRegistrableBatchIds } from "@/lib/academy-intake";
 import {
   logWarning,
   logInfo,
@@ -79,6 +79,7 @@ export type BrochureEditorBatch = {
   id: string;
   name: string;
   blurb: string | null;
+  isRegistrable: boolean;
 };
 
 export type BrochureEditorImage = {
@@ -177,7 +178,7 @@ export async function getBrochureEditor(
     return null;
   }
 
-  const [academyBatches, images, embeds, coaches, isIntakeAvailable] =
+  const [academyBatches, images, embeds, coaches, registrableBatchIds] =
     await Promise.all([
     db
       .select({
@@ -207,7 +208,7 @@ export async function getBrochureEditor(
       .from(coachProfiles)
       .where(eq(coachProfiles.academyId, academyId))
       .orderBy(asc(coachProfiles.sortOrder)),
-    isAcademyIntakeAvailable({
+    listRegistrableBatchIds({
       academyId,
       isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
     }),
@@ -227,7 +228,7 @@ export async function getBrochureEditor(
     themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     location: academy.location,
     phone: academy.phone,
-    isIntakeAvailable,
+    isIntakeAvailable: registrableBatchIds.size > 0,
     images: images
       .map((image) => normalizeStoredKey(image.storageKey))
       .filter((storageKey): storageKey is string => Boolean(storageKey))
@@ -238,7 +239,10 @@ export async function getBrochureEditor(
     youtubeUrls: embeds.map(
       (embed) => `https://www.youtube.com/watch?v=${embed.videoId}`,
     ),
-    batches: academyBatches,
+    batches: academyBatches.map((batch) => ({
+      ...batch,
+      isRegistrable: registrableBatchIds.has(batch.id),
+    })),
     coaches: coaches.map((coach) => {
       const imageStorageKey = normalizeStoredKey(coach.storageKey);
       return {

@@ -27,6 +27,7 @@ type RegistrationFormProps = {
   academySlug: string;
   batches: RegistrableBatch[];
   upiQrUrl: string | null;
+  initialBatchId?: string | null;
 };
 
 type FormValues = {
@@ -40,14 +41,24 @@ type FormValues = {
   note: string;
 };
 
-function preselectedFeeOptionId(batches: RegistrableBatch[]): string {
-  const options = batches.flatMap((batch) => batch.feeOptions);
-  return options.length === 1 ? options[0].id : "";
+export function preselectedFeeOptionId(
+  batches: RegistrableBatch[],
+  batchId?: string | null,
+): string {
+  const targetBatchId = batchId?.trim() ?? "";
+  if (!targetBatchId) {
+    return "";
+  }
+  const batch = batches.find((item) => item.id === targetBatchId);
+  return batch?.feeOptions[0]?.id ?? "";
 }
 
-function emptyValues(batches: RegistrableBatch[]): FormValues {
+export function emptyValues(
+  batches: RegistrableBatch[],
+  batchId?: string | null,
+): FormValues {
   return {
-    batchFeeOptionId: preselectedFeeOptionId(batches),
+    batchFeeOptionId: preselectedFeeOptionId(batches, batchId),
     playerFullName: "",
     playerDateOfBirth: "",
     guardianFullName: "",
@@ -88,9 +99,10 @@ export function RegistrationForm({
   academySlug,
   batches,
   upiQrUrl,
+  initialBatchId,
 }: RegistrationFormProps) {
   const router = useRouter();
-  const [values, setValues] = useState(() => emptyValues(batches));
+  const [values, setValues] = useState(() => emptyValues(batches, initialBatchId));
   const [fields, setFields] = useState<RegistrationFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -210,7 +222,7 @@ export function RegistrationForm({
         upiQrUrl={upiQrUrl}
         onRegisterAnother={() => {
           setSnapshot(null);
-          setValues(emptyValues(batches));
+          setValues(emptyValues(batches, initialBatchId));
           setFields({});
           setFormError(null);
         }}

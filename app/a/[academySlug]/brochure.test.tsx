@@ -7,7 +7,10 @@ import {
   HERO_CAROUSEL_INTERVAL_MS,
   startHeroCarouselTimer,
 } from "./brochure-gallery";
-import { RegistrationForm } from "./join/registration-form";
+import {
+  emptyValues,
+  RegistrationForm,
+} from "./join/registration-form";
 import { RegistrationThankYou } from "./join/registration-thank-you";
 import { ConversionView } from "./join/page";
 import { BrochureEditor } from "@/app/app/brochure/brochure-editor";
@@ -108,7 +111,14 @@ describe("Academy Brochure public seam", () => {
       <BrochureView
         brochure={makeBrochure({
           isIntakeAvailable: true,
-          batches: [{ name: "U-14 evening", blurb: "Batting and fielding" }],
+          batches: [
+            {
+              id: "batch-1",
+              name: "U-14 evening",
+              blurb: "Batting and fielding",
+              isRegistrable: true,
+            },
+          ],
           coaches: [{ fullName: "Ravi Kumar", imageUrl: null, blurb: "Head Coach" }],
         })}
       />,
@@ -169,7 +179,14 @@ describe("Academy Brochure public seam", () => {
           aboutLabel: "Our Story",
           about: "Founded in 2012.\nAll-weather turf nets.",
           youtubeVideoIds: ["jNQXAC9IVRw"],
-          batches: [{ name: "U-14 evening", blurb: "Evening nets" }],
+          batches: [
+            {
+              id: "batch-1",
+              name: "U-14 evening",
+              blurb: "Evening nets",
+              isRegistrable: true,
+            },
+          ],
           coaches: [{ fullName: "Ravi Kumar", imageUrl: null, blurb: "Head Coach" }],
         })}
       />,
@@ -436,7 +453,14 @@ describe("Academy Brochure public seam", () => {
       <BrochureView
         brochure={makeBrochure({
           youtubeVideoIds: ["jNQXAC9IVRw"],
-          batches: [{ name: "U-14 evening", blurb: "Evening nets" }],
+          batches: [
+            {
+              id: "batch-1",
+              name: "U-14 evening",
+              blurb: "Evening nets",
+              isRegistrable: true,
+            },
+          ],
           coaches: [
             {
               fullName: "Ravi Kumar",
@@ -498,7 +522,14 @@ describe("Academy Brochure public seam", () => {
     const imageHeroHtml = renderToStaticMarkup(
       <BrochureView
         brochure={makeBrochure({
-          batches: [{ name: "U-14 evening", blurb: null }],
+          batches: [
+            {
+              id: "batch-1",
+              name: "U-14 evening",
+              blurb: null,
+              isRegistrable: false,
+            },
+          ],
           images: [{ url: "https://blob.test/academies/a/brochure-gallery/1.png" }],
         })}
       />,
@@ -509,6 +540,49 @@ describe("Academy Brochure public seam", () => {
     expect(imageHero).toContain('aria-label="Scroll to content"');
     expect(imageHero).toContain("text-neutral-content/70");
     expect(imageHero).not.toContain("text-base-content/60");
+  });
+
+  it("renders Batch registration status badges and per-Batch Register CTAs on BrochureView", () => {
+    const html = renderToStaticMarkup(
+      <BrochureView
+        brochure={makeBrochure({
+          isIntakeAvailable: true,
+          batches: [
+            {
+              id: "batch-open",
+              name: "U-14 evening",
+              blurb: "Evening nets",
+              isRegistrable: true,
+            },
+            {
+              id: "batch-closed",
+              name: "U-16 morning",
+              blurb: "Morning conditioning",
+              isRegistrable: false,
+            },
+          ],
+        })}
+      />,
+    );
+
+    const batchesSection =
+      html.match(/<section[^>]*id="batches"[\s\S]*?<\/section>/)?.[0] ?? "";
+    const articles = batchesSection.match(/<article[\s\S]*?<\/article>/g) ?? [];
+    expect(articles).toHaveLength(2);
+
+    const [openCard, closedCard] = articles;
+    expect(openCard).toContain("U-14 evening");
+    expect(openCard).toContain("badge-success");
+    expect(openCard).toContain("Open for Registration");
+    expect(openCard).toContain('href="/a/blitz-cricket/join?batch=batch-open"');
+    expect(openCard).toContain(PUBLIC_PRIMARY_BUTTON_CLASS);
+    expect(openCard).toContain(">Register<");
+
+    expect(closedCard).toContain("U-16 morning");
+    expect(closedCard).toContain("badge-error");
+    expect(closedCard).toContain("Registration closed");
+    expect(closedCard).not.toContain("/join");
+    expect(closedCard).not.toContain(">Register<");
   });
 });
 
@@ -547,7 +621,35 @@ describe("public Academy dark theme and primary buttons", () => {
     expect(formHtml).not.toContain("btn-neutral");
     expect(formHtml).toContain(PUBLIC_PRIMARY_BUTTON_CLASS);
     expect(formHtml).toContain("radio radio-primary mt-1");
-    expect(formHtml).toContain("border-2 border-primary");
+    expect(formHtml).toContain("border-2 border-transparent");
+    expect(formHtml).not.toContain("border-2 border-primary");
+    expect(formHtml).not.toContain("checked=\"\"");
+
+    const preselectedFormHtml = renderToStaticMarkup(
+      <RegistrationForm
+        academySlug="blitz-cricket"
+        initialBatchId="batch-1"
+        batches={[
+          {
+            id: "batch-1",
+            name: "U-14 evening",
+            feeOptions: [
+              {
+                id: "fee-1",
+                daysPerWeek: 3,
+                termDays: 30,
+                feePaise: 1500000,
+                label: "Weekday nets",
+              },
+            ],
+          },
+        ]}
+        upiQrUrl={null}
+      />,
+    );
+    expect(preselectedFormHtml).toContain("border-2 border-primary");
+    expect(preselectedFormHtml).toContain('value="fee-1"');
+    expect(preselectedFormHtml).toContain("checked=\"\"");
 
     const multiOptionFormHtml = renderToStaticMarkup(
       <RegistrationForm
@@ -599,6 +701,84 @@ describe("public Academy dark theme and primary buttons", () => {
     expect(thankYouHtml).toContain("Register another Player");
     expect(thankYouHtml).not.toContain("btn-neutral");
     expect(thankYouHtml).toContain(PUBLIC_PRIMARY_BUTTON_CLASS);
+  });
+
+  it("preselects the first offered fee option for a matching registrable Batch and resets to it", () => {
+    const batches = [
+      {
+        id: "batch-1",
+        name: "U-14 evening",
+        feeOptions: [
+          {
+            id: "fee-1a",
+            daysPerWeek: 3,
+            termDays: 30,
+            feePaise: 1500000,
+            label: "Weekday nets",
+          },
+          {
+            id: "fee-1b",
+            daysPerWeek: 5,
+            termDays: 30,
+            feePaise: 2200000,
+            label: "Full week",
+          },
+        ],
+      },
+      {
+        id: "batch-2",
+        name: "U-16 morning",
+        feeOptions: [
+          {
+            id: "fee-2a",
+            daysPerWeek: 3,
+            termDays: 30,
+            feePaise: 1600000,
+            label: "Morning standard",
+          },
+          {
+            id: "fee-2b",
+            daysPerWeek: 6,
+            termDays: 30,
+            feePaise: 2500000,
+            label: "Morning intensive",
+          },
+        ],
+      },
+    ];
+
+    const matchedHtml = renderToStaticMarkup(
+      <ConversionView
+        conversion={makeConversion({ batches })}
+        initialBatchId="batch-2"
+      />,
+    );
+    expect(matchedHtml).toMatch(/<input[^>]*value="fee-2a"[^>]*>/);
+    expect(matchedHtml.match(/<input[^>]*value="fee-2a"[^>]*>/)?.[0]).toContain(
+      'checked=""',
+    );
+    expect(
+      matchedHtml.match(/<input[^>]*value="fee-1a"[^>]*>/)?.[0],
+    ).not.toContain('checked=""');
+    expect(
+      matchedHtml.match(/<input[^>]*value="fee-2b"[^>]*>/)?.[0],
+    ).not.toContain('checked=""');
+
+    for (const initialBatchId of [undefined, null, "", "   ", "unknown-batch"]) {
+      const unmatchedHtml = renderToStaticMarkup(
+        <ConversionView
+          conversion={makeConversion({ batches })}
+          initialBatchId={initialBatchId}
+        />,
+      );
+      expect(unmatchedHtml).not.toContain("checked=\"\"");
+      expect(unmatchedHtml).not.toContain("border-2 border-primary");
+    }
+
+    expect(emptyValues(batches, "batch-2").batchFeeOptionId).toBe("fee-2a");
+    expect(emptyValues(batches, "unknown-batch").batchFeeOptionId).toBe("");
+    expect(emptyValues(batches, "").batchFeeOptionId).toBe("");
+    expect(emptyValues(batches).batchFeeOptionId).toBe("");
   });
 
   it("renders the Owner's Brochure editor fields in order and live-previews theme, logo, and About", () => {
@@ -695,6 +875,59 @@ describe("public Academy dark theme and primary buttons", () => {
     const uploadFormMarkup = uploadHtml.slice(0, uploadHtml.indexOf(">Preview<"));
     expect(uploadFormMarkup).toContain("Upload logo");
     expect(uploadFormMarkup).not.toContain("Remove logo");
+
+    const batchPreviewHtml = renderToStaticMarkup(
+      <BrochureEditor
+        brochure={{
+          name: "Blitz Cricket Academy",
+          slug: "blitz-cricket",
+          tagline: null,
+          aboutLabel: "About Us",
+          about: null,
+          logoStorageKey: null,
+          logoUrl: null,
+          themeMode: "dark",
+          themeAccent: "default",
+          location: null,
+          phone: null,
+          isIntakeAvailable: true,
+          images: [],
+          youtubeUrls: [],
+          batches: [
+            {
+              id: "batch-open",
+              name: "U-14 evening",
+              blurb: "Evening nets",
+              isRegistrable: true,
+            },
+            {
+              id: "batch-closed",
+              name: "U-16 morning",
+              blurb: "Morning nets",
+              isRegistrable: false,
+            },
+          ],
+          coaches: [],
+        }}
+      />,
+    );
+    const batchPreviewSection = batchPreviewHtml.slice(
+      batchPreviewHtml.indexOf(">Preview<"),
+    );
+    const previewBatches =
+      batchPreviewSection.match(/<section[^>]*id="batches"[\s\S]*?<\/section>/)?.[0] ??
+      "";
+    const previewCards =
+      previewBatches.match(/<article[\s\S]*?<\/article>/g) ?? [];
+    expect(previewCards).toHaveLength(2);
+    expect(previewCards[0]).toContain("Open for Registration");
+    expect(previewCards[0]).toContain("badge-success");
+    expect(previewCards[0]).toContain(
+      'href="/a/blitz-cricket/join?batch=batch-open"',
+    );
+    expect(previewCards[1]).toContain("Registration closed");
+    expect(previewCards[1]).toContain("badge-error");
+    expect(previewCards[1]).not.toContain("/join");
   });
 
   it("renders ConversionView header logo link and theme across open, closed, and off states", () => {

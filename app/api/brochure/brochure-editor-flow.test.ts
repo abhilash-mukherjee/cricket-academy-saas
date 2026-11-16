@@ -321,6 +321,14 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
         feePaise: 1500000,
         sortOrder: 0,
       });
+      const [closedBatch] = await db
+        .insert(batches)
+        .values({
+          academyId: academy!.id,
+          name: "U-16 morning",
+          isOpenForRegistration: false,
+        })
+        .returning({ id: batches.id });
 
       const html = renderToStaticMarkup(
         await AcademyBrochurePage({
@@ -333,6 +341,18 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain(`/a/${slug}/join`);
       expect(html).toContain("+919876543210");
       expect(html).not.toContain("Contact +919876543210");
+
+      const batchesSection =
+        html.match(/<section[^>]*id="batches"[\s\S]*?<\/section>/)?.[0] ?? "";
+      const cards = batchesSection.match(/<article[\s\S]*?<\/article>/g) ?? [];
+      expect(cards).toHaveLength(2);
+      expect(cards[0]).toContain("Open for Registration");
+      expect(cards[0]).toContain("badge-success");
+      expect(cards[0]).toContain(`href="/a/${slug}/join?batch=${batch!.id}"`);
+      expect(cards[1]).toContain("Registration closed");
+      expect(cards[1]).toContain("badge-error");
+      expect(cards[1]).not.toContain(`href="/a/${slug}/join?batch=${closedBatch!.id}"`);
+      expect(cards[1]).not.toContain(">Register<");
     });
 
     it("omits the CTA when intake is unavailable and phone is missing", async () => {
@@ -380,6 +400,39 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).toContain("Contact Us");
       expect(html).toContain(
         "A place name or a map link.",
+      );
+      expect(html).toContain("Registration closed");
+      expect(html).toContain("badge-error");
+
+      const db = getDb();
+      const [academy] = await db
+        .select({ id: academies.id })
+        .from(academies)
+        .where(eq(academies.slug, slug))
+        .limit(1);
+      const [batch] = await db
+        .select({ id: batches.id })
+        .from(batches)
+        .where(eq(batches.academyId, academy!.id))
+        .limit(1);
+      await db
+        .update(batches)
+        .set({ isOpenForRegistration: true })
+        .where(eq(batches.id, batch!.id));
+      await db.insert(batchFeeOptions).values({
+        academyId: academy!.id,
+        batchId: batch!.id,
+        daysPerWeek: 3,
+        termDays: 30,
+        feePaise: 1500000,
+        sortOrder: 0,
+      });
+
+      const openPreviewHtml = renderToStaticMarkup(await BrochureEditorPage());
+      expect(openPreviewHtml).toContain("Open for Registration");
+      expect(openPreviewHtml).toContain("badge-success");
+      expect(openPreviewHtml).toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
       );
     });
 

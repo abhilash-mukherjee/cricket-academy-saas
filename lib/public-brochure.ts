@@ -18,8 +18,15 @@ import {
   resolveAcademyThemeMode,
 } from "@/lib/academy-theme";
 import { brochureUrl } from "@/lib/public-origin";
-import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import { listRegistrableBatchIds } from "@/lib/academy-intake";
 import { publicAcademyCacheTag } from "@/lib/public-academy-pages";
+
+export type PublicBrochureBatch = {
+  id: string;
+  name: string;
+  blurb: string | null;
+  isRegistrable: boolean;
+};
 
 export type PublicBrochure = {
   name: string;
@@ -35,7 +42,7 @@ export type PublicBrochure = {
   isIntakeAvailable: boolean;
   images: { url: string }[];
   youtubeVideoIds: string[];
-  batches: { name: string; blurb: string | null }[];
+  batches: PublicBrochureBatch[];
   coaches: {
     fullName: string;
     imageUrl: string | null;
@@ -71,7 +78,7 @@ async function loadPublicBrochure(
     return null;
   }
 
-  const [images, embeds, academyBatches, coaches, isIntakeAvailable] =
+  const [images, embeds, academyBatches, coaches, registrableBatchIds] =
     await Promise.all([
       db
         .select({ storageKey: brochureImages.storageKey })
@@ -84,7 +91,7 @@ async function loadPublicBrochure(
         .where(eq(youtubeEmbeds.academyId, academy.id))
         .orderBy(asc(youtubeEmbeds.sortOrder)),
       db
-        .select({ name: batches.name, blurb: batches.blurb })
+        .select({ id: batches.id, name: batches.name, blurb: batches.blurb })
         .from(batches)
         .where(eq(batches.academyId, academy.id))
         .orderBy(asc(batches.createdAt)),
@@ -97,7 +104,7 @@ async function loadPublicBrochure(
         .from(coachProfiles)
         .where(eq(coachProfiles.academyId, academy.id))
         .orderBy(asc(coachProfiles.sortOrder)),
-      isAcademyIntakeAvailable({
+      listRegistrableBatchIds({
         academyId: academy.id,
         isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
       }),
@@ -114,13 +121,18 @@ async function loadPublicBrochure(
     themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     location: academy.location,
     phone: academy.phone,
-    isIntakeAvailable,
+    isIntakeAvailable: registrableBatchIds.size > 0,
     images: images
       .map((image) => resolvePublicAssetUrl(image.storageKey))
       .filter((url): url is string => Boolean(url))
       .map((url) => ({ url })),
     youtubeVideoIds: embeds.map((embed) => embed.videoId),
-    batches: academyBatches,
+    batches: academyBatches.map((batch) => ({
+      id: batch.id,
+      name: batch.name,
+      blurb: batch.blurb,
+      isRegistrable: registrableBatchIds.has(batch.id),
+    })),
     coaches: coaches.map((coach) => ({
       fullName: coach.fullName,
       imageUrl: resolvePublicAssetUrl(coach.storageKey),
@@ -134,7 +146,7 @@ async function getCachedPublicBrochure(
 ): Promise<PublicBrochure | null> {
   const cached = await unstable_cache(
     () => loadPublicBrochure(slug),
-    ["public-brochure", slug, "appearance-v1"],
+    ["public-brochure", slug, "appearance-v1", "batch-registration-v1"],
     {
       tags: [publicAcademyCacheTag(slug)],
       revalidate: false,
@@ -151,6 +163,10 @@ async function getCachedPublicBrochure(
     logoUrl: cached.logoUrl ?? null,
     themeMode: resolveAcademyThemeMode(cached.themeMode),
     themeAccent: resolveAcademyThemeAccent(cached.themeAccent),
+    batches: cached.batches.map((batch) => ({
+      ...batch,
+      isRegistrable: Boolean(batch.isRegistrable),
+    })),
   };
 }
 
