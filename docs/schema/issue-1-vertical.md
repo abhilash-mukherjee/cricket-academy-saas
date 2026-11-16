@@ -59,6 +59,8 @@ Standard Better Auth shape. Magic-link only in v1; `account` is likely unused.
 | `about` | `text` nullable | Brochure About section copy ([issue #104](./issue-104-brochure-appearance.md)) |
 | `location` | `text` nullable | |
 | `phone` | `text` nullable | E.164; brochure CTA when online Registration is off |
+| `instagram_handle` | `text` nullable | Canonical Instagram handle (`1–30` letters, digits, `.`, `_`); shown in Brochure hero ([issue #107](./issue-107-brochure-instagram-whatsapp.md)) |
+| `whatsapp` | `text` nullable | E.164 Phone; drives the Brochure floating WhatsApp `"Chat with us"` button ([issue #107](./issue-107-brochure-instagram-whatsapp.md)) |
 | `is_online_registration_allowed` | `boolean NOT NULL DEFAULT true` | |
 | `is_active` | `boolean NOT NULL DEFAULT true` | `false` → public pages 404; slug stays reserved |
 | `owner_user_id` | `uuid` nullable FK → `user` | Set on wizard complete or claim |
@@ -76,6 +78,7 @@ Standard Better Auth shape. Magic-link only in v1; `account` is likely unused.
 - `CHECK (btrim(about_label) <> '')` (`academies_about_label_not_blank`)
 - `CHECK (theme_mode IN ('dark', 'light'))` (`academies_theme_mode_check`)
 - `CHECK (theme_accent IN ('default', 'emerald', 'blue', 'crimson', 'amber', 'violet', 'teal', 'orange'))` (`academies_theme_accent_check`)
+- `CHECK (instagram_handle IS NULL OR instagram_handle ~ '^[A-Za-z0-9._]{1,30}$')` (`academies_instagram_handle_format`)
 - `UNIQUE (owner_user_id) WHERE owner_user_id IS NOT NULL`
 - Index on `(is_active)` for sitemap queries
 
