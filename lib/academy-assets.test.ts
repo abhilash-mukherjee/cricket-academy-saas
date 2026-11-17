@@ -25,12 +25,24 @@ describe("academy asset storage keys", () => {
         academyId,
       ),
     ).toBe(true);
+    expect(
+      isAcademyScopedStorageKey(
+        `academies/${academyId}/academy-logo/logo.png`,
+        academyId,
+      ),
+    ).toBe(true);
   });
 
   it("rejects cross-tenant keys", () => {
     expect(
       isAcademyScopedStorageKey(
         "academies/other-academy/brochure-gallery/photo.png",
+        academyId,
+      ),
+    ).toBe(false);
+    expect(
+      isAcademyScopedStorageKey(
+        "academies/other-academy/academy-logo/logo.png",
         academyId,
       ),
     ).toBe(false);
@@ -46,6 +58,8 @@ describe("academy asset storage keys", () => {
   it("resolves academy storage keys to public Blob URLs", () => {
     const key = `academies/${academyId}/brochure-gallery/photo.png`;
     expect(resolvePublicAssetUrl(key)).toBe(`https://blob.test/${key}`);
+    const logoKey = `academies/${academyId}/academy-logo/logo.png`;
+    expect(resolvePublicAssetUrl(logoKey)).toBe(`https://blob.test/${logoKey}`);
   });
 });
 

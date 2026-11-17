@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { BrochureView } from "./brochure-view";
 import { getPublicBrochure } from "@/lib/public-brochure";
+import { publicAcademyThemeStyle } from "@/lib/academy-theme";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
 import { brochureUrl } from "@/lib/public-origin";
 
@@ -21,7 +22,7 @@ export async function generateMetadata({
 
   return {
     title: brochure.name,
-    description: brochure.tagline ?? undefined,
+    description: brochure.tagline ?? brochure.about ?? undefined,
     alternates: { canonical: brochureUrl(brochure.slug) },
   };
 }
@@ -37,11 +38,9 @@ export default async function AcademyBrochurePage({
 
   return (
     <div
-      className={
-        brochure.isIntakeAvailable || brochure.phone
-          ? "bg-base-100 min-h-dvh pb-20"
-          : "bg-base-100 min-h-dvh"
-      }
+      data-theme={brochure.themeMode}
+      style={publicAcademyThemeStyle(brochure.themeAccent)}
+      className="bg-base-100 text-base-content min-h-dvh"
     >
       <BrochureView brochure={brochure} />
       <footer className="text-base-content/60 p-6 text-center text-sm">

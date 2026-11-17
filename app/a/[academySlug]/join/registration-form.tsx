@@ -21,11 +21,13 @@ import {
 import type { RegistrationSnapshot } from "@/lib/registrations";
 import { RegistrationThankYou } from "./registration-thank-you";
 import { UpiPayQr } from "./upi-pay-qr";
+import { PUBLIC_PRIMARY_BUTTON_CLASS } from "../public-button";
 
 type RegistrationFormProps = {
   academySlug: string;
   batches: RegistrableBatch[];
   upiQrUrl: string | null;
+  initialBatchId?: string | null;
 };
 
 type FormValues = {
@@ -39,14 +41,24 @@ type FormValues = {
   note: string;
 };
 
-function preselectedFeeOptionId(batches: RegistrableBatch[]): string {
-  const options = batches.flatMap((batch) => batch.feeOptions);
-  return options.length === 1 ? options[0].id : "";
+export function preselectedFeeOptionId(
+  batches: RegistrableBatch[],
+  batchId?: string | null,
+): string {
+  const targetBatchId = batchId?.trim() ?? "";
+  if (!targetBatchId) {
+    return "";
+  }
+  const batch = batches.find((item) => item.id === targetBatchId);
+  return batch?.feeOptions[0]?.id ?? "";
 }
 
-function emptyValues(batches: RegistrableBatch[]): FormValues {
+export function emptyValues(
+  batches: RegistrableBatch[],
+  batchId?: string | null,
+): FormValues {
   return {
-    batchFeeOptionId: preselectedFeeOptionId(batches),
+    batchFeeOptionId: preselectedFeeOptionId(batches, batchId),
     playerFullName: "",
     playerDateOfBirth: "",
     guardianFullName: "",
@@ -87,9 +99,10 @@ export function RegistrationForm({
   academySlug,
   batches,
   upiQrUrl,
+  initialBatchId,
 }: RegistrationFormProps) {
   const router = useRouter();
-  const [values, setValues] = useState(() => emptyValues(batches));
+  const [values, setValues] = useState(() => emptyValues(batches, initialBatchId));
   const [fields, setFields] = useState<RegistrationFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -209,7 +222,7 @@ export function RegistrationForm({
         upiQrUrl={upiQrUrl}
         onRegisterAnother={() => {
           setSnapshot(null);
-          setValues(emptyValues(batches));
+          setValues(emptyValues(batches, initialBatchId));
           setFields({});
           setFormError(null);
         }}
@@ -238,12 +251,16 @@ export function RegistrationForm({
                     option.id ||
                     `${batch.id || batch.name}-${option.daysPerWeek}-${option.termDays}`
                   }
-                  className="card bg-base-200 cursor-pointer"
+                  className={`card bg-base-200 cursor-pointer border-2 ${
+                    values.batchFeeOptionId === option.id
+                      ? "border-primary"
+                      : "border-transparent"
+                  }`}
                 >
                   <div className="card-body flex-row items-start gap-3 py-3">
                     <input
                       type="radio"
-                      className="radio mt-1"
+                      className="radio radio-primary mt-1"
                       name="batchFeeOptionId"
                       value={option.id}
                       checked={values.batchFeeOptionId === option.id}
@@ -392,7 +409,7 @@ export function RegistrationForm({
 
       <button
         type="submit"
-        className="btn btn-neutral"
+        className={PUBLIC_PRIMARY_BUTTON_CLASS}
         disabled={submitting}
       >
         Submit Registration

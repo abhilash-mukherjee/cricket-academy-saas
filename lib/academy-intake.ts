@@ -20,11 +20,33 @@ export async function isAcademyIntakeAvailable(options: {
   academyId: string;
   isOnlineRegistrationAllowed: boolean;
 }): Promise<boolean> {
+  const ids = await listRegistrableBatchIds(options);
+  return ids.size > 0;
+}
+
+export async function listRegistrableBatchIds(options: {
+  academyId: string;
+  isOnlineRegistrationAllowed: boolean;
+}): Promise<Set<string>> {
   if (!options.isOnlineRegistrationAllowed) {
-    return false;
+    return new Set();
   }
 
-  return academyHasRegistrableBatch(options.academyId);
+  const db = getDb();
+  const rows = await db
+    .selectDistinct({ batchId: batchFeeOptions.batchId })
+    .from(batchFeeOptions)
+    .innerJoin(batches, eq(batches.id, batchFeeOptions.batchId))
+    .where(
+      and(
+        eq(batchFeeOptions.academyId, options.academyId),
+        eq(batchFeeOptions.isOffered, true),
+        eq(batches.academyId, options.academyId),
+        eq(batches.isOpenForRegistration, true),
+      ),
+    );
+
+  return new Set(rows.map((row) => row.batchId));
 }
 
 export async function listRegistrableBatches(
@@ -88,23 +110,4 @@ export async function listRegistrableBatches(
     }
     return [{ id: batch.id, name: batch.name, feeOptions }];
   });
-}
-
-async function academyHasRegistrableBatch(academyId: string): Promise<boolean> {
-  const db = getDb();
-  const [row] = await db
-    .select({ id: batchFeeOptions.id })
-    .from(batchFeeOptions)
-    .innerJoin(batches, eq(batches.id, batchFeeOptions.batchId))
-    .where(
-      and(
-        eq(batchFeeOptions.academyId, academyId),
-        eq(batchFeeOptions.isOffered, true),
-        eq(batches.academyId, academyId),
-        eq(batches.isOpenForRegistration, true),
-      ),
-    )
-    .limit(1);
-
-  return Boolean(row);
 }

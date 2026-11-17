@@ -10,7 +10,7 @@ The first vertical's Postgres tables are specified in `docs/schema/issue-1-verti
 
 **`batch_fee_options`, not `batches.fee_paise`.** Each Batch offers discrete packages (term length × days per week × total price). `fee_paise` is the total for that package, not a monthly rate — academies often discount longer commitments. The visitor picks an option at registration; intensity, term, and fee are snapshotted on the Registration (ADR-0029). A Batch with no offered fee options is not registrable.
 
-**`storage_key`, not public URLs.** UPI QR, brochure images, and coach photos store an object-storage key; the app resolves URLs. CDN or provider base URL changes do not orphan rows. The Academy UPI QR is one image; the amount shown comes from the visitor’s selected fee option.
+**`storage_key`, not public URLs.** Academy logo, UPI QR, brochure images, and coach photos store an object-storage key; the app resolves URLs. CDN or provider base URL changes do not orphan rows. The Academy UPI QR is one image; the amount shown comes from the visitor’s selected fee option.
 
 **Impersonation state is session-only.** Active impersonation (banner, exit) lives in the session; `impersonation_audit_events` records meaningful writes (ADR-0018). No `impersonation_sessions` table in v1.
 

@@ -443,7 +443,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureHtml).toContain("Call to Register");
+      expect(brochureHtml).toContain("Contact Us");
       expect(brochureHtml).not.toContain(`href="/a/${slug}/join"`);
     });
 
@@ -508,7 +508,7 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureHtml).toContain("Register");
+      expect(brochureHtml).toContain("Register Now");
       expect(brochureHtml).toContain(`/a/${slug}/join`);
     });
 

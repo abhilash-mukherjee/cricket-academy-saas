@@ -99,6 +99,20 @@
       "when": 1791549984460,
       "tag": "0013_coach_attendance",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794762051367,
+      "tag": "0014_brochure_appearance",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794822414013,
+      "tag": "0015_brochure_instagram_whatsapp",
+      "breakpoints": true
     }
   ]
 }
