@@ -209,3 +209,57 @@ describe("deferred start mark on a pause", () => {
     );
   });
 });
+
+describe("brochure about, logo, and theme appearance on academies", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0014_brochure_appearance.sql",
+  );
+
+  it("adds about_label, about, logo_storage_key, theme_mode, theme_accent and check constraints", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "about_label" text DEFAULT \'About Us\' NOT NULL;',
+    );
+    expect(sql).toContain('ALTER TABLE "academies" ADD COLUMN "about" text;');
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "logo_storage_key" text;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "theme_mode" text DEFAULT \'dark\' NOT NULL;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "theme_accent" text DEFAULT \'default\' NOT NULL;',
+    );
+    expect(sql).toContain('CONSTRAINT "academies_about_label_not_blank"');
+    expect(sql).toContain('CONSTRAINT "academies_theme_mode_check"');
+    expect(sql).toContain('CONSTRAINT "academies_theme_accent_check"');
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+  });
+});
+
+describe("brochure instagram handle and whatsapp on academies", () => {
+  const migrationPath = join(
+    import.meta.dirname,
+    "migrations",
+    "0015_brochure_instagram_whatsapp.sql",
+  );
+
+  it("adds instagram_handle, whatsapp, and instagram handle format constraint without destructive DDL", () => {
+    const sql = readFileSync(migrationPath, "utf8");
+
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "instagram_handle" text;',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "academies" ADD COLUMN "whatsapp" text;',
+    );
+    expect(sql).toContain('CONSTRAINT "academies_instagram_handle_format"');
+    expect(sql).toMatch(
+      /"academies"\."instagram_handle" is null or "academies"\."instagram_handle" ~ '\^\[A-Za-z0-9\._\]\{1,30\}\$'/,
+    );
+    expect(sql).not.toMatch(/DROP (TABLE|COLUMN|CONSTRAINT|INDEX|TYPE)/i);
+  });
+});

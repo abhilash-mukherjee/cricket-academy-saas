@@ -20,3 +20,5 @@ export const ALLOWED_IMAGE_MIME_TYPES = [
   "image/webp",
 ] as const;
 export const MAX_BROCHURE_GALLERY_IMAGES = 6;
+export const WHATSAPP_CHAT_MESSAGE_TEMPLATE =
+  "I want to know more about {academy_name}";

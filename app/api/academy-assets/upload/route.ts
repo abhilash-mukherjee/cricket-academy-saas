@@ -10,6 +10,7 @@ import {
 } from "@/lib/owner-context";
 
 const purposes: AcademyAssetPurpose[] = [
+  "academy-logo",
   "brochure-gallery",
   "coach-photo",
   "upi-qr",

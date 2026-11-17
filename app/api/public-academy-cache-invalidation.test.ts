@@ -281,6 +281,83 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).not.toContain("Original tagline");
     });
 
+    it("purges public pages when the Owner updates Instagram or WhatsApp", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const firstSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            instagram: "@elite_cricket",
+            whatsapp: "9876543210",
+          }),
+        }),
+      );
+      expect(firstSave.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const firstHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(firstHtml).toContain("Follow us on Instagram");
+      expect(firstHtml).toContain('href="https://www.instagram.com/elite_cricket"');
+      expect(firstHtml).toContain("Chat with us");
+      expect(firstHtml).toContain(
+        `href="https://wa.me/919876543210?text=${encodeURIComponent("I want to know more about Blitz Cricket Academy")}"`,
+      );
+
+      revalidatePath.mockClear();
+      revalidateTag.mockClear();
+
+      const secondSave = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            instagram: "https://instagram.com/New_Handle/",
+            whatsapp: "+919123456789",
+          }),
+        }),
+      );
+      expect(secondSave.status).toBe(200);
+
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const secondHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(secondHtml).toContain('href="https://www.instagram.com/New_Handle"');
+      expect(secondHtml).not.toContain("elite_cricket");
+      expect(secondHtml).toContain("https://wa.me/919123456789?text=");
+      expect(secondHtml).not.toContain("https://wa.me/919876543210");
+    });
+
     it("purges public pages when the Owner saves conversion UPI QR", async () => {
       const cookie = await signInOwner(testEmail);
       await onboardOwner(cookie, slug);
@@ -588,8 +665,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterOpen).toContain("Register");
+      expect(brochureAfterOpen).toContain("Register Now");
       expect(brochureAfterOpen).toContain(`/a/${slug}/join`);
+      expect(brochureAfterOpen).toContain("Open for Registration");
+      expect(brochureAfterOpen).toContain("badge-success");
+      expect(brochureAfterOpen).toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
       expect(joinAfterOpen).toContain("U-14 evening");
       expect(joinAfterOpen).toContain("Weekday nets");
       expect(joinAfterOpen).toContain("₹15,000");
@@ -626,8 +708,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterClose).toContain("Call to Register");
+      expect(brochureAfterClose).toContain("Contact Us");
       expect(brochureAfterClose).not.toContain(`href="/a/${slug}/join"`);
+      expect(brochureAfterClose).not.toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
+      expect(brochureAfterClose).toContain("Registration closed");
+      expect(brochureAfterClose).toContain("badge-error");
       expect(joinAfterClose).toContain("Intake is closed.");
     });
 
@@ -824,8 +911,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterOff).toContain("Call to Register");
+      expect(brochureAfterOff).toContain("Contact Us");
       expect(brochureAfterOff).not.toContain(`href="/a/${slug}/join"`);
+      expect(brochureAfterOff).not.toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
+      expect(brochureAfterOff).toContain("Registration closed");
+      expect(brochureAfterOff).toContain("badge-error");
       expect(joinAfterOff).toMatch(/online Registration is off/i);
       expect(joinAfterOff).not.toContain("Weekday nets");
       expect(joinAfterOff).not.toContain("Pay with UPI");
@@ -861,8 +953,13 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(brochureAfterOn).toContain("Register");
+      expect(brochureAfterOn).toContain("Register Now");
       expect(brochureAfterOn).toContain(`/a/${slug}/join`);
+      expect(brochureAfterOn).toContain("Open for Registration");
+      expect(brochureAfterOn).toContain("badge-success");
+      expect(brochureAfterOn).toContain(
+        `href="/a/${slug}/join?batch=${batch!.id}"`,
+      );
       expect(joinAfterOn).toContain("U-14 evening");
       expect(joinAfterOn).toContain("Weekday nets");
     });

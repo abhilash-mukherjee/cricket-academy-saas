@@ -741,6 +741,79 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(html).not.toContain("Player phone");
     });
 
+    it("preselects the first offered fee option on /join only when ?batch matches a registrable Batch", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug, "U-14 evening");
+      const opened = await openRegistrableBatch(cookie, slug);
+
+      const singleWithoutParam = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(singleWithoutParam).not.toContain('checked=""');
+
+      const singleEmptyParam = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({ batch: "" }),
+        }),
+      );
+      expect(singleEmptyParam).not.toContain('checked=""');
+
+      const second = await createFeeOption(
+        new Request(`${origin}/api/batches/${opened.batch.id}/fee-options`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            daysPerWeek: 5,
+            termDays: 60,
+            feeInr: 22000,
+            label: "Weekend",
+          }),
+        }),
+        { params: Promise.resolve({ batchId: opened.batch.id }) },
+      );
+      expect(second.status).toBe(200);
+      const secondBody = (await second.json()) as { id: string };
+
+      const db = getDb();
+      const [closedBatch] = await db
+        .insert(batches)
+        .values({
+          academyId: opened.academy.id,
+          name: "U-16 closed",
+          isOpenForRegistration: false,
+        })
+        .returning({ id: batches.id });
+
+      const matchedHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({ batch: opened.batch.id }),
+        }),
+      );
+      expect(
+        matchedHtml.match(new RegExp(`<input[^>]*value="${opened.feeOptionId}"[^>]*>`))?.[0],
+      ).toContain('checked=""');
+      expect(
+        matchedHtml.match(new RegExp(`<input[^>]*value="${secondBody.id}"[^>]*>`))?.[0],
+      ).not.toContain('checked=""');
+
+      const closedParamHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({ batch: closedBatch!.id }),
+        }),
+      );
+      expect(closedParamHtml).not.toContain('checked=""');
+    });
+
     it("renders thank-you HTML from the snapshot and QR without a Registration id", async () => {
       const html = renderToStaticMarkup(
         <RegistrationThankYou

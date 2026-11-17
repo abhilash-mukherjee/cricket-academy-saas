@@ -1,9 +1,18 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPublicConversion } from "@/lib/public-conversion";
+import { LinkPendingMark } from "@/app/app/link-pending-mark";
+import {
+  publicAcademyThemeStyle,
+  resolveAcademyThemeAccent,
+  resolveAcademyThemeMode,
+} from "@/lib/academy-theme";
+import {
+  getPublicConversion,
+  type PublicConversion,
+} from "@/lib/public-conversion";
 import { ACADEMY_NOT_FOUND, APP_NAME } from "@/lib/constants";
-import { BrochureCta } from "../brochure-cta";
+import { AcademyLogoMark } from "../academy-logo";
 import { BrochurePhone } from "../brochure-phone";
 import { RegistrationForm } from "./registration-form";
 
@@ -32,29 +41,54 @@ export async function generateMetadata({
   };
 }
 
-export default async function ConversionPage({ params }: ConversionPageProps) {
-  const { academySlug } = await params;
-  const conversion = await getPublicConversion(academySlug);
-  if (!conversion) {
-    notFound();
+function firstParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
   }
+  return value ?? null;
+}
 
-  const showCopyPhone =
-    !conversion.isOnlineRegistrationAllowed && Boolean(conversion.phone);
+/** Public registration view rendered under `/a/[academySlug]/join`. */
+export function ConversionView({
+  conversion,
+  initialBatchId,
+}: {
+  conversion: PublicConversion;
+  initialBatchId?: string | null;
+}) {
+  const themeMode = resolveAcademyThemeMode(conversion.themeMode);
+  const themeAccent = resolveAcademyThemeAccent(conversion.themeAccent);
 
   return (
     <div
-      className={
-        showCopyPhone ? "bg-base-100 min-h-dvh pb-20" : "bg-base-100 min-h-dvh"
-      }
+      data-theme={themeMode}
+      style={publicAcademyThemeStyle(themeAccent)}
+      className="bg-base-100 text-base-content min-h-dvh"
     >
+      <header className="navbar bg-base-100/75 sticky top-0 z-30 h-16 px-4 backdrop-blur-md">
+        <div className="flex-1">
+          <Link
+            href={`/a/${conversion.slug}`}
+            className="inline-flex items-center"
+          >
+            <AcademyLogoMark
+              name={conversion.name}
+              logoUrl={conversion.logoUrl}
+              themeMode={themeMode}
+            />
+            <LinkPendingMark />
+          </Link>
+        </div>
+      </header>
       <main className="mx-auto flex w-full max-w-lg flex-col gap-4 p-6">
         <h1 className="text-3xl font-bold">{conversion.name}</h1>
         {conversion.isIntakeAvailable ? (
           <RegistrationForm
+            key={initialBatchId ?? ""}
             academySlug={conversion.slug}
             batches={conversion.batches}
             upiQrUrl={conversion.upiQrUrl}
+            initialBatchId={initialBatchId}
           />
         ) : conversion.isOnlineRegistrationAllowed ? (
           <>
@@ -72,17 +106,30 @@ export default async function ConversionPage({ params }: ConversionPageProps) {
           </>
         )}
       </main>
-      {showCopyPhone ? (
-        <BrochureCta
-          slug={conversion.slug}
-          phone={conversion.phone}
-          isIntakeAvailable={false}
-          placement="viewport"
-        />
-      ) : null}
       <footer className="text-base-content/60 p-6 text-center text-sm">
         Built with {APP_NAME}
       </footer>
     </div>
+  );
+}
+
+export default async function ConversionPage({
+  params,
+  searchParams,
+}: ConversionPageProps) {
+  const [{ academySlug }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({}),
+  ]);
+  const conversion = await getPublicConversion(academySlug);
+  if (!conversion) {
+    notFound();
+  }
+
+  return (
+    <ConversionView
+      conversion={conversion}
+      initialBatchId={firstParam(resolvedSearchParams.batch)}
+    />
   );
 }
