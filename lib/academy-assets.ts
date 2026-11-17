@@ -10,6 +10,7 @@ import {
 } from "@/lib/request-trace";
 
 export type AcademyAssetPurpose =
+  | "academy-logo"
   | "brochure-gallery"
   | "coach-photo"
   | "upi-qr";
@@ -70,6 +71,12 @@ export function extensionForMimeType(mimeType: string): string | null {
   return MIME_TO_EXTENSION[mimeType] ?? null;
 }
 
+const PURPOSE_FOLDER: Record<Exclude<AcademyAssetPurpose, "upi-qr">, string> = {
+  "academy-logo": "academy-logo",
+  "brochure-gallery": "brochure-gallery",
+  "coach-photo": "coach-photos",
+};
+
 function pathnameForPurpose(
   academyId: string,
   purpose: AcademyAssetPurpose,
@@ -80,9 +87,7 @@ function pathnameForPurpose(
     return `${academyAssetPrefix(academyId)}upi-qr.${extension}`;
   }
 
-  const folder =
-    purpose === "brochure-gallery" ? "brochure-gallery" : "coach-photos";
-  return `${academyAssetPrefix(academyId)}${folder}/${id}.${extension}`;
+  return `${academyAssetPrefix(academyId)}${PURPOSE_FOLDER[purpose]}/${id}.${extension}`;
 }
 
 // draftCount is the editor's current gallery size, including images already saved.

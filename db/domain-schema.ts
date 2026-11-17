@@ -30,8 +30,15 @@ export const academies = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     tagline: text("tagline"),
+    aboutLabel: text("about_label").notNull().default("About Us"),
+    about: text("about"),
+    logoStorageKey: text("logo_storage_key"),
+    themeMode: text("theme_mode").notNull().default("dark"),
+    themeAccent: text("theme_accent").notNull().default("default"),
     location: text("location"),
     phone: text("phone"),
+    instagramHandle: text("instagram_handle"),
+    whatsapp: text("whatsapp"),
     isOnlineRegistrationAllowed: boolean("is_online_registration_allowed")
       .notNull()
       .default(true),
@@ -57,6 +64,22 @@ export const academies = pgTable(
     check(
       "academies_slug_format",
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
+    ),
+    check(
+      "academies_about_label_not_blank",
+      sql`btrim(${table.aboutLabel}) <> ''`,
+    ),
+    check(
+      "academies_theme_mode_check",
+      sql`${table.themeMode} in ('dark', 'light')`,
+    ),
+    check(
+      "academies_theme_accent_check",
+      sql`${table.themeAccent} in ('default', 'emerald', 'blue', 'crimson', 'amber', 'violet', 'teal', 'orange')`,
+    ),
+    check(
+      "academies_instagram_handle_format",
+      sql`${table.instagramHandle} is null or ${table.instagramHandle} ~ '^[A-Za-z0-9._]{1,30}$'`,
     ),
     index("academies_is_active_idx").on(table.isActive),
   ],

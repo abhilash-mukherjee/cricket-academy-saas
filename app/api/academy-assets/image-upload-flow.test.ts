@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GET as verifyAuth, POST as authPost } from "../auth/[...all]/route";
 import { POST as completeOnboarding } from "../onboarding/route";
@@ -140,7 +141,7 @@ async function onboardOwner(cookie: string, slug: string) {
 
 async function uploadImage(
   cookie: string,
-  purpose: "brochure-gallery" | "coach-photo" | "upi-qr",
+  purpose: "academy-logo" | "brochure-gallery" | "coach-photo" | "upi-qr",
   file: File,
   draftGalleryCount?: number,
 ) {
@@ -204,6 +205,8 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       enableMailCapture();
       sessionCookie.value = "";
       blobStore.clear();
+      vi.mocked(revalidatePath).mockClear();
+      vi.mocked(revalidateTag).mockClear();
     });
 
     afterEach(async () => {
@@ -417,6 +420,207 @@ describe.skipIf(!hasDatabase || !hasAuthSecret)(
       expect(conversion?.upiQrUrl).toContain(upiQr.storageKey);
       expect(html).toContain("Register for a Batch.");
       expect(html).not.toContain("Pay with UPI");
+    });
+
+    it("uploads, replaces, and removes academy-logo across /a/{slug} and /a/{slug}/join and purges cache", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const db = getDb();
+      const [academy] = await db
+        .select({ id: academies.id })
+        .from(academies)
+        .where(eq(academies.slug, slug))
+        .limit(1);
+      expect(academy).toBeTruthy();
+
+      const firstLogo = await uploadImage(cookie, "academy-logo", pngFile("logo1.png"));
+      expect(firstLogo.storageKey).toMatch(
+        new RegExp(`^academies/${academy!.id}/academy-logo/`),
+      );
+      expect(blobStore.has(firstLogo.storageKey)).toBe(true);
+
+      vi.mocked(revalidatePath).mockClear();
+      vi.mocked(revalidateTag).mockClear();
+
+      const saveFirst = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            logoStorageKey: firstLogo.storageKey,
+          }),
+        }),
+      );
+      expect(saveFirst.status).toBe(200);
+      expect(revalidateTag).toHaveBeenCalledWith(`public-academy-${slug}`, "max");
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}`);
+      expect(revalidatePath).toHaveBeenCalledWith(`/a/${slug}/join`);
+
+      const brochureHtml = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      const brochureHeader =
+        brochureHtml.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "";
+      expectOptimizedAsset(brochureHeader, firstLogo.storageKey);
+      expect(brochureHeader).not.toMatch(/<a[^>]*>[\s\S]*academy-logo[\s\S]*<\/a>/);
+
+      // Intake closed state on /join
+      const closedJoinHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(closedJoinHtml).toContain("Intake is closed.");
+      const closedHeader =
+        closedJoinHtml.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "";
+      expectOptimizedAsset(closedHeader, firstLogo.storageKey);
+      expect(closedHeader).toMatch(
+        new RegExp(`<a[^>]*href="/a/${slug}"[^>]*>[\\s\\S]*${encodeURIComponent(firstLogo.storageKey)}`),
+      );
+
+      // Active intake state on /join
+      const [batch] = await db
+        .select({ id: batches.id })
+        .from(batches)
+        .where(eq(batches.academyId, academy!.id))
+        .limit(1);
+      expect(batch).toBeTruthy();
+      await db
+        .update(batches)
+        .set({ isOpenForRegistration: true })
+        .where(eq(batches.id, batch!.id));
+      await db.insert(batchFeeOptions).values({
+        academyId: academy!.id,
+        batchId: batch!.id,
+        daysPerWeek: 2,
+        termDays: 30,
+        feePaise: 1500000,
+        sortOrder: 0,
+      });
+
+      const activeJoinHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(activeJoinHtml).toContain("Register for a Batch.");
+      expectOptimizedAsset(
+        activeJoinHtml.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "",
+        firstLogo.storageKey,
+      );
+
+      // Online registration off state on /join
+      const offResponse = await saveConversion(
+        new Request(`${origin}/api/conversion`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({ isOnlineRegistrationAllowed: false }),
+        }),
+      );
+      expect(offResponse.status).toBe(200);
+
+      const offJoinHtml = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(offJoinHtml).toContain("Online Registration is off.");
+      expectOptimizedAsset(
+        offJoinHtml.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "",
+        firstLogo.storageKey,
+      );
+
+      // Replace logo deletes old blob
+      const secondLogo = await uploadImage(cookie, "academy-logo", pngFile("logo2.png"));
+      const saveSecond = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            logoStorageKey: secondLogo.storageKey,
+          }),
+        }),
+      );
+      expect(saveSecond.status).toBe(200);
+      expect(blobStore.has(firstLogo.storageKey)).toBe(false);
+      expect(blobStore.has(secondLogo.storageKey)).toBe(true);
+
+      // Remove logo deletes blob and restores default restartHQ mark
+      const removeLogo = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            logoStorageKey: null,
+          }),
+        }),
+      );
+      expect(removeLogo.status).toBe(200);
+      expect(blobStore.has(secondLogo.storageKey)).toBe(false);
+
+      const afterRemoveBrochure = renderToStaticMarkup(
+        await AcademyBrochurePage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(afterRemoveBrochure).toContain("/logo-white.svg");
+
+      const afterRemoveJoin = renderToStaticMarkup(
+        await ConversionPage({
+          params: Promise.resolve({ academySlug: slug }),
+          searchParams: Promise.resolve({}),
+        }),
+      );
+      expect(afterRemoveJoin).toContain("/logo-white.svg");
+    });
+
+    it("rejects cross-academy logoStorageKey with 403 invalid-storage-key", async () => {
+      const cookie = await signInOwner(testEmail);
+      await onboardOwner(cookie, slug);
+
+      const response = await saveBrochure(
+        new Request(`${origin}/api/brochure`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin,
+            cookie,
+          },
+          body: JSON.stringify({
+            name: "Blitz Cricket Academy",
+            logoStorageKey: "academies/other-academy/academy-logo/evil.png",
+          }),
+        }),
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: "invalid-storage-key" });
     });
   },
 );

@@ -7,16 +7,44 @@ import {
   youtubeEmbeds,
 } from "@/db/domain-schema";
 import { getDb } from "@/db/client";
+import { z } from "zod";
 import {
+  deleteAcademyAsset,
   deleteAcademyAssets,
   isAcademyScopedStorageKey,
   isLegacyHttpStorageKey,
   resolvePublicAssetUrl,
 } from "@/lib/academy-assets";
+import {
+  academyThemeAccentSchema,
+  academyThemeModeSchema,
+  resolveAboutLabel,
+  resolveAcademyThemeAccent,
+  resolveAcademyThemeMode,
+  type AcademyThemeAccent,
+  type AcademyThemeMode,
+} from "@/lib/academy-theme";
+
+export const brochureAppearanceInputSchema = z.object({
+  aboutLabel: z.string().nullable().optional(),
+  about: z.string().nullable().optional(),
+  logoStorageKey: z.string().nullable().optional(),
+  themeMode: academyThemeModeSchema.optional(),
+  themeAccent: academyThemeAccentSchema.optional(),
+});
+
+export const brochureSocialInputSchema = z.object({
+  instagram: z.string().nullable().optional(),
+  whatsapp: z.string().nullable().optional(),
+});
 import { MAX_BROCHURE_GALLERY_IMAGES } from "@/lib/constants";
+import {
+  instagramProfileUrl,
+  normalizeOptionalInstagram,
+} from "@/lib/instagram";
 import { normalizeOptionalPhone } from "@/lib/phone";
 import { parseYoutubeVideoId } from "@/lib/youtube";
-import { isAcademyIntakeAvailable } from "@/lib/academy-intake";
+import { listRegistrableBatchIds } from "@/lib/academy-intake";
 import {
   logWarning,
   logInfo,
@@ -31,8 +59,15 @@ export type BrochureCoachInput = {
 export type BrochureEditInput = {
   name: string;
   tagline?: string | null;
+  aboutLabel?: string | null;
+  about?: string | null;
+  logoStorageKey?: string | null;
+  themeMode?: string;
+  themeAccent?: string;
   location?: string | null;
   phone?: string | null;
+  instagram?: string | null;
+  whatsapp?: string | null;
   imageStorageKeys?: string[];
   youtubeUrls?: string[];
   batchBlurbs?: { id: string; blurb: string }[];
@@ -42,6 +77,7 @@ export type BrochureEditInput = {
 export type BrochureEditError =
   | "invalid-input"
   | "invalid-phone"
+  | "invalid-instagram"
   | "invalid-storage-key"
   | "invalid-youtube-url"
   | "gallery-limit"
@@ -55,6 +91,7 @@ export type BrochureEditorBatch = {
   id: string;
   name: string;
   blurb: string | null;
+  isRegistrable: boolean;
 };
 
 export type BrochureEditorImage = {
@@ -73,8 +110,16 @@ export type BrochureEditorState = {
   name: string;
   slug: string;
   tagline: string | null;
+  aboutLabel: string;
+  about: string | null;
+  logoStorageKey: string | null;
+  logoUrl: string | null;
+  themeMode: AcademyThemeMode;
+  themeAccent: AcademyThemeAccent;
   location: string | null;
   phone: string | null;
+  instagramUrl: string | null;
+  whatsapp: string | null;
   isIntakeAvailable: boolean;
   images: BrochureEditorImage[];
   youtubeUrls: string[];
@@ -130,8 +175,15 @@ export async function getBrochureEditor(
       name: academies.name,
       slug: academies.slug,
       tagline: academies.tagline,
+      aboutLabel: academies.aboutLabel,
+      about: academies.about,
+      logoStorageKey: academies.logoStorageKey,
+      themeMode: academies.themeMode,
+      themeAccent: academies.themeAccent,
       location: academies.location,
       phone: academies.phone,
+      instagramHandle: academies.instagramHandle,
+      whatsapp: academies.whatsapp,
       isOnlineRegistrationAllowed: academies.isOnlineRegistrationAllowed,
     })
     .from(academies)
@@ -142,7 +194,7 @@ export async function getBrochureEditor(
     return null;
   }
 
-  const [academyBatches, images, embeds, coaches, isIntakeAvailable] =
+  const [academyBatches, images, embeds, coaches, registrableBatchIds] =
     await Promise.all([
     db
       .select({
@@ -172,19 +224,31 @@ export async function getBrochureEditor(
       .from(coachProfiles)
       .where(eq(coachProfiles.academyId, academyId))
       .orderBy(asc(coachProfiles.sortOrder)),
-    isAcademyIntakeAvailable({
+    listRegistrableBatchIds({
       academyId,
       isOnlineRegistrationAllowed: academy.isOnlineRegistrationAllowed,
     }),
   ]);
 
+  const logoStorageKey = normalizeStoredKey(academy.logoStorageKey);
+
   return {
     name: academy.name,
     slug: academy.slug,
     tagline: academy.tagline,
+    aboutLabel: academy.aboutLabel,
+    about: academy.about,
+    logoStorageKey,
+    logoUrl: resolvePublicAssetUrl(logoStorageKey),
+    themeMode: resolveAcademyThemeMode(academy.themeMode),
+    themeAccent: resolveAcademyThemeAccent(academy.themeAccent),
     location: academy.location,
     phone: academy.phone,
-    isIntakeAvailable,
+    instagramUrl: academy.instagramHandle
+      ? instagramProfileUrl(academy.instagramHandle)
+      : null,
+    whatsapp: academy.whatsapp,
+    isIntakeAvailable: registrableBatchIds.size > 0,
     images: images
       .map((image) => normalizeStoredKey(image.storageKey))
       .filter((storageKey): storageKey is string => Boolean(storageKey))
@@ -195,7 +259,10 @@ export async function getBrochureEditor(
     youtubeUrls: embeds.map(
       (embed) => `https://www.youtube.com/watch?v=${embed.videoId}`,
     ),
-    batches: academyBatches,
+    batches: academyBatches.map((batch) => ({
+      ...batch,
+      isRegistrable: registrableBatchIds.has(batch.id),
+    })),
     coaches: coaches.map((coach) => {
       const imageStorageKey = normalizeStoredKey(coach.storageKey);
       return {
@@ -233,7 +300,57 @@ export async function updateBrochure(
     return { ok: false, error: "invalid-phone" };
   }
 
-  const brochureFields = { name, phone: phoneResult.phone };
+  const parsedSocial = brochureSocialInputSchema.safeParse({
+    ...(input.instagram !== undefined ? { instagram: input.instagram } : {}),
+    ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp } : {}),
+  });
+  if (!parsedSocial.success) {
+    logWarning(
+      `Brochure was not updated with ID: ${academyId}.`,
+      "invalid-input",
+      { name, phone: phoneResult.phone },
+    );
+    return { ok: false, error: "invalid-input" };
+  }
+
+  let nextWhatsapp: string | null | undefined;
+  if (parsedSocial.data.whatsapp !== undefined) {
+    const whatsappResult = normalizeOptionalPhone(parsedSocial.data.whatsapp);
+    if (!whatsappResult.ok) {
+      logWarning(
+        `Brochure was not updated with ID: ${academyId}.`,
+        "invalid-phone",
+        { name, whatsapp: parsedSocial.data.whatsapp },
+      );
+      return { ok: false, error: "invalid-phone" };
+    }
+    nextWhatsapp = whatsappResult.phone;
+  }
+
+  let nextInstagramHandle: string | null | undefined;
+  if (parsedSocial.data.instagram !== undefined) {
+    const instagramResult = normalizeOptionalInstagram(
+      parsedSocial.data.instagram,
+    );
+    if (!instagramResult.ok) {
+      logWarning(
+        `Brochure was not updated with ID: ${academyId}.`,
+        "invalid-instagram",
+        { name, instagram: parsedSocial.data.instagram },
+      );
+      return { ok: false, error: "invalid-instagram" };
+    }
+    nextInstagramHandle = instagramResult.instagramHandle;
+  }
+
+  const brochureFields = {
+    name,
+    phone: phoneResult.phone,
+    ...(nextWhatsapp !== undefined ? { whatsapp: nextWhatsapp } : {}),
+    ...(nextInstagramHandle !== undefined
+      ? { instagramHandle: nextInstagramHandle }
+      : {}),
+  };
   const brochureNotUpdated = (error: BrochureEditError): BrochureEditResult => {
     logWarning(
       `Brochure was not updated with ID: ${academyId}.`,
@@ -242,6 +359,31 @@ export async function updateBrochure(
     );
     return { ok: false, error };
   };
+
+  const parsedAppearance = brochureAppearanceInputSchema.safeParse({
+    ...(input.aboutLabel !== undefined
+      ? { aboutLabel: input.aboutLabel }
+      : {}),
+    ...(input.about !== undefined ? { about: input.about } : {}),
+    ...(input.logoStorageKey !== undefined
+      ? { logoStorageKey: input.logoStorageKey }
+      : {}),
+    ...(input.themeMode !== undefined ? { themeMode: input.themeMode } : {}),
+    ...(input.themeAccent !== undefined
+      ? { themeAccent: input.themeAccent }
+      : {}),
+  });
+  if (!parsedAppearance.success) {
+    return brochureNotUpdated("invalid-input");
+  }
+
+  let nextLogoKey: string | null | undefined;
+  if (input.logoStorageKey !== undefined) {
+    nextLogoKey = optionalText(input.logoStorageKey);
+    if (nextLogoKey && !isAcademyScopedStorageKey(nextLogoKey, academyId)) {
+      return brochureNotUpdated("invalid-storage-key");
+    }
+  }
 
   let imageKeys: string[] | undefined;
   if (input.imageStorageKeys) {
@@ -308,7 +450,13 @@ export async function updateBrochure(
   }
 
   const db = getDb();
-  const [existingImages, existingCoaches] = await Promise.all([
+  const [existingAcademy, existingImages, existingCoaches] = await Promise.all([
+    db
+      .select({ logoStorageKey: academies.logoStorageKey })
+      .from(academies)
+      .where(eq(academies.id, academyId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
     db
       .select({ storageKey: brochureImages.storageKey })
       .from(brochureImages)
@@ -319,14 +467,55 @@ export async function updateBrochure(
       .where(eq(coachProfiles.academyId, academyId)),
   ]);
 
+  if (!existingAcademy) {
+    return brochureNotUpdated("not-found");
+  }
+
+  const academyUpdate: {
+    name: string;
+    tagline: string | null;
+    location: string | null;
+    phone: string | null;
+    instagramHandle?: string | null;
+    whatsapp?: string | null;
+    aboutLabel?: string;
+    about?: string | null;
+    logoStorageKey?: string | null;
+    themeMode?: AcademyThemeMode;
+    themeAccent?: AcademyThemeAccent;
+  } = {
+    name,
+    tagline: optionalText(input.tagline),
+    location: optionalText(input.location),
+    phone: phoneResult.phone,
+  };
+  if (nextInstagramHandle !== undefined) {
+    academyUpdate.instagramHandle = nextInstagramHandle;
+  }
+  if (nextWhatsapp !== undefined) {
+    academyUpdate.whatsapp = nextWhatsapp;
+  }
+  if (parsedAppearance.data.aboutLabel !== undefined) {
+    academyUpdate.aboutLabel = resolveAboutLabel(
+      optionalText(parsedAppearance.data.aboutLabel),
+    );
+  }
+  if (parsedAppearance.data.about !== undefined) {
+    academyUpdate.about = optionalText(parsedAppearance.data.about);
+  }
+  if (nextLogoKey !== undefined) {
+    academyUpdate.logoStorageKey = nextLogoKey;
+  }
+  if (parsedAppearance.data.themeMode !== undefined) {
+    academyUpdate.themeMode = parsedAppearance.data.themeMode;
+  }
+  if (parsedAppearance.data.themeAccent !== undefined) {
+    academyUpdate.themeAccent = parsedAppearance.data.themeAccent;
+  }
+
   const updated = await db
     .update(academies)
-    .set({
-      name,
-      tagline: optionalText(input.tagline),
-      location: optionalText(input.location),
-      phone: phoneResult.phone,
-    })
+    .set(academyUpdate)
     .where(eq(academies.id, academyId))
     .returning({ id: academies.id });
 
@@ -354,6 +543,14 @@ export async function updateBrochure(
         .set({ blurb: optionalText(item.blurb) })
         .where(and(eq(batches.id, item.id), eq(batches.academyId, academyId)));
     }
+  }
+
+  if (
+    nextLogoKey !== undefined &&
+    existingAcademy.logoStorageKey &&
+    existingAcademy.logoStorageKey !== nextLogoKey
+  ) {
+    await deleteAcademyAsset(existingAcademy.logoStorageKey);
   }
 
   if (imageKeys) {
